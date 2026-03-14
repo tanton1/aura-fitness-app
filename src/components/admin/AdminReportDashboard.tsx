@@ -25,34 +25,9 @@ import {
 } from 'recharts';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Session, Trainer, StudentContract, Student } from '../../types';
-
-// --- Dữ liệu mẫu (Mock Data) ---
-const revenueData = [
-  { name: 'T2', total: 12000000 },
-  { name: 'T3', total: 18000000 },
-  { name: 'T4', total: 15000000 },
-  { name: 'T5', total: 25000000 },
-  { name: 'T6', total: 22000000 },
-  { name: 'T7', total: 30000000 },
-  { name: 'CN', total: 28000000 },
-];
-
-const packageData = [
-  { name: 'Gói 1 Tháng', value: 400 },
-  { name: 'Gói 3 Tháng', value: 300 },
-  { name: 'Gói 6 Tháng', value: 300 },
-  { name: 'Gói 1 Năm', value: 200 },
-];
+import { Session, Trainer, StudentContract, Student, PaymentRecord } from '../../types';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6'];
-
-const recentTransactions = [
-  { id: 'TRX-001', user: 'Nguyễn Văn A', package: 'Gói 3 Tháng', amount: '3,500,000đ', status: 'Thành công', date: 'Hôm nay, 14:30' },
-  { id: 'TRX-002', user: 'Trần Thị B', package: 'Gói 1 Tháng', amount: '1,200,000đ', status: 'Thành công', date: 'Hôm nay, 10:15' },
-  { id: 'TRX-003', user: 'Lê Văn C', package: 'Gói 1 Năm', amount: '10,000,000đ', status: 'Đang xử lý', date: 'Hôm qua, 16:45' },
-  { id: 'TRX-004', user: 'Phạm Thị D', package: 'Gói 6 Tháng', amount: '6,000,000đ', status: 'Thành công', date: 'Hôm qua, 09:20' },
-];
 
 export default function AdminReportDashboard() {
   const [timeRange, setTimeRange] = useState('7days');
@@ -60,6 +35,7 @@ export default function AdminReportDashboard() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [contracts, setContracts] = useState<StudentContract[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
 
   useEffect(() => {
     const docRef = doc(db, 'schedules', 'global_schedule');
@@ -70,6 +46,7 @@ export default function AdminReportDashboard() {
         setTrainers(data.trainers || []);
         setContracts(data.contracts || []);
         setStudents(data.students || []);
+        setPayments(data.payments || []);
       }
     });
     return () => unsub();
@@ -97,6 +74,36 @@ export default function AdminReportDashboard() {
     .map(c => ({
       name: students.find(s => s.id === c.studentId)?.name || 'Học viên ẩn',
       debt: c.totalPrice - c.paidAmount
+    }));
+
+  // Revenue Data (Last 7 days)
+  const revenueData = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const dateStr = d.toISOString().split('T')[0];
+    const total = payments
+      .filter(p => p.date.startsWith(dateStr))
+      .reduce((sum, p) => sum + p.amount, 0);
+    return { name: d.toLocaleDateString('vi-VN', { weekday: 'short' }), total };
+  });
+
+  // Package Distribution
+  const packageData = Object.entries(contracts.reduce((acc, c) => {
+    acc[c.packageName] = (acc[c.packageName] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>)).map(([name, value]) => ({ name, value }));
+
+  // Recent Transactions
+  const recentTransactions = payments
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5)
+    .map(p => ({
+      id: p.id,
+      user: students.find(s => s.id === p.studentId)?.name || 'Học viên ẩn',
+      package: contracts.find(c => c.id === p.contractId)?.packageName || 'N/A',
+      amount: p.amount.toLocaleString('vi-VN') + 'đ',
+      status: 'Thành công',
+      date: new Date(p.date).toLocaleString('vi-VN')
     }));
 
   return (
@@ -128,35 +135,35 @@ export default function AdminReportDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard 
           title="Tổng doanh thu" 
-          value="150.000.000đ" 
+          value={payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('vi-VN') + 'đ'}
           trend="+12.5%" 
           isPositive={true} 
           icon={<DollarSign className="w-5 h-5 text-emerald-500" />} 
         />
         <KPICard 
           title="Học viên mới" 
-          value="124" 
+          value={students.length.toString()} 
           trend="+8.2%" 
           isPositive={true} 
           icon={<Users className="w-5 h-5 text-indigo-500" />} 
         />
         <KPICard 
           title="Giao dịch" 
-          value="342" 
+          value={payments.length.toString()} 
           trend="-2.4%" 
           isPositive={false} 
           icon={<CreditCard className="w-5 h-5 text-rose-500" />} 
         />
         <KPICard 
-          title="Tỷ lệ gia hạn" 
-          value="68%" 
+          title="Hợp đồng active" 
+          value={contracts.filter(c => c.status === 'active').length.toString()} 
           trend="+4.1%" 
           isPositive={true} 
           icon={<Activity className="w-5 h-5 text-blue-500" />} 
         />
       </div>
 
-      {/* New Reports - PT & Debt (Moved up for visibility) */}
+      {/* New Reports - PT & Debt */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* PT Sessions */}
         <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-6">
