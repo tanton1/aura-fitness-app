@@ -24,6 +24,7 @@ export default function StudentManagement({ user, profile }: Props) {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -46,8 +47,10 @@ export default function StudentManagement({ user, profile }: Props) {
       (s.phone && s.phone.includes(searchTerm))
     );
 
-    // Filter by branch if profile has branchId
-    if (profile?.branchId && profile.role !== 'admin') {
+    // Filter by branch
+    if (selectedBranchId !== 'all') {
+      filtered = filtered.filter(s => s.branchId === selectedBranchId);
+    } else if (profile?.branchId && profile.role !== 'admin') {
       filtered = filtered.filter(s => s.branchId === profile.branchId);
     }
 
@@ -59,7 +62,7 @@ export default function StudentManagement({ user, profile }: Props) {
       });
     }
     return filtered;
-  }, [students, searchTerm, dateRange]);
+  }, [students, searchTerm, dateRange, selectedBranchId, profile]);
 
   useEffect(() => {
     if (user) {
@@ -100,17 +103,14 @@ export default function StudentManagement({ user, profile }: Props) {
 
   const handleSaveContract = async (newContract: StudentContract) => {
     try {
-      // Calculate commission if trainer is assigned
       if (newContract.trainerId) {
         const trainer = trainers.find(t => t.id === newContract.trainerId);
         if (trainer) {
           const commission = newContract.totalPrice * (trainer.commissionRate / 100);
           console.log(`Commission for ${trainer.name}: ${commission}`);
-          // In a real app, save this to a payroll record
         }
       }
 
-      // Update student status to active if it's not already
       const student = students.find(s => s.id === newContract.studentId);
       let updatedStudents = students;
       if (student && student.status !== 'active') {
@@ -148,7 +148,6 @@ export default function StudentManagement({ user, profile }: Props) {
     if (!formData.name) return;
     setError(null);
 
-    // Check for duplicates
     const isDuplicatePhone = students.some(s => 
       s.phone && formData.phone && s.phone === formData.phone && s.id !== editingStudent?.id
     );
@@ -182,7 +181,6 @@ export default function StudentManagement({ user, profile }: Props) {
       finalStudents = currentStudents.map(s => s.id === editingStudent.id ? sanitize({ ...s, ...formData }) as Student : s);
     } else {
       let studentId = Date.now().toString();
-      // Create Firebase Auth user
       if (formData.phone) {
         try {
           const email = formData.email || `${formData.phone}@aurafitness.com`;
@@ -199,7 +197,6 @@ export default function StudentManagement({ user, profile }: Props) {
           }
         } catch (e: any) {
           console.error("Error creating auth user:", e);
-          // Continue even if auth creation fails (e.g., user already exists)
         }
       }
 
@@ -216,7 +213,6 @@ export default function StudentManagement({ user, profile }: Props) {
         branchId: formData.branchId || profile?.branchId || '',
       };
       
-      // Re-fetch current students from state to be safe after awaits
       finalStudents = [...students, newStudent];
     }
 
@@ -276,6 +272,14 @@ export default function StudentManagement({ user, profile }: Props) {
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-pink-500"
             />
           </div>
+          <select 
+            value={selectedBranchId}
+            onChange={(e) => setSelectedBranchId(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-3 rounded-xl focus:outline-none focus:border-pink-500"
+          >
+            <option value="all">Tất cả chi nhánh</option>
+            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
           <button
             onClick={() => {
               setEditingStudent(null);

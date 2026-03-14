@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
-  TrendingUp, 
   Users, 
-  CreditCard, 
-  Activity,
   ArrowUpRight,
   ArrowDownRight,
   Calendar,
   DollarSign,
-  User as UserIcon
+  Building2
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -25,17 +22,19 @@ import {
 } from 'recharts';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Session, Trainer, StudentContract, Student, PaymentRecord } from '../../types';
+import { Session, Trainer, StudentContract, Student, PaymentRecord, Branch } from '../../types';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6'];
 
 export default function AdminReportDashboard() {
   const [timeRange, setTimeRange] = useState('7days');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
   const [sessions, setSessions] = useState<Session[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [contracts, setContracts] = useState<StudentContract[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
   useEffect(() => {
     const docRef = doc(db, 'schedules', 'global_schedule');
@@ -47,32 +46,46 @@ export default function AdminReportDashboard() {
         setContracts(data.contracts || []);
         setStudents(data.students || []);
         setPayments(data.payments || []);
+        setBranches(data.branches || []);
       }
     });
     return () => unsub();
   }, []);
 
+  // Filter data by branch
+  const filterByBranch = <T extends { branchId?: string }>(items: T[]) => 
+    selectedBranchId === 'all' ? items : items.filter(item => item.branchId === selectedBranchId);
+
+  const filteredSessions = filterByBranch(sessions);
+  const filteredTrainers = selectedBranchId === 'all' ? trainers : trainers.filter(t => t.branchId === selectedBranchId);
+  const filteredContracts = filterByBranch(contracts);
+  const filteredStudents = filterByBranch(students);
+  const filteredPayments = payments.filter(p => {
+    const contract = contracts.find(c => c.id === p.contractId);
+    return selectedBranchId === 'all' || contract?.branchId === selectedBranchId;
+  });
+
   // PT Sessions Report
-  const ptSessions = trainers.map(t => ({
+  const ptSessions = filteredTrainers.map(t => ({
     name: t.name,
-    count: sessions.filter(s => s.trainerId === t.id && s.status === 'completed' && s.verifiedByStudent).length
+    count: filteredSessions.filter(s => s.trainerId === t.id && s.status === 'completed' && s.verifiedByStudent).length
   }));
 
   // PT Commission Report
-  const ptCommissions = trainers.map(t => {
-    const completedSessions = sessions.filter(s => s.trainerId === t.id && s.status === 'completed' && s.verifiedByStudent);
+  const ptCommissions = filteredTrainers.map(t => {
+    const completedSessions = filteredSessions.filter(s => s.trainerId === t.id && s.status === 'completed' && s.verifiedByStudent);
     const sessionComm = completedSessions.length * (t.commissionPerSession || 0);
-    const referralContracts = contracts.filter(c => c.referralCode === t.employeeCode);
+    const referralContracts = filteredContracts.filter(c => c.referralCode === t.employeeCode);
     const referralComm = referralContracts.reduce((s, c) => s + (c.referralCommission || 0), 0);
     return { name: t.name, total: sessionComm + referralComm };
   });
 
   // Customer Debt Report
-  const totalDebt = contracts.reduce((sum, c) => sum + (c.totalPrice - c.paidAmount), 0);
-  const debtList = contracts
+  const totalDebt = filteredContracts.reduce((sum, c) => sum + (c.totalPrice - c.paidAmount), 0);
+  const debtList = filteredContracts
     .filter(c => c.totalPrice > c.paidAmount)
     .map(c => ({
-      name: students.find(s => s.id === c.studentId)?.name || 'Học viên ẩn',
+      name: filteredStudents.find(s => s.id === c.studentId)?.name || 'Học viên ẩn',
       debt: c.totalPrice - c.paidAmount
     }));
 
@@ -81,26 +94,26 @@ export default function AdminReportDashboard() {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
     const dateStr = d.toISOString().split('T')[0];
-    const total = payments
+    const total = filteredPayments
       .filter(p => p.date.startsWith(dateStr))
       .reduce((sum, p) => sum + p.amount, 0);
     return { name: d.toLocaleDateString('vi-VN', { weekday: 'short' }), total };
   });
 
   // Package Distribution
-  const packageData = Object.entries(contracts.reduce((acc, c) => {
+  const packageData = Object.entries(filteredContracts.reduce((acc, c) => {
     acc[c.packageName] = (acc[c.packageName] || 0) + 1;
     return acc;
   }, {} as Record<string, number>)).map(([name, value]) => ({ name, value }));
 
   // Recent Transactions
-  const recentTransactions = payments
+  const recentTransactions = filteredPayments
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5)
     .map(p => ({
       id: p.id,
-      user: students.find(s => s.id === p.studentId)?.name || 'Học viên ẩn',
-      package: contracts.find(c => c.id === p.contractId)?.packageName || 'N/A',
+      user: filteredStudents.find(s => s.id === p.studentId)?.name || 'Học viên ẩn',
+      package: filteredContracts.find(c => c.id === p.contractId)?.packageName || 'N/A',
       amount: p.amount.toLocaleString('vi-VN') + 'đ',
       status: 'Thành công',
       date: new Date(p.date).toLocaleString('vi-VN')
@@ -115,6 +128,14 @@ export default function AdminReportDashboard() {
           <p className="text-zinc-400 text-sm mt-1">Theo dõi hiệu suất kinh doanh và hoạt động của phòng tập.</p>
         </div>
         <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
+          <select 
+            value={selectedBranchId}
+            onChange={(e) => setSelectedBranchId(e.target.value)}
+            className="bg-transparent text-zinc-300 text-xs font-medium px-2 py-1.5 rounded-md focus:outline-none"
+          >
+            <option value="all">Tất cả chi nhánh</option>
+            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
           {['7days', '30days', 'year'].map((range) => (
             <button
               key={range}
@@ -132,34 +153,20 @@ export default function AdminReportDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <KPICard 
           title="Tổng doanh thu" 
-          value={payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('vi-VN') + 'đ'}
+          value={filteredPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('vi-VN') + 'đ'}
           trend="+12.5%" 
           isPositive={true} 
           icon={<DollarSign className="w-5 h-5 text-emerald-500" />} 
         />
         <KPICard 
           title="Học viên mới" 
-          value={students.length.toString()} 
+          value={filteredStudents.length.toString()} 
           trend="+8.2%" 
           isPositive={true} 
           icon={<Users className="w-5 h-5 text-indigo-500" />} 
-        />
-        <KPICard 
-          title="Giao dịch" 
-          value={payments.length.toString()} 
-          trend="-2.4%" 
-          isPositive={false} 
-          icon={<CreditCard className="w-5 h-5 text-rose-500" />} 
-        />
-        <KPICard 
-          title="Hợp đồng active" 
-          value={contracts.filter(c => c.status === 'active').length.toString()} 
-          trend="+4.1%" 
-          isPositive={true} 
-          icon={<Activity className="w-5 h-5 text-blue-500" />} 
         />
       </div>
 

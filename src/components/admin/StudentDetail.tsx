@@ -3,6 +3,7 @@ import { Student, StudentContract, TrainingPackage, Installment, Trainer, Branch
 import { ArrowLeft, CheckCircle, Plus, Activity, History, FileText, CreditCard, Calendar as CalendarIcon, AlertCircle, TrendingUp, Package, ClipboardCheck, Droplets, Moon, Smile, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ContractInvoice from './ContractInvoice';
+import EditContractModal from './EditContractModal';
 import StudentProgressAdmin from './StudentProgressAdmin';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
@@ -30,6 +31,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   const [installmentCount, setInstallmentCount] = useState(1);
   const [installments, setInstallments] = useState<{date: string, amount: number}[]>([]);
   const [viewingContract, setViewingContract] = useState<StudentContract | null>(null);
+  const [editingContract, setEditingContract] = useState<StudentContract | null>(null);
   const [isManagingDebt, setIsManagingDebt] = useState(false);
   const [payingInstallmentId, setPayingInstallmentId] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState('');
@@ -376,14 +378,24 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
             <Activity className="w-5 h-5 text-pink-500" />
             Gói tập hiện tại
           </h3>
-          {activeContract && (
-            <button 
-              onClick={() => setViewingContract(activeContract)}
-              className="text-xs font-medium text-pink-500 hover:text-pink-400 flex items-center gap-1 bg-pink-500/10 px-2 py-1 rounded-lg"
-            >
-              <FileText className="w-3 h-3" /> Xem HĐ
-            </button>
-          )}
+          <div className="flex gap-2">
+            {activeContract && (
+              <button 
+                onClick={() => setViewingContract(activeContract)}
+                className="text-xs font-medium text-pink-500 hover:text-pink-400 flex items-center gap-1 bg-pink-500/10 px-2 py-1 rounded-lg"
+              >
+                <FileText className="w-3 h-3" /> Xem HĐ
+              </button>
+            )}
+            {activeContract && (
+              <button 
+                onClick={() => setEditingContract(activeContract)}
+                className="text-xs font-medium text-amber-500 hover:text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-lg"
+              >
+                Chỉnh sửa
+              </button>
+            )}
+          </div>
         </div>
         
         {activeContract ? (
@@ -729,6 +741,19 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
             student={student}
             contract={viewingContract}
             onClose={() => setViewingContract(null)}
+          />
+        )}
+        {editingContract && (
+          <EditContractModal
+            contract={editingContract}
+            packages={packages}
+            trainers={trainers}
+            branches={branches}
+            onClose={() => setEditingContract(null)}
+            onSave={(updatedContract) => {
+              onUpdateContract(updatedContract);
+              setEditingContract(null);
+            }}
           />
         )}
       </AnimatePresence>
