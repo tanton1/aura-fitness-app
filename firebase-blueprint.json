@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "trainer", "staff"] },
+        "branchId": { "type": "string" },
+        "employeeCode": { "type": "string" }
+      },
+      "required": ["name", "role"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Global schedule information",
+      "type": "object",
+      "properties": {
+        "trainers": { "type": "array" },
+        "branches": { "type": "array" },
+        "staff": { "type": "array" },
+        "students": { "type": "array" },
+        "contracts": { "type": "array" },
+        "packages": { "type": "array" },
+        "sessions": { "type": "array" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profiles"
+    },
+    "/schedules/global_schedule": {
+      "schema": { "$ref": "Schedule" },
+      "description": "Global schedule data"
+    },
+    "/dailyCheckins/{checkinId}": {
+      "schema": {
+        "title": "DailyCheckin",
+        "type": "object",
+        "properties": {
+          "studentId": { "type": "string" },
+          "date": { "type": "string" },
+          "hunger": { "type": "number" },
+          "energy": { "type": "number" },
+          "compliance": { "type": "number" },
+          "note": { "type": "string" }
+        }
+      },
+      "description": "Daily student check-ins"
+    }
+  }
+}
