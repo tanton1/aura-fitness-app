@@ -167,7 +167,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           studentId: entry.studentId,
           date: dateStr,
           status: 'scheduled',
-          branchId: contract?.branchId || trainers.find(t => t.id === entry.trainerId)?.branchId,
+          branchId: contract?.branchId || trainers.find(t => t.id === entry.trainerId)?.branchId || null,
           verifiedByStudent: false
         });
       });

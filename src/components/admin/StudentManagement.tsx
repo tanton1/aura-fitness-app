@@ -102,7 +102,7 @@ export default function StudentManagement({ user, profile }: Props) {
   const saveToFirebase = async (newStudents: Student[]) => {
     if (user) {
       try {
-        await setDoc(doc(db, 'schedules', 'global_schedule'), { students: newStudents }, { merge: true });
+        await setDoc(doc(db, 'schedules', 'global_schedule'), { students: JSON.parse(JSON.stringify(newStudents)) }, { merge: true });
       } catch (e) {
         console.error("Error saving students:", e);
         setAlertMessage("Lỗi lưu dữ liệu học viên: " + (e as Error).message);

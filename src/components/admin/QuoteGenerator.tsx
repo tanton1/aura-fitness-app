@@ -181,9 +181,9 @@ export default function QuoteGenerator({ user }: Props) {
     if (user) {
       try {
         await setDoc(doc(db, 'schedules', 'global_schedule'), { 
-          quotes: newQuotes,
-          students: newStudents,
-          contracts: newContracts
+          quotes: JSON.parse(JSON.stringify(newQuotes)),
+          students: JSON.parse(JSON.stringify(newStudents)),
+          contracts: JSON.parse(JSON.stringify(newContracts))
         }, { merge: true });
         alert('Đã chốt sale thành công! Học viên và hợp đồng đã được tạo.');
       } catch (e) {

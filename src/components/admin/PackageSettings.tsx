@@ -69,7 +69,7 @@ export default function PackageSettings({ user }: Props) {
         totalSessions: formData.totalSessions,
         price: formData.price,
         durationMonths: formData.durationMonths || 1,
-        branchId: formData.branchId || undefined,
+        branchId: formData.branchId || null,
       };
       newPackages.push(newPkg);
     }

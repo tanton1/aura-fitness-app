@@ -204,8 +204,8 @@ export default function FinanceManagement({ user, profile }: Props) {
     if (user) {
       try {
         await setDoc(doc(db, 'schedules', 'global_schedule'), { 
-          contracts: newContracts,
-          payments: newPayments
+          contracts: JSON.parse(JSON.stringify(newContracts)),
+          payments: JSON.parse(JSON.stringify(newPayments))
         }, { merge: true });
       } catch (e) {
         console.error("Error saving payment:", e);

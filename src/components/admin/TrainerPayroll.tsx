@@ -141,7 +141,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
     const newSessions = sessions.map(s => s.id === editingSession.id ? updatedSession : s);
     
     try {
-      await setDoc(doc(db, 'schedules', 'global_schedule'), { sessions: newSessions }, { merge: true });
+      await setDoc(doc(db, 'schedules', 'global_schedule'), { sessions: JSON.parse(JSON.stringify(newSessions)) }, { merge: true });
       setEditingSession(null);
     } catch (e) {
       alert('Lỗi khi lưu: ' + (e as Error).message);

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Student, Trainer, Schedule, DAYS, HOURS, ScheduleEntry } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, User, Clock, Info, Download, X, Lock, Unlock, Plus, Trash2 } from 'lucide-react';
+import { Calendar, User, Clock, Info, Download, X, Lock, Unlock, Plus, Trash2, Search } from 'lucide-react';
 import { getDatesForCurrentWeek, getDatesForWeek } from '../utils/dateUtils';
 import * as XLSX from 'xlsx';
 
@@ -23,6 +23,7 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
   const [editingSlot, setEditingSlot] = useState<{ id: string, day: string, hour: number } | null>(null);
   const [slotStudents, setSlotStudents] = useState<{ id: string, isLocked: boolean }[]>([]);
   const [newStudentId, setNewStudentId] = useState<string>('');
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
   
   const currentWeekDates = useMemo(() => getDatesForWeek(weekOffset), [weekOffset]);
 
@@ -61,6 +62,7 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
     setSlotStudents(trainerEntries.map(e => ({ id: e.studentId, isLocked: !!e.isLocked })));
     setEditingSlot({ id: slotId, day, hour });
     setNewStudentId('');
+    setStudentSearchTerm('');
   };
 
   const handleSaveSlot = () => {
@@ -378,29 +380,53 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                 </div>
 
                 {slotStudents.length < 2 && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <label className="block text-sm font-medium text-zinc-400">Thêm học viên</label>
-                    <div className="flex gap-2">
-                      <select
-                        value={newStudentId}
-                        onChange={(e) => setNewStudentId(e.target.value)}
-                        className="flex-1 bg-zinc-950 border border-zinc-800 text-white px-3 py-2 rounded-xl outline-none focus:border-pink-500"
-                      >
-                        <option value="">-- Chọn học viên --</option>
-                        {students
-                          .filter(s => !slotStudents.some(ss => ss.id === s.id))
-                          .map(s => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))
-                        }
-                      </select>
-                      <button
-                        onClick={handleAddStudentToSlot}
-                        disabled={!newStudentId}
-                        className="bg-zinc-800 text-white px-3 py-2 rounded-xl hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <Plus className="w-5 h-5" />
-                      </button>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm tên hoặc SĐT..."
+                        value={studentSearchTerm}
+                        onChange={(e) => setStudentSearchTerm(e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 text-white pl-10 pr-4 py-2 rounded-xl outline-none focus:border-pink-500"
+                      />
+                    </div>
+                    
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-xl max-h-48 overflow-y-auto custom-scrollbar">
+                      {students
+                        .filter(s => !slotStudents.some(ss => ss.id === s.id))
+                        .filter(s => 
+                          !studentSearchTerm || 
+                          s.name.toLowerCase().includes(studentSearchTerm.toLowerCase()) || 
+                          (s.phone && s.phone.includes(studentSearchTerm))
+                        )
+                        .map(s => (
+                          <div 
+                            key={s.id} 
+                            className="flex items-center justify-between p-3 hover:bg-zinc-800 border-b border-zinc-800/50 last:border-0 transition-colors"
+                          >
+                            <div>
+                              <div className="font-medium text-zinc-200">{s.name}</div>
+                              {s.phone && <div className="text-xs text-zinc-500">{s.phone}</div>}
+                            </div>
+                            <button
+                              onClick={() => {
+                                setSlotStudents([...slotStudents, { id: s.id, isLocked: true }]);
+                                setStudentSearchTerm('');
+                              }}
+                              className="p-1.5 bg-pink-500/10 text-pink-500 rounded-lg hover:bg-pink-500 hover:text-white transition-colors"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))
+                      }
+                      {students.filter(s => !slotStudents.some(ss => ss.id === s.id)).filter(s => !studentSearchTerm || s.name.toLowerCase().includes(studentSearchTerm.toLowerCase()) || (s.phone && s.phone.includes(studentSearchTerm))).length === 0 && (
+                        <div className="p-4 text-center text-zinc-500 text-sm">
+                          Không tìm thấy học viên
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
