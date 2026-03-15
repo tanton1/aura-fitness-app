@@ -157,7 +157,7 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
           </AnimatePresence>
         </div>
         
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex gap-2 w-full md:w-auto shrink-0">
           {!currentTrainerId && (
             <div className="relative w-full md:w-64 shrink-0">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -179,7 +179,7 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
           )}
           <button
             onClick={handleExportExcel}
-            className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-emerald-500 transition-all flex items-center gap-2 shadow-sm"
+            className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-emerald-500 transition-all flex items-center gap-2 shadow-sm shrink-0"
           >
             <Download className="w-4 h-4" /> Xuất Excel
           </button>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Student, StudentContract, PaymentRecord, Installment, UserProfile } from '../../types';
+import { Student, StudentContract, PaymentRecord, Installment, UserProfile, Branch } from '../../types';
 import { User } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -13,6 +13,8 @@ interface Props {
 }
 
 export default function FinanceManagement({ user, profile }: Props) {
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
   const [contracts, setContracts] = useState<StudentContract[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
@@ -26,6 +28,23 @@ export default function FinanceManagement({ user, profile }: Props) {
   const [installments, setInstallments] = useState<{date: string, amount: number}[]>([]);
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      const docRef = doc(db, 'schedules', 'global_schedule');
+      const unsub = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setContracts(data.contracts || []);
+          setStudents(data.students || []);
+          setPayments(data.payments || []);
+          setSessions(data.sessions || []);
+          setBranches(data.branches || []);
+        }
+      });
+      return () => unsub();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!selectedContract || !isPaying) {
@@ -52,11 +71,15 @@ export default function FinanceManagement({ user, profile }: Props) {
   };
 
   const filteredContracts = useMemo(() => {
+    let filtered = contracts;
     if (profile?.branchId && profile.role !== 'admin') {
-      return contracts.filter(c => c.branchId === profile.branchId);
+      filtered = filtered.filter(c => c.branchId === profile.branchId);
     }
-    return contracts;
-  }, [contracts, profile]);
+    if (selectedBranchId !== 'all') {
+      filtered = filtered.filter(c => selectedBranchId === 'none' ? !c.branchId : c.branchId === selectedBranchId);
+    }
+    return filtered;
+  }, [contracts, profile, selectedBranchId]);
 
   const filteredPayments = useMemo(() => {
     // Generate missing payments from contracts
@@ -86,6 +109,13 @@ export default function FinanceManagement({ user, profile }: Props) {
         return contract?.branchId === profile.branchId;
       });
     }
+    if (selectedBranchId !== 'all') {
+      filtered = filtered.filter(p => {
+        const contract = contracts.find(c => c.id === p.contractId);
+        const branchId = contract?.branchId;
+        return selectedBranchId === 'none' ? !branchId : branchId === selectedBranchId;
+      });
+    }
     if (dateRange) {
       filtered = filtered.filter(p => {
         const pDate = new Date(p.date);
@@ -93,27 +123,15 @@ export default function FinanceManagement({ user, profile }: Props) {
       });
     }
     return filtered;
-  }, [payments, contracts, dateRange, profile]);
-
-  useEffect(() => {
-    if (user) {
-      const docRef = doc(db, 'schedules', 'global_schedule');
-      const unsub = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setContracts(data.contracts || []);
-          setStudents(data.students || []);
-          setPayments(data.payments || []);
-          setSessions(data.sessions || []);
-        }
-      });
-      return () => unsub();
-    }
-  }, [user]);
+  }, [payments, contracts, dateRange, profile, selectedBranchId]);
 
   const totalRevenue = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalDebt = filteredContracts.reduce((sum, c) => sum + (c.totalPrice - c.paidAmount), 0);
+  const totalDebt = filteredContracts.reduce((sum, c) => {
+    const debt = c.totalPrice - c.paidAmount;
+    return debt > 0 ? sum + debt : sum;
+  }, 0);
   const contractsWithDebt = filteredContracts.filter(c => c.totalPrice > c.paidAmount);
+  const contractsOverpaid = filteredContracts.filter(c => c.paidAmount > c.totalPrice);
 
   const confirmCleanup = async () => {
     setShowCleanupConfirm(false);
@@ -245,6 +263,15 @@ export default function FinanceManagement({ user, profile }: Props) {
 
       <div className="flex justify-between items-center">
         <DateRangeFilter onFilter={(start, end) => setDateRange({ start, end })} />
+        <select 
+          value={selectedBranchId}
+          onChange={(e) => setSelectedBranchId(e.target.value)}
+          className="bg-zinc-900 text-zinc-300 text-sm font-medium px-4 py-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-pink-500"
+        >
+          <option value="all">Tất cả chi nhánh</option>
+          <option value="none">Chưa phân chi nhánh</option>
+          {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
       </div>
       
       {/* Overview Cards */}
@@ -342,6 +369,27 @@ export default function FinanceManagement({ user, profile }: Props) {
           )}
         </div>
       </div>
+
+      {/* Overpaid Contracts List */}
+      {contractsOverpaid.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-500" />
+            Hợp đồng thanh toán dư
+          </h3>
+          <div className="space-y-3">
+            {contractsOverpaid.map(contract => (
+              <div key={contract.id} className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex justify-between items-center">
+                <div>
+                  <h4 className="text-white font-medium">{getStudentName(contract.studentId)}</h4>
+                  <p className="text-xs text-zinc-500 mt-1">{contract.packageName}</p>
+                </div>
+                <p className="text-sm font-bold text-amber-400">Dư: {(contract.paidAmount - contract.totalPrice).toLocaleString('vi-VN')}đ</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Payment History Modal */}
       <AnimatePresence>

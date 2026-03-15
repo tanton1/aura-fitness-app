@@ -85,52 +85,76 @@ export default function AdminReportDashboard() {
     }
   });
 
+  const { currentStartDate, previousStartDate, previousEndDate } = useMemo(() => {
+    const now = new Date();
+    let currentStart = new Date(now);
+    let prevStart = new Date(now);
+    let prevEnd = new Date(now);
+
+    if (timeRange === '7days') {
+      currentStart.setDate(now.getDate() - 7);
+      prevEnd = new Date(currentStart);
+      prevStart.setDate(prevEnd.getDate() - 7);
+    } else if (timeRange === '30days') {
+      currentStart.setDate(now.getDate() - 30);
+      prevEnd = new Date(currentStart);
+      prevStart.setDate(prevEnd.getDate() - 30);
+    } else if (timeRange === 'year') {
+      currentStart = new Date(now.getFullYear(), 0, 1);
+      prevEnd = new Date(now.getFullYear(), 0, 1);
+      prevEnd.setMilliseconds(-1);
+      prevStart = new Date(now.getFullYear() - 1, 0, 1);
+    }
+    return { currentStartDate: currentStart, previousStartDate: prevStart, previousEndDate: prevEnd };
+  }, [timeRange]);
+
   const filteredPayments = allPayments.filter(p => {
     const contract = contracts.find(c => c.id === p.contractId);
     const branchId = contract?.branchId || undefined;
-    
-    // Debug log
-    if (!branchId) {
-      console.log("Payment with undefined branch:", p, "Contract:", contract);
-    }
-    
     const selectedId = selectedBranchId === 'none' ? undefined : selectedBranchId;
     const inBranch = selectedBranchId === 'all' || branchId === selectedId;
-    
-    // Filter by timeRange
-    const pDate = new Date(p.date);
-    const now = new Date();
-    let inTimeRange = true;
-    if (timeRange === '7days') {
-      const sevenDaysAgo = new Date(now.setDate(now.getDate() - 7));
-      inTimeRange = pDate >= sevenDaysAgo;
-    } else if (timeRange === '30days') {
-      const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
-      inTimeRange = pDate >= thirtyDaysAgo;
-    } else if (timeRange === 'year') {
-      const startOfYear = new Date(now.getFullYear(), 0, 1);
-      inTimeRange = pDate >= startOfYear;
-    }
 
-    return inBranch && inTimeRange;
+    const pDate = new Date(p.date);
+    return inBranch && pDate >= currentStartDate;
   });
 
   const filteredStudentsForKPI = filteredStudents.filter(s => {
     if (!s.joinDate) return false;
     const sDate = new Date(s.joinDate);
-    const now = new Date();
-    if (timeRange === '7days') {
-      const sevenDaysAgo = new Date(now.setDate(now.getDate() - 7));
-      return sDate >= sevenDaysAgo;
-    } else if (timeRange === '30days') {
-      const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
-      return sDate >= thirtyDaysAgo;
-    } else if (timeRange === 'year') {
-      const startOfYear = new Date(now.getFullYear(), 0, 1);
-      return sDate >= startOfYear;
-    }
-    return true;
+    return sDate >= currentStartDate;
   });
+
+  const previousPayments = allPayments.filter(p => {
+    const contract = contracts.find(c => c.id === p.contractId);
+    const branchId = contract?.branchId || undefined;
+    const selectedId = selectedBranchId === 'none' ? undefined : selectedBranchId;
+    const inBranch = selectedBranchId === 'all' || branchId === selectedId;
+
+    const pDate = new Date(p.date);
+    return inBranch && pDate >= previousStartDate && pDate < previousEndDate;
+  });
+
+  const previousStudents = filteredStudents.filter(s => {
+    if (!s.joinDate) return false;
+    const sDate = new Date(s.joinDate);
+    return sDate >= previousStartDate && sDate < previousEndDate;
+  });
+
+  const currentRevenue = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+  const previousRevenue = previousPayments.reduce((sum, p) => sum + p.amount, 0);
+  
+  const calculateGrowth = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  const revenueGrowth = calculateGrowth(currentRevenue, previousRevenue);
+  const studentsGrowth = calculateGrowth(filteredStudentsForKPI.length, previousStudents.length);
+
+  const formatTrend = (growth: number) => {
+    const sign = growth > 0 ? '+' : '';
+    return `${sign}${growth.toFixed(1)}%`;
+  };
 
   useEffect(() => {
     console.log("Payments data:", payments);
@@ -145,11 +169,7 @@ export default function AdminReportDashboard() {
     const sessionsInTimeRange = filteredSessions.filter(s => {
       if (s.trainerId !== t.id || s.status !== 'completed' || !s.verifiedByStudent) return false;
       const sDate = new Date(s.date);
-      const now = new Date();
-      if (timeRange === '7days') return sDate >= new Date(now.setDate(now.getDate() - 7));
-      if (timeRange === '30days') return sDate >= new Date(now.setDate(now.getDate() - 30));
-      if (timeRange === 'year') return sDate >= new Date(now.getFullYear(), 0, 1);
-      return true;
+      return sDate >= currentStartDate;
     });
     return { name: t.name, count: sessionsInTimeRange.length };
   });
@@ -159,22 +179,14 @@ export default function AdminReportDashboard() {
     const sessionsInTimeRange = filteredSessions.filter(s => {
       if (s.trainerId !== t.id || s.status !== 'completed' || !s.verifiedByStudent) return false;
       const sDate = new Date(s.date);
-      const now = new Date();
-      if (timeRange === '7days') return sDate >= new Date(now.setDate(now.getDate() - 7));
-      if (timeRange === '30days') return sDate >= new Date(now.setDate(now.getDate() - 30));
-      if (timeRange === 'year') return sDate >= new Date(now.getFullYear(), 0, 1);
-      return true;
+      return sDate >= currentStartDate;
     });
     const sessionComm = sessionsInTimeRange.length * (t.commissionPerSession || 0);
     
     const referralContractsInTimeRange = filteredContracts.filter(c => {
       if (c.referralCode !== t.employeeCode) return false;
       const cDate = new Date(c.startDate || new Date());
-      const now = new Date();
-      if (timeRange === '7days') return cDate >= new Date(now.setDate(now.getDate() - 7));
-      if (timeRange === '30days') return cDate >= new Date(now.setDate(now.getDate() - 30));
-      if (timeRange === 'year') return cDate >= new Date(now.getFullYear(), 0, 1);
-      return true;
+      return cDate >= currentStartDate;
     });
     const referralComm = referralContractsInTimeRange.reduce((s, c) => s + (c.referralCommission || 0), 0);
     
@@ -182,7 +194,10 @@ export default function AdminReportDashboard() {
   });
 
   // Customer Debt Report
-  const totalDebt = filteredContracts.reduce((sum, c) => sum + (c.totalPrice - c.paidAmount), 0);
+  const totalDebt = filteredContracts.reduce((sum, c) => {
+    const debt = c.totalPrice - c.paidAmount;
+    return debt > 0 ? sum + debt : sum;
+  }, 0);
   const debtList = filteredContracts
     .filter(c => c.totalPrice > c.paidAmount)
     .map(c => ({
@@ -222,11 +237,7 @@ export default function AdminReportDashboard() {
   // Package Distribution
   const packageData = Object.entries(filteredContracts.filter(c => {
     const cDate = new Date(c.startDate || new Date());
-    const now = new Date();
-    if (timeRange === '7days') return cDate >= new Date(now.setDate(now.getDate() - 7));
-    if (timeRange === '30days') return cDate >= new Date(now.setDate(now.getDate() - 30));
-    if (timeRange === 'year') return cDate >= new Date(now.getFullYear(), 0, 1);
-    return true;
+    return cDate >= currentStartDate;
   }).reduce((acc, c) => {
     acc[c.packageName] = (acc[c.packageName] || 0) + 1;
     return acc;
@@ -249,9 +260,11 @@ export default function AdminReportDashboard() {
     <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Tổng quan báo cáo</h1>
-          <p className="text-zinc-400 text-sm mt-1">Theo dõi hiệu suất kinh doanh và hoạt động của phòng tập.</p>
+        <div className="mb-4 sm:mb-0">
+          <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
+            Tổng quan báo cáo
+          </h1>
+          <p className="text-zinc-400 text-sm mt-3">Theo dõi hiệu suất kinh doanh và hoạt động của phòng tập.</p>
         </div>
         <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
           <button
@@ -303,16 +316,16 @@ export default function AdminReportDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <KPICard 
               title="Tổng doanh thu" 
-              value={filteredPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('vi-VN') + 'đ'}
-              trend="+12.5%" 
-              isPositive={true} 
+              value={currentRevenue.toLocaleString('vi-VN') + 'đ'}
+              trend={formatTrend(revenueGrowth)} 
+              isPositive={revenueGrowth >= 0} 
               icon={<DollarSign className="w-5 h-5 text-emerald-500" />} 
             />
             <KPICard 
               title="Học viên mới" 
               value={filteredStudentsForKPI.length.toString()} 
-              trend="+8.2%" 
-              isPositive={true} 
+              trend={formatTrend(studentsGrowth)} 
+              isPositive={studentsGrowth >= 0} 
               icon={<Users className="w-5 h-5 text-indigo-500" />} 
             />
           </div>
