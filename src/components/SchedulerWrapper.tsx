@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Student, Trainer, Schedule, Warning, UserProfile, DAYS, HOURS, StudentContract, Session, ScheduleEntry } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Student, Trainer, Schedule, Warning, UserProfile, DAYS, HOURS, StudentContract, Session, ScheduleEntry, Branch } from '../types';
 import { generateSchedule } from '../utils/scheduler';
 import StudentForm from './StudentForm';
 import StudentList from './StudentList';
@@ -19,6 +19,7 @@ interface Props {
 export default function SchedulerWrapper({ user, profile }: Props) {
   const [students, setStudents] = useState<Student[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [contracts, setContracts] = useState<StudentContract[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [schedule, setSchedule] = useState<Schedule>({});
@@ -29,6 +30,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const [studentTab, setStudentTab] = useState<'overview' | 'schedule' | 'profile'>('overview');
   const [weekOffset, setWeekOffset] = useState(0);
   const [studentSessionFilter, setStudentSessionFilter] = useState<'upcoming' | 'history' | 'this_week'>('upcoming');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
 
   const isAdmin = profile?.role === 'admin';
   const isTrainer = profile?.role === 'trainer';
@@ -61,6 +63,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           });
           
           setTrainers(Array.from(allTrainersMap.values()));
+          setBranches(data.branches || []);
           setContracts(data.contracts || []);
           setSessions(data.sessions || []);
           setSchedule(data.schedule || {});
@@ -76,6 +79,12 @@ export default function SchedulerWrapper({ user, profile }: Props) {
       setIsLoaded(true);
     }
   }, [user]);
+
+  const filteredStudents = useMemo(() => {
+    if (selectedBranchId === 'all') return students;
+    if (selectedBranchId === 'none') return students.filter(s => !s.branchId || s.branchId === '');
+    return students.filter(s => s.branchId === selectedBranchId);
+  }, [students, selectedBranchId]);
 
   const saveToFirebase = async (newStudents: Student[], newTrainers: Trainer[], newSchedule: Schedule, newWarnings: Warning[]) => {
     if (user) {
@@ -299,8 +308,20 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                 />
               )}
 
+              <div className="mb-4">
+                <select 
+                  value={selectedBranchId}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                  className="bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-2 rounded-xl focus:outline-none focus:border-pink-500"
+                >
+                  <option value="all">Tất cả chi nhánh</option>
+                  <option value="none">Chưa xác định</option>
+                  {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+
               <StudentList 
-                students={students} 
+                students={filteredStudents} 
                 schedule={schedule} 
                 warnings={warnings}
                 onEdit={setEditingStudent}
