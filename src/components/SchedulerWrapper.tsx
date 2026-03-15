@@ -4,7 +4,7 @@ import { generateSchedule } from '../utils/scheduler';
 import StudentForm from './StudentForm';
 import StudentList from './StudentList';
 import PTSchedule from './PTSchedule';
-import { Calendar, Users, UserPlus, CheckCircle2, Package, User as UserIcon, Phone, Mail, MapPin, CheckCircle, ChevronRight, CreditCard, Clock, XCircle } from 'lucide-react';
+import { Calendar, Users, UserPlus, CheckCircle2, Package, User as UserIcon, Phone, Mail, MapPin, CheckCircle, ChevronRight, CreditCard, Clock, XCircle, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';
 import { doc, setDoc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
@@ -31,6 +31,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [studentSessionFilter, setStudentSessionFilter] = useState<'upcoming' | 'history' | 'this_week'>('upcoming');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const isAdmin = profile?.role === 'admin';
   const isTrainer = profile?.role === 'trainer';
@@ -81,10 +82,28 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   }, [user]);
 
   const filteredStudents = useMemo(() => {
-    if (selectedBranchId === 'all') return students;
-    if (selectedBranchId === 'none') return students.filter(s => !s.branchId || s.branchId === '');
-    return students.filter(s => s.branchId === selectedBranchId);
-  }, [students, selectedBranchId]);
+    let filtered = students;
+    
+    // Filter by branch
+    if (selectedBranchId !== 'all') {
+      if (selectedBranchId === 'none') {
+        filtered = filtered.filter(s => !s.branchId || s.branchId === '');
+      } else {
+        filtered = filtered.filter(s => s.branchId === selectedBranchId);
+      }
+    }
+    
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(s => 
+        s.name.toLowerCase().includes(term) || 
+        (s.phone && s.phone.includes(term))
+      );
+    }
+    
+    return filtered;
+  }, [students, selectedBranchId, searchTerm]);
 
   const saveToFirebase = async (newStudents: Student[], newTrainers: Trainer[], newSchedule: Schedule, newWarnings: Warning[]) => {
     if (user) {
@@ -97,6 +116,21 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     }
   };
 
+  const handleResetSchedule = () => {
+    if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch đã xếp không? Các ca đã khóa thủ công cũng sẽ bị xóa.')) {
+      return;
+    }
+    const emptySchedule: Schedule = {};
+    for (const day of DAYS) {
+      for (const hour of HOURS) {
+        emptySchedule[`${day}-${hour}`] = [];
+      }
+    }
+    setSchedule(emptySchedule);
+    setWarnings([]);
+    saveToFirebase(students, trainers, emptySchedule, []);
+  };
+
   const handleGenerate = () => {
     const unconfirmedStudents = students.filter(s => !s.isScheduleConfirmed);
     if (unconfirmedStudents.length > 0) {
@@ -104,7 +138,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         return;
       }
     }
-    const result = generateSchedule(students, trainers, contracts);
+    const result = generateSchedule(students, trainers, contracts, schedule);
     setSchedule(result.schedule);
     setWarnings(result.warnings);
     saveToFirebase(students, trainers, result.schedule, result.warnings);
@@ -261,6 +295,9 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           </div>
           
           <div className="flex gap-2">
+            <button onClick={handleResetSchedule} className="bg-zinc-800 text-zinc-300 px-4 py-2 text-sm rounded-xl font-bold hover:bg-zinc-700 hover:text-white transition-all flex items-center gap-2 border border-zinc-700">
+              <RotateCcw className="w-4 h-4" /> Reset Lịch
+            </button>
             <button onClick={handleGenerate} className="bg-pink-600 text-white px-4 py-2 text-sm rounded-xl font-bold hover:bg-pink-500 transition-all flex items-center gap-2">
               <Calendar className="w-4 h-4" /> Xếp Lịch
             </button>
@@ -308,7 +345,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                 />
               )}
 
-              <div className="mb-4">
+              <div className="mb-4 flex gap-4">
                 <select 
                   value={selectedBranchId}
                   onChange={(e) => setSelectedBranchId(e.target.value)}
@@ -318,6 +355,13 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                   <option value="none">Chưa xác định</option>
                   {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm tên hoặc SĐT..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-2 rounded-xl focus:outline-none focus:border-pink-500 flex-grow"
+                />
               </div>
 
               <StudentList 
@@ -335,7 +379,16 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           )}
 
           {activeSubTab === 'schedule' && (
-            <PTSchedule schedule={schedule} students={students} trainers={trainers} weekOffset={weekOffset} />
+            <PTSchedule 
+              schedule={schedule} 
+              students={students} 
+              trainers={trainers} 
+              weekOffset={weekOffset} 
+              onUpdateSchedule={(newSchedule) => {
+                setSchedule(newSchedule);
+                saveToFirebase(students, trainers, newSchedule, warnings);
+              }}
+            />
           )}
         </div>
       </div>

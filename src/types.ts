@@ -194,6 +194,7 @@ export interface Quote {
 export interface ScheduleEntry {
   studentId: string;
   trainerId: string;
+  isLocked?: boolean;
 }
 
 export interface Schedule {

@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Student, Trainer, Schedule, DAYS, HOURS } from '../types';
+import { Student, Trainer, Schedule, DAYS, HOURS, ScheduleEntry } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, User, Clock, Info } from 'lucide-react';
+import { Calendar, User, Clock, Info, Download, X, Lock, Unlock, Plus, Trash2 } from 'lucide-react';
 import { getDatesForCurrentWeek, getDatesForWeek } from '../utils/dateUtils';
+import * as XLSX from 'xlsx';
 
 interface Props {
   schedule: Schedule;
@@ -10,17 +11,93 @@ interface Props {
   trainers: Trainer[];
   currentTrainerId?: string;
   weekOffset?: number;
+  onUpdateSchedule?: (newSchedule: Schedule) => void;
 }
 
-export default function PTSchedule({ schedule, students, trainers, currentTrainerId, weekOffset = 0 }: Props) {
+export default function PTSchedule({ schedule, students, trainers, currentTrainerId, weekOffset = 0, onUpdateSchedule }: Props) {
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>(currentTrainerId || trainers[0]?.id || '');
   const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>(DAYS[0]);
+  
+  // Manual Scheduling State
+  const [editingSlot, setEditingSlot] = useState<{ id: string, day: string, hour: number } | null>(null);
+  const [slotStudents, setSlotStudents] = useState<{ id: string, isLocked: boolean }[]>([]);
+  const [newStudentId, setNewStudentId] = useState<string>('');
   
   const currentWeekDates = useMemo(() => getDatesForWeek(weekOffset), [weekOffset]);
 
   const getStudentName = (id: string) => {
     return students.find(s => s.id === id)?.name || 'Unknown';
+  };
+
+  const handleExportExcel = () => {
+    const data = [
+      ['Giờ', ...DAYS],
+      ...HOURS.map(hour => {
+        return [
+          `${hour}:00`,
+          ...DAYS.map(day => {
+            const slotId = `${day}-${hour}`;
+            const slotEntries = schedule[slotId] || [];
+            const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
+            return trainerEntries.map(e => getStudentName(e.studentId)).join(', ');
+          })
+        ];
+      })
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lịch tập');
+    XLSX.writeFile(wb, `Lich_Tap_PT_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.xlsx`);
+  };
+
+  const openSlotEditor = (day: string, hour: number) => {
+    if (currentTrainerId) return; // Only admin can edit
+    const slotId = `${day}-${hour}`;
+    const slotEntries = schedule[slotId] || [];
+    const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
+    
+    setSlotStudents(trainerEntries.map(e => ({ id: e.studentId, isLocked: !!e.isLocked })));
+    setEditingSlot({ id: slotId, day, hour });
+    setNewStudentId('');
+  };
+
+  const handleSaveSlot = () => {
+    if (!editingSlot || !onUpdateSchedule) return;
+    
+    const newSchedule = { ...schedule };
+    const slotId = editingSlot.id;
+    
+    // Remove old entries for this trainer in this slot
+    const otherEntries = (newSchedule[slotId] || []).filter(e => e.trainerId !== selectedTrainerId);
+    
+    // Add new entries
+    const newEntries: ScheduleEntry[] = slotStudents.map(s => ({
+      studentId: s.id,
+      trainerId: selectedTrainerId,
+      isLocked: s.isLocked
+    }));
+    
+    newSchedule[slotId] = [...otherEntries, ...newEntries];
+    onUpdateSchedule(newSchedule);
+    setEditingSlot(null);
+  };
+
+  const handleAddStudentToSlot = () => {
+    if (!newStudentId || slotStudents.length >= 2) return;
+    if (slotStudents.some(s => s.id === newStudentId)) return; // Already in slot
+    
+    setSlotStudents([...slotStudents, { id: newStudentId, isLocked: true }]);
+    setNewStudentId('');
+  };
+
+  const handleRemoveStudentFromSlot = (idToRemove: string) => {
+    setSlotStudents(slotStudents.filter(s => s.id !== idToRemove));
+  };
+
+  const handleToggleLock = (idToToggle: string) => {
+    setSlotStudents(slotStudents.map(s => s.id === idToToggle ? { ...s, isLocked: !s.isLocked } : s));
   };
 
   if (trainers.length === 0) {
@@ -34,7 +111,7 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
   }
 
   return (
-    <div className="bg-zinc-900 md:p-6 rounded-2xl shadow-xl border border-zinc-800 flex flex-col h-full overflow-hidden">
+    <div className="bg-zinc-900 md:p-6 rounded-2xl shadow-xl border border-zinc-800 flex flex-col h-full overflow-hidden relative">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-0 mb-4 gap-4">
         <div className="w-full md:w-auto">
@@ -78,25 +155,33 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
           </AnimatePresence>
         </div>
         
-        {!currentTrainerId && (
-          <div className="relative w-full md:w-64 shrink-0">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <User className="w-4 h-4 text-zinc-500" />
+        <div className="flex gap-2 w-full md:w-auto">
+          {!currentTrainerId && (
+            <div className="relative w-full md:w-64 shrink-0">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <User className="w-4 h-4 text-zinc-500" />
+              </div>
+              <select
+                value={selectedTrainerId}
+                onChange={(e) => setSelectedTrainerId(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 text-white pl-10 pr-10 py-3 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent font-medium appearance-none transition-all shadow-sm"
+              >
+                {trainers.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+              </div>
             </div>
-            <select
-              value={selectedTrainerId}
-              onChange={(e) => setSelectedTrainerId(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 text-white pl-10 pr-10 py-3 rounded-xl outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent font-medium appearance-none transition-all shadow-sm"
-            >
-              {trainers.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-            </div>
-          </div>
-        )}
+          )}
+          <button
+            onClick={handleExportExcel}
+            className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-emerald-500 transition-all flex items-center gap-2 shadow-sm"
+          >
+            <Download className="w-4 h-4" /> Xuất Excel
+          </button>
+        </div>
       </div>
 
       {/* Mobile Day Selector */}
@@ -155,7 +240,8 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                       return (
                         <td 
                           key={slotId}
-                          className={`border-b border-r border-zinc-800/50 p-1 md:p-1.5 text-center transition-all duration-300 align-top relative ${
+                          onClick={() => openSlotEditor(day, hour)}
+                          className={`border-b border-r border-zinc-800/50 p-1 md:p-1.5 text-center transition-all duration-300 align-top relative ${!currentTrainerId ? 'cursor-pointer' : ''} ${
                             selectedDay !== day ? 'hidden md:table-cell' : ''
                           } ${
                             isHighlighted
@@ -167,24 +253,31 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                         >
                           {studentIds.length > 0 ? (
                             <div className="flex flex-col gap-1 h-full justify-start">
-                              {studentIds.map(id => (
-                                <motion.button 
-                                  whileHover={{ scale: 1.02, y: -1 }}
-                                  whileTap={{ scale: 0.98 }}
-                                  key={id} 
-                                  onClick={() => setHighlightedStudentId(id === highlightedStudentId ? null : id)}
-                                  className={`w-full truncate text-xs md:text-sm font-bold rounded-lg px-2 py-1.5 border text-left transition-all shadow-sm ${
-                                    highlightedStudentId === id
-                                      ? 'bg-pink-500 text-white border-pink-400 shadow-[0_4px_15px_rgba(236,72,153,0.4)]'
-                                      : 'text-zinc-300 bg-zinc-800 border-zinc-700 hover:border-pink-500/50 hover:text-pink-400'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1.5">
-                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${highlightedStudentId === id ? 'bg-white shadow-[0_0_5px_rgba(255,255,255,0.8)]' : 'bg-pink-500'}`} />
-                                    <span className="truncate">{getStudentName(id)}</span>
-                                  </div>
-                                </motion.button>
-                              ))}
+                              {studentIds.map(id => {
+                                const isLocked = trainerEntries.find(e => e.studentId === id)?.isLocked;
+                                return (
+                                  <motion.button 
+                                    whileHover={{ scale: 1.02, y: -1 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    key={id} 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setHighlightedStudentId(id === highlightedStudentId ? null : id);
+                                    }}
+                                    className={`w-full truncate text-xs md:text-sm font-bold rounded-lg px-2 py-1.5 border text-left transition-all shadow-sm flex items-center justify-between ${
+                                      highlightedStudentId === id
+                                        ? 'bg-pink-500 text-white border-pink-400 shadow-[0_4px_15px_rgba(236,72,153,0.4)]'
+                                        : 'text-zinc-300 bg-zinc-800 border-zinc-700 hover:border-pink-500/50 hover:text-pink-400'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 overflow-hidden">
+                                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${highlightedStudentId === id ? 'bg-white shadow-[0_0_5px_rgba(255,255,255,0.8)]' : 'bg-pink-500'}`} />
+                                      <span className="truncate">{getStudentName(id)}</span>
+                                    </div>
+                                    {isLocked && <Lock className="w-3 h-3 shrink-0 opacity-50" />}
+                                  </motion.button>
+                                );
+                              })}
                             </div>
                           ) : (
                             <div className="h-full w-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -214,7 +307,123 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
           <div className="w-5 h-5 bg-zinc-950 border border-zinc-800 rounded-md border-dashed"></div>
           <span className="text-zinc-500">Slot trống</span>
         </div>
+        <div className="flex items-center gap-2">
+          <Lock className="w-4 h-4 text-zinc-500" />
+          <span className="text-zinc-500">Đã khóa (xếp thủ công)</span>
+        </div>
       </div>
+
+      {/* Manual Schedule Modal */}
+      <AnimatePresence>
+        {editingSlot && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-pink-500" />
+                  Xếp lịch thủ công
+                </h3>
+                <button onClick={() => setEditingSlot(null)} className="text-zinc-400 hover:text-white transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div className="flex justify-between items-center bg-zinc-800/50 p-3 rounded-xl border border-zinc-700/50">
+                  <div className="text-zinc-300">
+                    <span className="block text-xs text-zinc-500 mb-1">Thời gian</span>
+                    <span className="font-bold">{editingSlot.day} - {editingSlot.hour}:00</span>
+                  </div>
+                  <div className="text-right text-zinc-300">
+                    <span className="block text-xs text-zinc-500 mb-1">Huấn luyện viên</span>
+                    <span className="font-bold">{trainers.find(t => t.id === selectedTrainerId)?.name}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-zinc-400">Học viên trong ca (Tối đa 2)</label>
+                  {slotStudents.length === 0 ? (
+                    <div className="text-center py-4 text-zinc-500 text-sm border border-dashed border-zinc-700 rounded-xl">
+                      Chưa có học viên nào
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {slotStudents.map((s) => (
+                        <div key={s.id} className="flex items-center justify-between bg-zinc-800 p-3 rounded-xl border border-zinc-700">
+                          <span className="font-medium text-zinc-200">{getStudentName(s.id)}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleToggleLock(s.id)}
+                              className={`p-1.5 rounded-lg transition-colors ${s.isLocked ? 'bg-pink-500/20 text-pink-400' : 'bg-zinc-700 text-zinc-400 hover:text-white'}`}
+                              title={s.isLocked ? "Đã khóa (không bị ghi đè)" : "Mở khóa (có thể bị ghi đè)"}
+                            >
+                              {s.isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                            </button>
+                            <button
+                              onClick={() => handleRemoveStudentFromSlot(s.id)}
+                              className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {slotStudents.length < 2 && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-zinc-400">Thêm học viên</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={newStudentId}
+                        onChange={(e) => setNewStudentId(e.target.value)}
+                        className="flex-1 bg-zinc-950 border border-zinc-800 text-white px-3 py-2 rounded-xl outline-none focus:border-pink-500"
+                      >
+                        <option value="">-- Chọn học viên --</option>
+                        {students
+                          .filter(s => !slotStudents.some(ss => ss.id === s.id))
+                          .map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))
+                        }
+                      </select>
+                      <button
+                        onClick={handleAddStudentToSlot}
+                        disabled={!newStudentId}
+                        className="bg-zinc-800 text-white px-3 py-2 rounded-xl hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-zinc-800 bg-zinc-950 flex justify-end gap-3">
+                <button
+                  onClick={() => setEditingSlot(null)}
+                  className="px-4 py-2 text-zinc-400 hover:text-white font-medium transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSaveSlot}
+                  className="px-6 py-2 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-pink-500/20"
+                >
+                  Lưu thay đổi
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

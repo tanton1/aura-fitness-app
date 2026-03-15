@@ -9,7 +9,8 @@ const MAX_STUDENTS_PER_PT = 2;
 export function generateSchedule(
   students: Student[], 
   trainers: Trainer[], 
-  contracts: StudentContract[]
+  contracts: StudentContract[],
+  existingSchedule?: Schedule
 ): SchedulerResult {
   const schedule: Schedule = {};
   const warnings: Warning[] = [];
@@ -20,6 +21,38 @@ export function generateSchedule(
   for (const day of DAYS) {
     for (const hour of HOURS) {
       schedule[`${day}-${hour}`] = [];
+    }
+  }
+
+  const studentNeeds: Record<string, number> = {};
+  const studentScheduledDays: Record<string, Set<string>> = {};
+  const studentScheduledSlots: Record<string, string[]> = {};
+
+  for (const s of students) {
+    studentNeeds[s.id] = s.sessionsPerWeek;
+    studentScheduledDays[s.id] = new Set();
+    studentScheduledSlots[s.id] = [];
+  }
+
+  // Pre-fill locked entries from existing schedule
+  if (existingSchedule) {
+    for (const day of DAYS) {
+      for (const hour of HOURS) {
+        const slotId = `${day}-${hour}`;
+        const existingEntries = existingSchedule[slotId] || [];
+        for (const entry of existingEntries) {
+          if (entry.isLocked) {
+            schedule[slotId].push(entry);
+            
+            // Update student tracking
+            if (studentNeeds[entry.studentId] !== undefined) {
+              studentNeeds[entry.studentId]--;
+              studentScheduledDays[entry.studentId].add(day);
+              studentScheduledSlots[entry.studentId].push(slotId);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -35,16 +68,6 @@ export function generateSchedule(
   const sortedStudents = [...students].sort(
     (a, b) => (a.availableSlots?.length || 0) - (b.availableSlots?.length || 0)
   );
-
-  const studentNeeds: Record<string, number> = {};
-  const studentScheduledDays: Record<string, Set<string>> = {};
-  const studentScheduledSlots: Record<string, string[]> = {};
-
-  for (const s of sortedStudents) {
-    studentNeeds[s.id] = s.sessionsPerWeek;
-    studentScheduledDays[s.id] = new Set();
-    studentScheduledSlots[s.id] = [];
-  }
 
   // Scheduling logic: Group by branch
   const branches = Array.from(new Set(trainers.map(t => t.branchId).filter(Boolean))) as string[];
