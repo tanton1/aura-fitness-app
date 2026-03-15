@@ -31,6 +31,9 @@ export default function StudentManagement({ user, profile }: Props) {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Student>>({
     name: '',
     phone: '',
@@ -98,7 +101,7 @@ export default function StudentManagement({ user, profile }: Props) {
         await setDoc(doc(db, 'schedules', 'global_schedule'), { students: newStudents }, { merge: true });
       } catch (e) {
         console.error("Error saving students:", e);
-        alert("Lỗi lưu dữ liệu học viên: " + (e as Error).message);
+        setAlertMessage("Lỗi lưu dữ liệu học viên: " + (e as Error).message);
       }
     }
   };
@@ -147,7 +150,7 @@ export default function StudentManagement({ user, profile }: Props) {
       }
     } catch (e) {
       console.error("Error saving contract:", e);
-      alert("Lỗi lưu hợp đồng: " + (e as Error).message);
+      setAlertMessage("Lỗi lưu hợp đồng: " + (e as Error).message);
     }
   };
 
@@ -181,7 +184,7 @@ export default function StudentManagement({ user, profile }: Props) {
       }
     } catch (e) {
       console.error("Error updating contract:", e);
-      alert("Lỗi cập nhật hợp đồng: " + (e as Error).message);
+      setAlertMessage("Lỗi cập nhật hợp đồng: " + (e as Error).message);
     }
   };
 
@@ -265,12 +268,42 @@ export default function StudentManagement({ user, profile }: Props) {
     setError(null);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa học viên này?')) {
-      const newStudents = students.filter(s => s.id !== id);
-      setStudents(newStudents);
-      await saveToFirebase(newStudents);
+  const handleDelete = (id: string) => {
+    setStudentToDelete(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const executeDelete = async () => {
+    if (!studentToDelete) return;
+    
+    const id = studentToDelete;
+    const newStudents = students.filter(s => s.id !== id);
+    const newContracts = contracts.filter(c => c.studentId !== id);
+    const newPayments = payments.filter(p => p.studentId !== id);
+    const newSessions = sessions.filter(s => s.studentId !== id);
+    
+    setStudents(newStudents);
+    setContracts(newContracts);
+    setPayments(newPayments);
+    setSessions(newSessions);
+    
+    if (user) {
+      try {
+        await setDoc(doc(db, 'schedules', 'global_schedule'), { 
+          students: newStudents,
+          contracts: newContracts,
+          payments: newPayments,
+          sessions: newSessions
+        }, { merge: true });
+        setAlertMessage("Đã xóa học viên thành công!");
+      } catch (e) {
+        console.error("Error deleting student data:", e);
+        setAlertMessage("Lỗi xóa dữ liệu học viên: " + (e as Error).message);
+      }
     }
+    
+    setShowDeleteConfirm(false);
+    setStudentToDelete(null);
   };
 
   if (selectedStudentId) {
@@ -560,6 +593,81 @@ export default function StudentManagement({ user, profile }: Props) {
                   </button>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm Delete Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div key="delete-confirm" className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setShowDeleteConfirm(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-red-500/30 text-center"
+            >
+              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Xác nhận xóa</h3>
+              <p className="text-zinc-400 mb-6">
+                Bạn có chắc chắn muốn xóa học viên này? Thao tác này sẽ xóa toàn bộ hợp đồng, lịch sử thanh toán và buổi tập của học viên.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 rounded-xl font-medium text-zinc-400 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={executeDelete}
+                  className="flex-1 py-3 rounded-xl font-medium text-white bg-red-500 hover:bg-red-600 transition-colors shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                >
+                  Đồng ý xóa
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Alert Modal */}
+      <AnimatePresence>
+        {alertMessage && (
+          <div key="alert-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setAlertMessage(null)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-zinc-800 text-center"
+            >
+              <div className="w-16 h-16 bg-pink-500/20 text-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <p className="text-white font-medium mb-6">{alertMessage}</p>
+              <button 
+                onClick={() => setAlertMessage(null)}
+                className="w-full py-3 rounded-xl font-medium text-white bg-pink-500 hover:bg-pink-600 transition-colors shadow-[0_0_15px_rgba(236,72,153,0.4)]"
+              >
+                Đóng
+              </button>
             </motion.div>
           </div>
         )}

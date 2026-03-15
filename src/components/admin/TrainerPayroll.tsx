@@ -319,7 +319,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
                             <div className="space-y-1">
                               <div className="flex items-center gap-2 text-zinc-200 font-medium">
                                 <UserIcon className="w-4 h-4 text-pink-500" />
-                                {student?.name || 'Học viên ẩn'}
+                                {student?.name || 'Học viên ẩn (Đã xóa)'}
                               </div>
                               <p className="text-zinc-500 text-xs flex items-center gap-1">
                                 PT: <span className="text-zinc-400">{trainer?.name}</span> • {branch?.name || 'N/A'}

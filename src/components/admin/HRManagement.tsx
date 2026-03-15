@@ -4,7 +4,8 @@ import { db, auth } from '../../lib/firebase';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import firebaseConfig from '../../../firebase-applet-config.json';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
-import { User as UserIcon, Building, Plus, Trash2, Edit2, ShieldCheck, Users, Package } from 'lucide-react';
+import { User as UserIcon, Building, Plus, Trash2, Edit2, ShieldCheck, Users, Package, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Trainer, Branch, StaffMember } from '../../types';
 import PackageSettings from './PackageSettings';
@@ -23,6 +24,10 @@ export default function HRManagement({ user }: Props) {
   const [formData, setFormData] = useState<Partial<Trainer | Branch | StaffMember>>({});
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'staff' | 'branch'} | null>(null);
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -238,8 +243,9 @@ export default function HRManagement({ user }: Props) {
     setError(null);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!user || !confirm('Bạn có chắc chắn muốn xóa?')) return;
+  const executeDelete = async () => {
+    if (!user || !itemToDelete) return;
+    const { id, type } = itemToDelete;
     const docRef = doc(db, 'schedules', 'global_schedule');
     
     // Always filter both arrays to ensure complete removal
@@ -247,25 +253,38 @@ export default function HRManagement({ user }: Props) {
     const updatedStaff = staff.filter(s => s.id !== id);
     const updatedBranches = branches.filter(b => b.id !== id);
 
-    if (activeSubTab === 'trainers') {
-      await setDoc(docRef, { trainers: updatedTrainers }, { merge: true });
-    } else if (activeSubTab === 'branches') {
-      await setDoc(docRef, { branches: updatedBranches }, { merge: true });
-    } else if (activeSubTab === 'staff') {
-      await setDoc(docRef, { 
-        staff: updatedStaff,
-        trainers: updatedTrainers
-      }, { merge: true });
-    }
-    
-    // Also try to delete from users collection if it's a staff/trainer
-    if (activeSubTab === 'staff' || activeSubTab === 'trainers') {
-      try {
-        await deleteDoc(doc(db, 'users', id));
-      } catch (e) {
-        console.error("Error deleting user doc:", e);
+    try {
+      if (activeSubTab === 'trainers') {
+        await setDoc(docRef, { trainers: updatedTrainers }, { merge: true });
+      } else if (activeSubTab === 'branches') {
+        await setDoc(docRef, { branches: updatedBranches }, { merge: true });
+      } else if (activeSubTab === 'staff') {
+        await setDoc(docRef, { 
+          staff: updatedStaff,
+          trainers: updatedTrainers
+        }, { merge: true });
       }
+      
+      // Also try to delete from users collection if it's a staff/trainer
+      if (activeSubTab === 'staff' || activeSubTab === 'trainers') {
+        try {
+          await deleteDoc(doc(db, 'users', id));
+        } catch (e) {
+          console.error("Error deleting user doc:", e);
+        }
+      }
+      setAlertMessage('Đã xóa thành công!');
+    } catch (e) {
+      console.error("Error deleting item:", e);
+      setAlertMessage("Lỗi khi xóa: " + (e as Error).message);
     }
+    setShowDeleteConfirm(false);
+    setItemToDelete(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    setItemToDelete({ id, type: 'staff' }); // type is ignored in executeDelete anyway since it uses activeSubTab
+    setShowDeleteConfirm(true);
   };
 
   return (
@@ -323,28 +342,7 @@ export default function HRManagement({ user }: Props) {
             <p className="text-zinc-400 text-sm">Dọn dẹp dữ liệu thừa hoặc bị lỗi trong database</p>
           </div>
           <button
-            onClick={async () => {
-              if (!confirm('Bạn có muốn dọn dẹp dữ liệu PT và nhân viên bị thừa? Hệ thống sẽ xóa các mục trùng lặp hoặc không hợp lệ.')) return;
-              const docRef = doc(db, 'schedules', 'global_schedule');
-              
-              // Remove duplicates and invalid entries
-              const cleanTrainers = trainers.filter((t, index, self) => 
-                t.id && self.findIndex(s => s.id === t.id) === index
-              );
-              const cleanStaff = staff.filter((s, index, self) => 
-                s.id && self.findIndex(item => item.id === s.id) === index
-              );
-              
-              try {
-                await setDoc(docRef, { 
-                  trainers: cleanTrainers,
-                  staff: cleanStaff
-                }, { merge: true });
-                alert('Đã dọn dẹp dữ liệu thành công!');
-              } catch (e) {
-                alert('Lỗi khi dọn dẹp: ' + (e as Error).message);
-              }
-            }}
+            onClick={() => setShowCleanupConfirm(true)}
             className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-xl hover:bg-zinc-700 transition-colors text-sm"
           >
             Dọn dẹp dữ liệu
@@ -503,6 +501,145 @@ export default function HRManagement({ user }: Props) {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div key="delete-confirm" className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setShowDeleteConfirm(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-red-500/30 text-center"
+            >
+              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Xác nhận xóa</h3>
+              <p className="text-zinc-400 mb-6">
+                Bạn có chắc chắn muốn xóa mục này?
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 rounded-xl font-medium text-zinc-400 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={executeDelete}
+                  className="flex-1 py-3 rounded-xl font-medium text-white bg-red-500 hover:bg-red-600 transition-colors shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                >
+                  Đồng ý xóa
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm Cleanup Modal */}
+      <AnimatePresence>
+        {showCleanupConfirm && (
+          <div key="cleanup-confirm" className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setShowCleanupConfirm(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-red-500/30 text-center"
+            >
+              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Xác nhận dọn dẹp</h3>
+              <p className="text-zinc-400 mb-6">
+                Bạn có muốn dọn dẹp dữ liệu PT và nhân viên bị thừa? Hệ thống sẽ xóa các mục trùng lặp hoặc không hợp lệ.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowCleanupConfirm(false)}
+                  className="flex-1 py-3 rounded-xl font-medium text-zinc-400 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={async () => {
+                    setShowCleanupConfirm(false);
+                    const docRef = doc(db, 'schedules', 'global_schedule');
+                    
+                    // Remove duplicates and invalid entries
+                    const cleanTrainers = trainers.filter((t, index, self) => 
+                      t.id && self.findIndex(s => s.id === t.id) === index
+                    );
+                    const cleanStaff = staff.filter((s, index, self) => 
+                      s.id && self.findIndex(item => item.id === s.id) === index
+                    );
+                    
+                    try {
+                      await setDoc(docRef, { 
+                        trainers: cleanTrainers,
+                        staff: cleanStaff
+                      }, { merge: true });
+                      setAlertMessage('Đã dọn dẹp dữ liệu thành công!');
+                    } catch (e) {
+                      setAlertMessage('Lỗi khi dọn dẹp: ' + (e as Error).message);
+                    }
+                  }}
+                  className="flex-1 py-3 rounded-xl font-medium text-white bg-red-500 hover:bg-red-600 transition-colors shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                >
+                  Đồng ý dọn dẹp
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Alert Modal */}
+      <AnimatePresence>
+        {alertMessage && (
+          <div key="alert-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setAlertMessage(null)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-zinc-800 text-center"
+            >
+              <div className="w-16 h-16 bg-pink-500/20 text-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <p className="text-white font-medium mb-6">{alertMessage}</p>
+              <button 
+                onClick={() => setAlertMessage(null)}
+                className="w-full py-3 rounded-xl font-medium text-white bg-pink-500 hover:bg-pink-600 transition-colors shadow-[0_0_15px_rgba(236,72,153,0.4)]"
+              >
+                Đóng
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

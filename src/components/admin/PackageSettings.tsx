@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { TrainingPackage } from '../../types';
+import { TrainingPackage, Branch } from '../../types';
 import { User } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Package, Plus, Edit2, Trash2, Clock, Hash, DollarSign } from 'lucide-react';
+import { Package, Plus, Edit2, Trash2, Clock, Hash, DollarSign, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
 
 export default function PackageSettings({ user }: Props) {
   const [packages, setPackages] = useState<TrainingPackage[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingPackage, setEditingPackage] = useState<TrainingPackage | null>(null);
@@ -21,7 +22,8 @@ export default function PackageSettings({ user }: Props) {
     name: '',
     totalSessions: 12,
     price: 0,
-    durationMonths: 1
+    durationMonths: 1,
+    branchId: ''
   });
 
   useEffect(() => {
@@ -30,6 +32,7 @@ export default function PackageSettings({ user }: Props) {
       const unsub = onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
+          setBranches(data.branches || []);
           if (!data.packages || data.packages.length === 0) {
             setPackages([
               { id: 'p1', name: 'Gói 12 buổi', totalSessions: 12, price: 4200000, durationMonths: 1 },
@@ -66,6 +69,7 @@ export default function PackageSettings({ user }: Props) {
         totalSessions: formData.totalSessions,
         price: formData.price,
         durationMonths: formData.durationMonths || 1,
+        branchId: formData.branchId || undefined,
       };
       newPackages.push(newPkg);
     }
@@ -125,6 +129,10 @@ export default function PackageSettings({ user }: Props) {
                   <div className="flex items-center gap-2 text-sm text-zinc-400">
                     <Clock className="w-4 h-4 text-zinc-500" />
                     <span>Hạn {pkg.durationMonths} tháng</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-zinc-400 col-span-2">
+                    <Building2 className="w-4 h-4 text-zinc-500" />
+                    <span>{pkg.branchId ? branches.find(b => b.id === pkg.branchId)?.name : 'Tất cả chi nhánh'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-pink-500 font-bold col-span-2 mt-1">
                     <DollarSign className="w-4 h-4" />
@@ -225,6 +233,18 @@ export default function PackageSettings({ user }: Props) {
                     className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500 text-lg font-bold text-pink-500" 
                     placeholder="VD: 10800000"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1">Chi nhánh</label>
+                  <select 
+                    value={formData.branchId || ''}
+                    onChange={e => setFormData({...formData, branchId: e.target.value})}
+                    className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500"
+                  >
+                    <option value="">Tất cả chi nhánh</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
                 </div>
 
                 <div className="pt-4 flex gap-3">

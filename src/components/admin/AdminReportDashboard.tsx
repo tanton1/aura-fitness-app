@@ -54,11 +54,14 @@ export default function AdminReportDashboard() {
   }, []);
 
   // Filter data by branch
-  const filterByBranch = (items: any[]) => 
-    selectedBranchId === 'all' ? items : items.filter(item => item.branchId === selectedBranchId);
+  const filterByBranch = (items: any[]) => {
+    if (selectedBranchId === 'all') return items;
+    if (selectedBranchId === 'none') return items.filter(item => !item.branchId);
+    return items.filter(item => item.branchId === selectedBranchId);
+  };
 
   const filteredSessions = filterByBranch(sessions);
-  const filteredTrainers = selectedBranchId === 'all' ? trainers : trainers.filter(t => t.branchId === selectedBranchId);
+  const filteredTrainers = selectedBranchId === 'all' ? trainers : (selectedBranchId === 'none' ? trainers.filter(t => !t.branchId) : trainers.filter(t => t.branchId === selectedBranchId));
   const filteredContracts = filterByBranch(contracts);
   const filteredStudents = filterByBranch(students);
   
@@ -168,7 +171,7 @@ export default function AdminReportDashboard() {
   const debtList = filteredContracts
     .filter(c => c.totalPrice > c.paidAmount)
     .map(c => ({
-      name: filteredStudents.find(s => s.id === c.studentId)?.name || 'Học viên ẩn',
+      name: students.find(s => s.id === c.studentId)?.name || 'Học viên ẩn (Đã xóa)',
       debt: c.totalPrice - c.paidAmount
     }));
 
@@ -220,7 +223,7 @@ export default function AdminReportDashboard() {
     .slice(0, 5)
     .map(p => ({
       id: p.id,
-      user: filteredStudents.find(s => s.id === p.studentId)?.name || 'Học viên ẩn',
+      user: students.find(s => s.id === p.studentId)?.name || 'Học viên ẩn (Đã xóa)',
       package: filteredContracts.find(c => c.id === p.contractId)?.packageName || 'N/A',
       amount: p.amount.toLocaleString('vi-VN') + 'đ',
       status: 'Thành công',
@@ -260,6 +263,7 @@ export default function AdminReportDashboard() {
             className="bg-transparent text-zinc-300 text-xs font-medium px-2 py-1.5 rounded-md focus:outline-none"
           >
             <option value="all">Tất cả chi nhánh</option>
+            <option value="none">Chưa phân chi nhánh</option>
             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
           {['7days', '30days', 'year'].map((range) => (

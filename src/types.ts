@@ -133,6 +133,7 @@ export interface TrainingPackage {
   totalSessions: number;
   price: number;
   durationMonths: number;
+  branchId?: string; // Add this
 }
 
 export interface Installment {

@@ -16,6 +16,7 @@ export default function FinanceManagement({ user, profile }: Props) {
   const [contracts, setContracts] = useState<StudentContract[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   const [isPaying, setIsPaying] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
@@ -23,6 +24,8 @@ export default function FinanceManagement({ user, profile }: Props) {
   const [payAmount, setPayAmount] = useState('');
   const [installmentCount, setInstallmentCount] = useState(1);
   const [installments, setInstallments] = useState<{date: string, amount: number}[]>([]);
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedContract || !isPaying) {
@@ -97,6 +100,7 @@ export default function FinanceManagement({ user, profile }: Props) {
           setContracts(data.contracts || []);
           setStudents(data.students || []);
           setPayments(data.payments || []);
+          setSessions(data.sessions || []);
         }
       });
       return () => unsub();
@@ -106,6 +110,37 @@ export default function FinanceManagement({ user, profile }: Props) {
   const totalRevenue = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
   const totalDebt = filteredContracts.reduce((sum, c) => sum + (c.totalPrice - c.paidAmount), 0);
   const contractsWithDebt = filteredContracts.filter(c => c.totalPrice > c.paidAmount);
+
+  const confirmCleanup = async () => {
+    setShowCleanupConfirm(false);
+    
+    const validStudentIds = new Set(students.map(s => s.id).filter(Boolean));
+    const newContracts = contracts.filter(c => c.studentId && validStudentIds.has(c.studentId));
+    const newPayments = payments.filter(p => p.studentId && validStudentIds.has(p.studentId));
+    const newSessions = sessions.filter(s => s.studentId && validStudentIds.has(s.studentId));
+    
+    setContracts(newContracts);
+    setPayments(newPayments);
+    setSessions(newSessions);
+    
+    if (user) {
+      try {
+        await setDoc(doc(db, 'schedules', 'global_schedule'), { 
+          contracts: newContracts,
+          payments: newPayments,
+          sessions: newSessions
+        }, { merge: true });
+        setAlertMessage('Đã dọn dẹp dữ liệu mồ côi thành công!');
+      } catch (e) {
+        console.error("Error cleaning up data:", e);
+        setAlertMessage("Có lỗi khi dọn dẹp dữ liệu!");
+      }
+    }
+  };
+
+  const cleanUpOrphanedData = () => {
+    setShowCleanupConfirm(true);
+  };
 
   const handlePayment = async () => {
     if (!selectedContract || !payAmount) return;
@@ -118,11 +153,11 @@ export default function FinanceManagement({ user, profile }: Props) {
     if (remainingDebt > 0) {
       const sum = installments.reduce((a, b) => a + b.amount, 0);
       if (sum !== remainingDebt) {
-        alert('Tổng số tiền các kỳ phải bằng số tiền còn nợ!');
+        setAlertMessage('Tổng số tiền các kỳ phải bằng số tiền còn nợ!');
         return;
       }
       if (installments.some(i => !i.date)) {
-        alert('Vui lòng chọn ngày hẹn trả cho tất cả các kỳ!');
+        setAlertMessage('Vui lòng chọn ngày hẹn trả cho tất cả các kỳ!');
         return;
       }
       finalInstallments = installments.map((inst, idx) => ({
@@ -169,7 +204,7 @@ export default function FinanceManagement({ user, profile }: Props) {
         }, { merge: true });
       } catch (e) {
         console.error("Error saving payment:", e);
-        alert("Có lỗi khi lưu phiếu thu!");
+        setAlertMessage("Có lỗi khi lưu phiếu thu!");
       }
     }
 
@@ -181,16 +216,26 @@ export default function FinanceManagement({ user, profile }: Props) {
   };
 
   const getStudentName = (id: string) => {
-    return students.find(s => s.id === id)?.name || 'Học viên ẩn';
+    return students.find(s => s.id === id)?.name || 'Học viên ẩn (Đã xóa)';
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
-          Tài chính
-        </h1>
-        <p className="text-zinc-400 mt-2">Quản lý doanh thu và công nợ</p>
+      <div className="flex justify-between items-start">
+        <div className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
+            Tài chính
+          </h1>
+          <p className="text-zinc-400 mt-2">Quản lý doanh thu và công nợ</p>
+        </div>
+        {profile?.role === 'admin' && (
+          <button 
+            onClick={cleanUpOrphanedData}
+            className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-red-500/20"
+          >
+            Dọn dẹp dữ liệu mồ côi
+          </button>
+        )}
       </div>
 
       <div className="flex justify-between items-center">
@@ -454,6 +499,81 @@ export default function FinanceManagement({ user, profile }: Props) {
                   </button>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm Cleanup Modal */}
+      <AnimatePresence>
+        {showCleanupConfirm && (
+          <div key="cleanup-confirm" className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setShowCleanupConfirm(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-red-500/30 text-center"
+            >
+              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Xác nhận dọn dẹp</h3>
+              <p className="text-zinc-400 mb-6">
+                Bạn có chắc chắn muốn xóa toàn bộ hợp đồng, lịch sử thanh toán và buổi tập của những học viên đã bị xóa? Thao tác này sẽ làm thay đổi báo cáo doanh thu và công nợ.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowCleanupConfirm(false)}
+                  className="flex-1 py-3 rounded-xl font-medium text-zinc-400 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={confirmCleanup}
+                  className="flex-1 py-3 rounded-xl font-medium text-white bg-red-500 hover:bg-red-600 transition-colors shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                >
+                  Đồng ý xóa
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Alert Modal */}
+      <AnimatePresence>
+        {alertMessage && (
+          <div key="alert-modal" className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setAlertMessage(null)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-zinc-800 text-center"
+            >
+              <div className="w-16 h-16 bg-pink-500/20 text-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <p className="text-white font-medium mb-6">{alertMessage}</p>
+              <button 
+                onClick={() => setAlertMessage(null)}
+                className="w-full py-3 rounded-xl font-medium text-white bg-pink-500 hover:bg-pink-600 transition-colors shadow-[0_0_15px_rgba(236,72,153,0.4)]"
+              >
+                Đóng
+              </button>
             </motion.div>
           </div>
         )}

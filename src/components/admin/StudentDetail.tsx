@@ -753,26 +753,28 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
       {/* Contract Invoice Modal */}
       <AnimatePresence>
         {viewingContract && (
-          <ContractInvoice 
-            key="view-contract"
-            student={student}
-            contract={viewingContract}
-            onClose={() => setViewingContract(null)}
-          />
+          <div key="view-contract">
+            <ContractInvoice 
+              student={student}
+              contract={viewingContract}
+              onClose={() => setViewingContract(null)}
+            />
+          </div>
         )}
         {editingContract && (
-          <EditContractModal
-            key="edit-contract"
-            contract={editingContract}
-            packages={packages}
-            trainers={trainers}
-            branches={branches}
-            onClose={() => setEditingContract(null)}
-            onSave={(updatedContract) => {
-              onUpdateContract(updatedContract);
-              setEditingContract(null);
-            }}
-          />
+          <div key="edit-contract">
+            <EditContractModal
+              contract={editingContract}
+              packages={packages}
+              trainers={trainers}
+              branches={branches}
+              onClose={() => setEditingContract(null)}
+              onSave={(updatedContract) => {
+                onUpdateContract(updatedContract);
+                setEditingContract(null);
+              }}
+            />
+          </div>
         )}
       </AnimatePresence>
     </div>
