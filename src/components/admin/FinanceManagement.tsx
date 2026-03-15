@@ -62,15 +62,19 @@ export default function FinanceManagement({ user, profile }: Props) {
     // Generate missing payments from contracts
     const allPayments = [...payments];
     contracts.forEach(c => {
-      if (c.paidAmount > 0 && !payments.some(p => p.contractId === c.id)) {
+      const totalPaidForContract = payments
+        .filter(p => p.contractId === c.id)
+        .reduce((sum, p) => sum + p.amount, 0);
+      
+      if (c.paidAmount > totalPaidForContract) {
         allPayments.push({
           id: `auto-${c.id}`,
           contractId: c.id,
           studentId: c.studentId,
-          amount: c.paidAmount,
+          amount: c.paidAmount - totalPaidForContract,
           date: c.startDate ? new Date(c.startDate).toISOString() : new Date().toISOString(),
           method: 'transfer',
-          note: 'Thanh toán (tự động tạo)'
+          note: 'Thanh toán (tự động tạo - phần chênh lệch)'
         });
       }
     });
@@ -115,8 +119,9 @@ export default function FinanceManagement({ user, profile }: Props) {
     setShowCleanupConfirm(false);
     
     const validStudentIds = new Set(students.map(s => s.id).filter(Boolean));
+    const validContractIds = new Set(contracts.map(c => c.id).filter(Boolean));
     const newContracts = contracts.filter(c => c.studentId && validStudentIds.has(c.studentId));
-    const newPayments = payments.filter(p => p.studentId && validStudentIds.has(p.studentId));
+    const newPayments = payments.filter(p => p.studentId && validStudentIds.has(p.studentId) && p.contractId && validContractIds.has(p.contractId));
     const newSessions = sessions.filter(s => s.studentId && validStudentIds.has(s.studentId));
     
     setContracts(newContracts);

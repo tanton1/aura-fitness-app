@@ -37,6 +37,18 @@ export default function EditContractModal({ contract, packages, trainers, branch
 
         <div className="space-y-4">
           <div>
+            <label className="block text-sm font-medium text-zinc-400 mb-1">Chi nhánh</label>
+            <select 
+              value={formData.branchId || ''}
+              onChange={e => setFormData({ ...formData, branchId: e.target.value })}
+              className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500"
+            >
+              <option value="">-- Chưa xác định --</option>
+              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-zinc-400 mb-1">Gói tập</label>
             <select 
               value={formData.packageId}

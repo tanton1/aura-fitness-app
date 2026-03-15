@@ -53,7 +53,11 @@ export default function StudentManagement({ user, profile }: Props) {
 
     // Filter by branch
     if (selectedBranchId !== 'all') {
-      filtered = filtered.filter(s => s.branchId === selectedBranchId);
+      if (selectedBranchId === 'none') {
+        filtered = filtered.filter(s => !s.branchId || s.branchId === '');
+      } else {
+        filtered = filtered.filter(s => s.branchId === selectedBranchId);
+      }
     } else if (profile?.branchId && profile.role !== 'admin') {
       filtered = filtered.filter(s => s.branchId === profile.branchId);
     }
@@ -352,6 +356,7 @@ export default function StudentManagement({ user, profile }: Props) {
             className="bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-3 rounded-xl focus:outline-none focus:border-pink-500"
           >
             <option value="all">Tất cả chi nhánh</option>
+            <option value="none">Chưa xác định</option>
             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
           <button

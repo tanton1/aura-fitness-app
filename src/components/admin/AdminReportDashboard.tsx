@@ -68,22 +68,34 @@ export default function AdminReportDashboard() {
   // Generate missing payments from contracts
   const allPayments = [...payments];
   contracts.forEach(c => {
-    if (c.paidAmount > 0 && !payments.some(p => p.contractId === c.id)) {
+    const totalPaidForContract = payments
+      .filter(p => p.contractId === c.id)
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    if (c.paidAmount > totalPaidForContract) {
       allPayments.push({
         id: `auto-${c.id}`,
         contractId: c.id,
         studentId: c.studentId,
-        amount: c.paidAmount,
+        amount: c.paidAmount - totalPaidForContract,
         date: c.startDate ? new Date(c.startDate).toISOString() : new Date().toISOString(),
         method: 'transfer',
-        note: 'Thanh toán (tự động tạo)'
+        note: 'Thanh toán (tự động tạo - phần chênh lệch)'
       });
     }
   });
 
   const filteredPayments = allPayments.filter(p => {
     const contract = contracts.find(c => c.id === p.contractId);
-    const inBranch = selectedBranchId === 'all' || contract?.branchId === selectedBranchId;
+    const branchId = contract?.branchId || undefined;
+    
+    // Debug log
+    if (!branchId) {
+      console.log("Payment with undefined branch:", p, "Contract:", contract);
+    }
+    
+    const selectedId = selectedBranchId === 'none' ? undefined : selectedBranchId;
+    const inBranch = selectedBranchId === 'all' || branchId === selectedId;
     
     // Filter by timeRange
     const pDate = new Date(p.date);
@@ -122,8 +134,11 @@ export default function AdminReportDashboard() {
 
   useEffect(() => {
     console.log("Payments data:", payments);
+    console.log("Contracts data:", contracts);
+    console.log("All payments (including auto):", allPayments);
     console.log("Filtered payments:", filteredPayments);
-  }, [payments, filteredPayments]);
+    console.log("Total revenue:", filteredPayments.reduce((sum, p) => sum + p.amount, 0));
+  }, [payments, contracts, filteredPayments]);
 
   // PT Sessions Report
   const ptSessions = filteredTrainers.map(t => {
