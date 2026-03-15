@@ -15,9 +15,10 @@ interface Props {
   user: User | null;
   profile: UserProfile | null;
   activeTab: 'overview' | 'students' | 'finance' | 'hr' | 'payroll' | 'packages';
+  onNavigate?: (screen: string) => void;
 }
 
-export default function AdminDashboard({ user, profile, activeTab }: Props) {
+export default function AdminDashboard({ user, profile, activeTab, onNavigate }: Props) {
   const [contracts, setContracts] = useState<StudentContract[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -58,7 +59,7 @@ export default function AdminDashboard({ user, profile, activeTab }: Props) {
     <div className="min-h-screen bg-zinc-950 pb-24">
       {/* Tab Content */}
       <div className="p-4 pt-6">
-        {activeTab === 'overview' && <AdminReportDashboard />}
+        {activeTab === 'overview' && <AdminReportDashboard onNavigate={onNavigate} />}
         {activeTab === 'students' && <StudentManagement user={user} profile={profile} />}
         {activeTab === 'finance' && <FinanceManagement user={user} profile={profile} />}
         {activeTab === 'packages' && <PackageSettings user={user} />}

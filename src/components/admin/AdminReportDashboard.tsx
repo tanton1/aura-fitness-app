@@ -26,7 +26,11 @@ import { Session, Trainer, StudentContract, Student, PaymentRecord, Branch } fro
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6'];
 
-export default function AdminReportDashboard() {
+interface Props {
+  onNavigate?: (screen: string) => void;
+}
+
+export default function AdminReportDashboard({ onNavigate }: Props) {
   const [timeRange, setTimeRange] = useState('7days');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'overview' | 'pt'>('overview');
@@ -235,10 +239,7 @@ export default function AdminReportDashboard() {
   }, [timeRange, filteredPayments]);
 
   // Package Distribution
-  const packageData = Object.entries(filteredContracts.filter(c => {
-    const cDate = new Date(c.startDate || new Date());
-    return cDate >= currentStartDate;
-  }).reduce((acc, c) => {
+  const packageData = Object.entries(filteredContracts.filter(c => c.status === 'active').reduce((acc, c) => {
     acc[c.packageName] = (acc[c.packageName] || 0) + 1;
     return acc;
   }, {} as Record<string, number>)).map(([name, value]) => ({ name, value }));
@@ -438,13 +439,12 @@ export default function AdminReportDashboard() {
           >
             <div className="p-6 border-b border-zinc-800/50 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-white">Giao dịch gần đây</h3>
-              <button className="text-sm text-indigo-400 hover:text-indigo-300 font-medium">Xem tất cả</button>
+              <button onClick={() => onNavigate && onNavigate('students')} className="text-sm text-indigo-400 hover:text-indigo-300 font-medium">Xem tất cả</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-zinc-900/80 text-zinc-400 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-medium">Mã GD</th>
                     <th className="p-4 font-medium">Học viên</th>
                     <th className="p-4 font-medium">Gói tập</th>
                     <th className="p-4 font-medium">Số tiền</th>
@@ -455,7 +455,6 @@ export default function AdminReportDashboard() {
                 <tbody className="text-sm divide-y divide-zinc-800/50">
                   {recentTransactions.map((trx) => (
                     <tr key={trx.id} className="hover:bg-zinc-800/20 transition-colors">
-                      <td className="p-4 font-mono text-zinc-300">{trx.id}</td>
                       <td className="p-4 text-white font-medium">{trx.user}</td>
                       <td className="p-4 text-zinc-400">{trx.package}</td>
                       <td className="p-4 text-white font-mono">{trx.amount}</td>

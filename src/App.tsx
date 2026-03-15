@@ -122,15 +122,15 @@ export default function App() {
       case 'personal':
         return <PersonalDashboard profile={profile} onUpdateProfile={handleUpdateProfile} onResetProfile={handleResetProfile} />;
       case 'overview':
-        return <AdminDashboard user={user} profile={profile} activeTab="overview" />;
+        return <AdminDashboard user={user} profile={profile} activeTab="overview" onNavigate={setCurrentScreen} />;
       case 'students':
-        return <AdminDashboard user={user} profile={profile} activeTab="students" />;
+        return <AdminDashboard user={user} profile={profile} activeTab="students" onNavigate={setCurrentScreen} />;
       case 'finance':
-        return <AdminDashboard user={user} profile={profile} activeTab="finance" />;
+        return <AdminDashboard user={user} profile={profile} activeTab="finance" onNavigate={setCurrentScreen} />;
       case 'hr':
-        return <AdminDashboard user={user} profile={profile} activeTab="hr" />;
+        return <AdminDashboard user={user} profile={profile} activeTab="hr" onNavigate={setCurrentScreen} />;
       case 'payroll':
-        return <AdminDashboard user={user} profile={profile} activeTab="payroll" />;
+        return <AdminDashboard user={user} profile={profile} activeTab="payroll" onNavigate={setCurrentScreen} />;
       default:
         return <Dashboard profile={profile} onUpdateProfile={handleUpdateProfile} />;
     }

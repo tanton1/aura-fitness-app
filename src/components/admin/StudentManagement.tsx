@@ -26,6 +26,7 @@ export default function StudentManagement({ user, profile }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+  const [contractFilter, setContractFilter] = useState<'active' | 'expiring_week' | 'expiring_month' | 'expired' | 'all'>('active');
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -69,8 +70,53 @@ export default function StudentManagement({ user, profile }: Props) {
         return joinDate >= dateRange.start && joinDate <= dateRange.end;
       });
     }
+
+    if (contractFilter !== 'all') {
+      filtered = filtered.filter(s => {
+        const studentContracts = contracts.filter(c => c.studentId === s.id);
+        let status = 'none';
+        
+        if (studentContracts.length > 0) {
+          studentContracts.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+          const latestContract = studentContracts[0];
+          
+          if (latestContract.status === 'expired') {
+            status = 'expired';
+          } else if (latestContract.status !== 'active') {
+            status = 'inactive';
+          } else {
+            const endDate = new Date(latestContract.endDate);
+            const now = new Date();
+            
+            const timeDiff = endDate.getTime() - now.getTime();
+            const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            const sessionsLeft = latestContract.totalSessions - latestContract.usedSessions;
+            
+            if (daysLeft <= 7 || sessionsLeft <= 2) {
+              status = 'expiring_week';
+            } else {
+              const isSameMonth = !isNaN(endDate.getTime()) && endDate.getMonth() === now.getMonth() && endDate.getFullYear() === now.getFullYear();
+              if (isSameMonth || sessionsLeft <= 5) {
+                status = 'expiring_month';
+              } else {
+                status = 'active';
+              }
+            }
+          }
+        }
+        
+        if (contractFilter === 'active') {
+          return status === 'active' || status === 'expiring_month' || status === 'expiring_week';
+        }
+        if (contractFilter === 'expiring_month') {
+          return status === 'expiring_month' || status === 'expiring_week';
+        }
+        return status === contractFilter;
+      });
+    }
+
     return filtered;
-  }, [students, searchTerm, dateRange, selectedBranchId, profile]);
+  }, [students, searchTerm, dateRange, selectedBranchId, profile, contracts, contractFilter]);
 
   useEffect(() => {
     if (user) {
@@ -339,8 +385,8 @@ export default function StudentManagement({ user, profile }: Props) {
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 flex gap-2">
-          <div className="relative flex-1">
+        <div className="flex-1 flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
             <input
               type="text"
@@ -358,6 +404,17 @@ export default function StudentManagement({ user, profile }: Props) {
             <option value="all">Tất cả chi nhánh</option>
             <option value="none">Chưa xác định</option>
             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          <select 
+            value={contractFilter}
+            onChange={(e) => setContractFilter(e.target.value as any)}
+            className="bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-3 rounded-xl focus:outline-none focus:border-pink-500"
+          >
+            <option value="active">Đang tập (Ẩn hết hạn)</option>
+            <option value="expiring_week">Sắp hết trong tuần</option>
+            <option value="expiring_month">Sắp hết trong tháng</option>
+            <option value="expired">Đã hết hạn</option>
+            <option value="all">Tất cả</option>
           </select>
           <button
             onClick={() => {
@@ -386,11 +443,35 @@ export default function StudentManagement({ user, profile }: Props) {
                 return pending.some(i => new Date(i.date) <= new Date());
               });
 
+              const { isExpiringThisMonth, isExpiringThisWeek } = (() => {
+                const studentContracts = contracts.filter(c => c.studentId === student.id);
+                if (studentContracts.length === 0) return { isExpiringThisMonth: false, isExpiringThisWeek: false };
+                
+                studentContracts.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+                const latestContract = studentContracts[0];
+                
+                if (latestContract.status === 'expired' || latestContract.status !== 'active') {
+                  return { isExpiringThisMonth: false, isExpiringThisWeek: false };
+                }
+                
+                const endDate = new Date(latestContract.endDate);
+                const now = new Date();
+                
+                const timeDiff = endDate.getTime() - now.getTime();
+                const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                const sessionsLeft = latestContract.totalSessions - latestContract.usedSessions;
+                
+                const isWeek = daysLeft <= 7 || sessionsLeft <= 2;
+                const isMonth = (!isNaN(endDate.getTime()) && endDate.getMonth() === now.getMonth() && endDate.getFullYear() === now.getFullYear()) || sessionsLeft <= 5;
+                
+                return { isExpiringThisMonth: isMonth, isExpiringThisWeek: isWeek };
+              })();
+
               return (
-              <div key={student.id} className={`bg-zinc-900 border rounded-2xl p-4 shadow-sm transition-colors ${hasOverdueDebt ? 'border-red-500/30' : 'border-zinc-800'}`}>
+              <div key={student.id} className={`bg-zinc-900 border rounded-2xl p-4 shadow-sm transition-colors ${hasOverdueDebt ? 'border-red-500/30' : (isExpiringThisMonth || isExpiringThisWeek) ? 'border-amber-500/30' : 'border-zinc-800'}`}>
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                    <h3 className="text-lg font-medium text-white flex items-center gap-2 flex-wrap">
                       {student.name}
                       {student.status === 'active' ? (
                         <CheckCircle className="w-4 h-4 text-emerald-500" />
@@ -403,6 +484,17 @@ export default function StudentManagement({ user, profile }: Props) {
                           Nợ quá hạn
                         </span>
                       )}
+                      {isExpiringThisWeek ? (
+                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded-full border border-orange-500/20">
+                          <AlertCircle className="w-3 h-3" />
+                          Sắp hết hạn (Tuần)
+                        </span>
+                      ) : isExpiringThisMonth ? (
+                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full border border-amber-500/20">
+                          <AlertCircle className="w-3 h-3" />
+                          Gia Hạn Gói Tập
+                        </span>
+                      ) : null}
                     </h3>
                     <div className="flex flex-col gap-1 mt-2 text-sm text-zinc-400">
                       {student.phone && (
