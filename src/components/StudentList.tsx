@@ -1,17 +1,18 @@
 import React from 'react';
-import { Student, Schedule, Warning } from '../types';
-import { AlertTriangle, MessageSquare, Trash2, Edit2, CheckCircle2, Circle } from 'lucide-react';
+import { Student, Schedule, Warning, Branch } from '../types';
+import { AlertTriangle, MessageSquare, Trash2, Edit2, CheckCircle2, Circle, MapPin } from 'lucide-react';
 
 interface Props {
   students: Student[];
   schedule: Schedule;
   warnings: Warning[];
+  branches?: Branch[];
   onDelete?: (id: string) => void;
   onEdit: (student: Student) => void;
   onToggleConfirm?: (id: string) => void;
 }
 
-export default function StudentList({ students, schedule, warnings, onDelete, onEdit, onToggleConfirm }: Props) {
+export default function StudentList({ students, schedule, warnings, branches, onDelete, onEdit, onToggleConfirm }: Props) {
   const getStudentSchedule = (studentId: string) => {
     const slots: string[] = [];
     Object.entries(schedule).forEach(([slotId, entries]) => {
@@ -34,48 +35,70 @@ export default function StudentList({ students, schedule, warnings, onDelete, on
     return `${day} (${hour}h)`;
   };
 
+  const warningsByBranch = React.useMemo(() => {
+    const grouped: Record<string, Warning[]> = {};
+    warnings.forEach(w => {
+      const student = students.find(s => s.id === w.studentId);
+      const branchId = student?.branchId || 'none';
+      if (!grouped[branchId]) {
+        grouped[branchId] = [];
+      }
+      grouped[branchId].push(w);
+    });
+    return grouped;
+  }, [warnings, students]);
+
+  const getBranchName = (branchId: string) => {
+    if (branchId === 'none') return 'Chưa xác định';
+    return branches?.find(b => b.id === branchId)?.name || 'Chưa xác định';
+  };
+
   return (
     <div className="space-y-6">
       {warnings.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 space-y-4">
-          <h3 className="text-amber-400 font-black uppercase tracking-wide flex items-center gap-2">
-            <AlertTriangle size={20} />
-            Cảnh báo xếp lịch
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 space-y-4">
+          <h3 className="text-amber-400 font-bold uppercase tracking-wide flex items-center gap-2 text-sm">
+            <AlertTriangle size={18} />
+            Cảnh báo xếp lịch ({warnings.length})
           </h3>
-          <div className="space-y-3">
-            {warnings.map((warning, idx) => {
-              const student = students.find(s => s.id === warning.studentId);
-              return (
-                <div key={idx} className="bg-zinc-950/50 p-4 rounded-xl border border-amber-500/20 shadow-sm">
-                  <p className="font-bold text-zinc-200">
-                    ⚠️ Học viên <span className="text-amber-400">{student?.name}</span> mới xếp được {warning.scheduled}/{warning.requested} buổi.
-                  </p>
-                  <p className="text-sm text-zinc-400 mt-1">
-                    <span className="font-bold text-zinc-300">Lý do:</span> Khung giờ rảnh của HV trùng với các lớp đã kín chỗ.
-                  </p>
-                  {warning.suggestions.length > 0 && (
-                    <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl">
-                      <p className="text-sm text-emerald-400 mb-2">
-                        <span className="font-bold uppercase tracking-wider text-xs mr-2 bg-emerald-500/20 px-2 py-1 rounded">Gợi ý tối ưu</span>
-                        Chỉ cần HV thêm <strong className="text-emerald-300">MỘT TRONG CÁC</strong> giờ sau vào lịch rảnh, hệ thống sẽ xếp được thêm buổi (Ưu tiên các giờ đầu tiên để ghép lớp 2 người):
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {warning.suggestions.map((slot, i) => (
-                          <span key={slot} className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
-                            i < 2 
-                              ? 'bg-emerald-500/30 text-emerald-200 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]' 
-                              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          }`}>
-                            {i === 0 && '⭐ '}
-                            {formatSlot(slot)}
-                          </span>
-                        ))}
+          <div className="space-y-4">
+            {Object.entries(warningsByBranch).map(([branchId, branchWarnings]: [string, Warning[]]) => (
+              <div key={branchId} className="space-y-2">
+                <h4 className="text-amber-500/80 text-xs font-bold uppercase tracking-wider flex items-center gap-1">
+                  <MapPin size={12} />
+                  {getBranchName(branchId)}
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {branchWarnings.map((warning, idx) => {
+                    const student = students.find(s => s.id === warning.studentId);
+                    return (
+                      <div key={idx} className="bg-zinc-950/50 p-3 rounded-xl border border-amber-500/20 shadow-sm flex flex-col justify-between">
+                        <div>
+                          <p className="font-medium text-zinc-200 text-sm">
+                            <span className="text-amber-400 font-bold">{student?.name}</span>: {warning.scheduled}/{warning.requested} buổi
+                          </p>
+                          {warning.suggestions.length > 0 && (
+                            <div className="mt-2 text-xs">
+                              <span className="text-zinc-500">Gợi ý thêm giờ rảnh: </span>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {warning.suggestions.slice(0, 3).map((slot, i) => (
+                                  <span key={slot} className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    {formatSlot(slot)}
+                                  </span>
+                                ))}
+                                {warning.suggestions.length > 3 && (
+                                  <span className="text-[10px] text-zinc-500 px-1 py-0.5">+{warning.suggestions.length - 3}</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}

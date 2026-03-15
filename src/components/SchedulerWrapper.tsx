@@ -105,6 +105,21 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     return filtered;
   }, [students, selectedBranchId, searchTerm]);
 
+  const filteredWarnings = useMemo(() => {
+    return warnings.filter(w => {
+      const student = students.find(s => s.id === w.studentId);
+      if (!student) return false;
+      if (selectedBranchId !== 'all') {
+        if (selectedBranchId === 'none') {
+          return !student.branchId || student.branchId === '';
+        } else {
+          return student.branchId === selectedBranchId;
+        }
+      }
+      return true;
+    });
+  }, [warnings, students, selectedBranchId]);
+
   const saveToFirebase = async (newStudents: Student[], newTrainers: Trainer[], newSchedule: Schedule, newWarnings: Warning[]) => {
     if (user) {
       await setDoc(doc(db, 'schedules', 'global_schedule'), {
@@ -367,7 +382,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               <StudentList 
                 students={filteredStudents} 
                 schedule={schedule} 
-                warnings={warnings}
+                warnings={filteredWarnings}
+                branches={branches}
                 onEdit={setEditingStudent}
                 onToggleConfirm={(id) => {
                   const newStudents = students.map(s => s.id === id ? { ...s, isScheduleConfirmed: !s.isScheduleConfirmed } : s);
