@@ -17,6 +17,7 @@ interface Props {
 export default function PTSchedule({ schedule, students, trainers, currentTrainerId, weekOffset = 0, onUpdateSchedule }: Props) {
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>(currentTrainerId || trainers[0]?.id || '');
   const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
+  const [hoveredStudentId, setHoveredStudentId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>(DAYS[0]);
   
   // Manual Scheduling State
@@ -238,6 +239,7 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                       
                       const isHighlighted = highlightedStudentId && studentIds.includes(highlightedStudentId);
                       const isDimmed = highlightedStudentId && !studentIds.includes(highlightedStudentId);
+                      const isHoveredStudentAvailable = hoveredStudentId && students.find(s => s.id === hoveredStudentId)?.availableSlots?.includes(slotId);
                       
                       return (
                         <td 
@@ -248,9 +250,11 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                           } ${
                             isHighlighted
                               ? 'bg-pink-500/10 shadow-[inset_0_0_20px_rgba(236,72,153,0.1)] border-pink-500/30'
-                              : studentIds.length > 0 
-                                ? isDimmed ? 'bg-zinc-950 opacity-30' : 'bg-zinc-900/30 hover:bg-zinc-800/50' 
-                                : 'bg-transparent text-zinc-800 hover:bg-zinc-900/30'
+                              : isHoveredStudentAvailable
+                                ? 'bg-emerald-500/20 shadow-[inset_0_0_15px_rgba(16,185,129,0.1)] border-emerald-500/30'
+                                : studentIds.length > 0 
+                                  ? isDimmed ? 'bg-zinc-950 opacity-30' : 'bg-zinc-900/30 hover:bg-zinc-800/50' 
+                                  : 'bg-transparent text-zinc-800 hover:bg-zinc-900/30'
                           }`}
                         >
                           {studentIds.length > 0 ? (
@@ -262,6 +266,8 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                                     whileHover={{ scale: 1.02, y: -1 }}
                                     whileTap={{ scale: 0.98 }}
                                     key={id} 
+                                    onMouseEnter={() => setHoveredStudentId(id)}
+                                    onMouseLeave={() => setHoveredStudentId(null)}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setHighlightedStudentId(id === highlightedStudentId ? null : id);
@@ -311,7 +317,11 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
         </div>
         <div className="flex items-center gap-2">
           <Lock className="w-4 h-4 text-zinc-500" />
-          <span className="text-zinc-500">Đã khóa (xếp thủ công)</span>
+          <span className="text-zinc-500">Đã khóa (không bị xếp lại)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-emerald-500/20 border border-emerald-500/30 rounded-md"></div>
+          <span className="text-zinc-500">Giờ rảnh của học viên (khi rê chuột)</span>
         </div>
       </div>
 
@@ -404,6 +414,8 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                         .map(s => (
                           <div 
                             key={s.id} 
+                            onMouseEnter={() => setHoveredStudentId(s.id)}
+                            onMouseLeave={() => setHoveredStudentId(null)}
                             className="flex items-center justify-between p-3 hover:bg-zinc-800 border-b border-zinc-800/50 last:border-0 transition-colors"
                           >
                             <div>

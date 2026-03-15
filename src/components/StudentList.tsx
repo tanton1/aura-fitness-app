@@ -1,6 +1,6 @@
 import React from 'react';
 import { Student, Schedule, Warning, Branch } from '../types';
-import { AlertTriangle, MessageSquare, Trash2, Edit2, CheckCircle2, Circle, MapPin } from 'lucide-react';
+import { AlertTriangle, MessageSquare, Trash2, Edit2, CheckCircle2, Circle, MapPin, Lock, Unlock } from 'lucide-react';
 
 interface Props {
   students: Student[];
@@ -10,9 +10,10 @@ interface Props {
   onDelete?: (id: string) => void;
   onEdit: (student: Student) => void;
   onToggleConfirm?: (id: string) => void;
+  onToggleLockSchedule?: (id: string) => void;
 }
 
-export default function StudentList({ students, schedule, warnings, branches, onDelete, onEdit, onToggleConfirm }: Props) {
+export default function StudentList({ students, schedule, warnings, branches, onDelete, onEdit, onToggleConfirm, onToggleLockSchedule }: Props) {
   const getStudentSchedule = (studentId: string) => {
     const slots: string[] = [];
     Object.entries(schedule).forEach(([slotId, entries]) => {
@@ -28,6 +29,16 @@ export default function StudentList({ students, schedule, warnings, branches, on
       if (dayA !== dayB) return dayA.localeCompare(dayB);
       return parseInt(hourA) - parseInt(hourB);
     });
+  };
+
+  const isStudentLocked = (studentId: string) => {
+    let locked = false;
+    Object.values(schedule).forEach(entries => {
+      if (entries.some(e => e.studentId === studentId && e.isLocked)) {
+        locked = true;
+      }
+    });
+    return locked;
   };
 
   const formatSlot = (slotId: string) => {
@@ -130,6 +141,15 @@ export default function StudentList({ students, schedule, warnings, branches, on
                       </p>
                     </div>
                     <div className="flex gap-2">
+                      {onToggleLockSchedule && studentSchedule.length > 0 && (
+                        <button 
+                          onClick={() => onToggleLockSchedule(student.id)}
+                          className={`p-2 rounded-lg transition-colors ${isStudentLocked(student.id) ? 'text-pink-500 hover:bg-pink-500/10' : 'text-zinc-500 hover:text-pink-400 hover:bg-pink-500/10'}`}
+                          title={isStudentLocked(student.id) ? "Mở khóa lịch tập" : "Khóa lịch tập (không bị đổi khi xếp lại)"}
+                        >
+                          {isStudentLocked(student.id) ? <Lock size={18} /> : <Unlock size={18} />}
+                        </button>
+                      )}
                       {onToggleConfirm && (
                         <button 
                           onClick={() => onToggleConfirm(student.id)}

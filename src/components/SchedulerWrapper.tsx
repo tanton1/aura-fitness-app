@@ -390,6 +390,29 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                   setStudents(newStudents);
                   saveToFirebase(newStudents, trainers, schedule, warnings);
                 }}
+                onToggleLockSchedule={(id) => {
+                  const newSchedule = { ...schedule };
+                  let isCurrentlyLocked = false;
+                  
+                  // Check if currently locked
+                  Object.keys(newSchedule).forEach(slotId => {
+                    newSchedule[slotId].forEach(e => {
+                      if (e.studentId === id && e.isLocked) {
+                        isCurrentlyLocked = true;
+                      }
+                    });
+                  });
+
+                  // Toggle lock for all entries of this student
+                  Object.keys(newSchedule).forEach(slotId => {
+                    newSchedule[slotId] = newSchedule[slotId].map(e => 
+                      e.studentId === id ? { ...e, isLocked: !isCurrentlyLocked } : e
+                    );
+                  });
+
+                  setSchedule(newSchedule);
+                  saveToFirebase(students, trainers, newSchedule, warnings);
+                }}
               />
             </div>
           )}
