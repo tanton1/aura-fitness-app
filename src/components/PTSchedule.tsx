@@ -144,8 +144,6 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                       {hour}:00
                     </td>
                     {DAYS.map(day => {
-                      if (selectedDay !== day) return <td key={`${day}-${hour}`} className="hidden md:table-cell border-b border-r border-zinc-800/50"></td>;
-                      
                       const slotId = `${day}-${hour}`;
                       const slotEntries = schedule[slotId] || [];
                       const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
@@ -158,6 +156,8 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                         <td 
                           key={slotId}
                           className={`border-b border-r border-zinc-800/50 p-1 md:p-1.5 text-center transition-all duration-300 align-top relative ${
+                            selectedDay !== day ? 'hidden md:table-cell' : ''
+                          } ${
                             isHighlighted
                               ? 'bg-pink-500/10 shadow-[inset_0_0_20px_rgba(236,72,153,0.1)] border-pink-500/30'
                               : studentIds.length > 0 
