@@ -155,6 +155,7 @@ export interface StudentContract {
   usedSessions: number;
   totalPrice: number;
   paidAmount: number;
+  discount?: number;
   status: 'active' | 'expired' | 'cancelled';
   nextPaymentDate?: string;
   installments?: Installment[];

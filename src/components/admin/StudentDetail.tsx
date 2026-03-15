@@ -28,6 +28,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
   const [paidAmount, setPaidAmount] = useState('');
+  const [discount, setDiscount] = useState('');
   const [installmentCount, setInstallmentCount] = useState(1);
   const [installments, setInstallments] = useState<{date: string, amount: number}[]>([]);
   const [viewingContract, setViewingContract] = useState<StudentContract | null>(null);
@@ -80,7 +81,8 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
       setEndDate(end.toISOString().split('T')[0]);
     }
 
-    const debt = pkg.price - (Number(paidAmount) || 0);
+    const discountAmount = Number(discount) || 0;
+    const debt = (pkg.price - discountAmount) - (Number(paidAmount) || 0);
     if (debt > 0) {
       const base = Math.floor(debt / installmentCount);
       const rem = debt % installmentCount;
@@ -91,7 +93,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     } else {
       setInstallments([]);
     }
-  }, [installmentCount, paidAmount, selectedPackageId, packages, startDate]);
+  }, [installmentCount, paidAmount, discount, selectedPackageId, packages, startDate]);
 
   const handleInstallmentChange = (index: number, field: 'date' | 'amount', value: string | number) => {
     const newInsts = [...installments];
@@ -123,7 +125,8 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     }
 
     const amountPaid = Number(paidAmount) || 0;
-    const debt = pkg.price - amountPaid;
+    const discountAmount = Number(discount) || 0;
+    const debt = (pkg.price - discountAmount) - amountPaid;
     let finalInstallments: Installment[] = [];
 
     // Calculate referral commission if code is valid
@@ -166,6 +169,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
       usedSessions: 0,
       totalPrice: pkg.price,
       paidAmount: amountPaid,
+      discount: discountAmount,
       status: 'active',
       installments: finalInstallments,
       referralCode: referralCode || null,
@@ -185,6 +189,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     setStartDate(new Date().toISOString().split('T')[0]);
     setEndDate('');
     setPaidAmount('');
+    setDiscount('');
     setInstallmentCount(1);
     setInstallments([]);
   };
@@ -623,6 +628,17 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                   />
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-1">Giảm giá (VNĐ)</label>
+                  <input 
+                    type="number" 
+                    value={discount}
+                    onChange={e => setDiscount(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                    placeholder="VD: 500000"
+                  />
+                </div>
+
                 {selectedPackageId && (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -658,7 +674,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                       <p className="text-xs text-zinc-500 mt-1">Có thể thanh toán một phần hoặc toàn bộ.</p>
                     </div>
 
-                    {Number(paidAmount) < (packages.find(p => p.id === selectedPackageId)?.price || 0) && (
+                    {Number(paidAmount) < ((packages.find(p => p.id === selectedPackageId)?.price || 0) - (Number(discount) || 0)) && (
                       <motion.div 
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
@@ -667,7 +683,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                         <div className="flex justify-between items-center text-sm">
                           <span className="text-zinc-400">Số tiền còn nợ:</span>
                           <span className="text-red-400 font-bold">
-                            {((packages.find(p => p.id === selectedPackageId)?.price || 0) - Number(paidAmount)).toLocaleString('vi-VN')}đ
+                            {((packages.find(p => p.id === selectedPackageId)?.price || 0) - (Number(discount) || 0) - Number(paidAmount)).toLocaleString('vi-VN')}đ
                           </span>
                         </div>
                         
@@ -738,6 +754,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
       <AnimatePresence>
         {viewingContract && (
           <ContractInvoice 
+            key="view-contract"
             student={student}
             contract={viewingContract}
             onClose={() => setViewingContract(null)}
@@ -745,6 +762,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
         )}
         {editingContract && (
           <EditContractModal
+            key="edit-contract"
             contract={editingContract}
             packages={packages}
             trainers={trainers}

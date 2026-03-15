@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Student, UserProfile, StudentContract, TrainingPackage, Trainer, Branch, Session } from '../../types';
+import { Student, UserProfile, StudentContract, TrainingPackage, Trainer, Branch, Session, PaymentRecord } from '../../types';
 import { User } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
@@ -19,6 +19,7 @@ interface Props {
 export default function StudentManagement({ user, profile }: Props) {
   const [students, setStudents] = useState<Student[]>([]);
   const [contracts, setContracts] = useState<StudentContract[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [packages, setPackages] = useState<TrainingPackage[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -72,6 +73,7 @@ export default function StudentManagement({ user, profile }: Props) {
           const data = docSnap.data();
           setStudents(data.students || []);
           setContracts(data.contracts || []);
+          setPayments(data.payments || []);
           setTrainers(data.trainers || []);
           setBranches(data.branches || []);
           setSessions(data.sessions || []);
@@ -121,10 +123,26 @@ export default function StudentManagement({ user, profile }: Props) {
       const newContracts = [...contracts, newContract];
       setContracts(newContracts);
 
+      let newPayments = payments;
+      if (newContract.paidAmount > 0) {
+        const payment: PaymentRecord = {
+          id: Date.now().toString() + '-p',
+          contractId: newContract.id,
+          studentId: newContract.studentId,
+          amount: newContract.paidAmount,
+          date: new Date().toISOString(),
+          method: 'transfer',
+          note: 'Thanh toán lần đầu khi đăng ký gói'
+        };
+        newPayments = [...payments, payment];
+        setPayments(newPayments);
+      }
+
       if (user) {
         await setDoc(doc(db, 'schedules', 'global_schedule'), { 
           contracts: newContracts,
-          students: updatedStudents
+          students: updatedStudents,
+          payments: newPayments
         }, { merge: true });
       }
     } catch (e) {
@@ -135,9 +153,32 @@ export default function StudentManagement({ user, profile }: Props) {
 
   const handleUpdateContract = async (updatedContract: StudentContract) => {
     try {
+      const oldContract = contracts.find(c => c.id === updatedContract.id);
       const newContracts = contracts.map(c => c.id === updatedContract.id ? updatedContract : c);
       setContracts(newContracts);
-      if (user) await setDoc(doc(db, 'schedules', 'global_schedule'), { contracts: newContracts }, { merge: true });
+      
+      let newPayments = payments;
+      if (oldContract && updatedContract.paidAmount > oldContract.paidAmount) {
+        const diff = updatedContract.paidAmount - oldContract.paidAmount;
+        const payment: PaymentRecord = {
+          id: Date.now().toString() + '-p',
+          contractId: updatedContract.id,
+          studentId: updatedContract.studentId,
+          amount: diff,
+          date: new Date().toISOString(),
+          method: 'transfer',
+          note: 'Thanh toán thêm (cập nhật hợp đồng)'
+        };
+        newPayments = [...payments, payment];
+        setPayments(newPayments);
+      }
+
+      if (user) {
+        await setDoc(doc(db, 'schedules', 'global_schedule'), { 
+          contracts: newContracts,
+          payments: newPayments
+        }, { merge: true });
+      }
     } catch (e) {
       console.error("Error updating contract:", e);
       alert("Lỗi cập nhật hợp đồng: " + (e as Error).message);
@@ -396,7 +437,7 @@ export default function StudentManagement({ user, profile }: Props) {
       {/* Add/Edit Modal */}
       <AnimatePresence>
         {isAdding && (
-          <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-4">
+          <div key="add-edit-modal" className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

@@ -56,7 +56,23 @@ export default function FinanceManagement({ user, profile }: Props) {
   }, [contracts, profile]);
 
   const filteredPayments = useMemo(() => {
-    let filtered = payments;
+    // Generate missing payments from contracts
+    const allPayments = [...payments];
+    contracts.forEach(c => {
+      if (c.paidAmount > 0 && !payments.some(p => p.contractId === c.id)) {
+        allPayments.push({
+          id: `auto-${c.id}`,
+          contractId: c.id,
+          studentId: c.studentId,
+          amount: c.paidAmount,
+          date: c.startDate ? new Date(c.startDate).toISOString() : new Date().toISOString(),
+          method: 'transfer',
+          note: 'Thanh toán (tự động tạo)'
+        });
+      }
+    });
+
+    let filtered = allPayments;
     if (profile?.branchId && profile.role !== 'admin') {
       filtered = filtered.filter(p => {
         const contract = contracts.find(c => c.id === p.contractId);
@@ -70,7 +86,7 @@ export default function FinanceManagement({ user, profile }: Props) {
       });
     }
     return filtered;
-  }, [payments, dateRange]);
+  }, [payments, contracts, dateRange, profile]);
 
   useEffect(() => {
     if (user) {
@@ -302,8 +318,8 @@ export default function FinanceManagement({ user, profile }: Props) {
               </div>
 
               <div className="space-y-3">
-                {payments.length > 0 ? (
-                  payments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => (
+                {filteredPayments.length > 0 ? (
+                  filteredPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => (
                     <div key={p.id} className="p-4 bg-zinc-950 rounded-xl border border-zinc-800 flex justify-between items-center">
                       <div>
                         <p className="text-white font-medium">{getStudentName(p.studentId)}</p>
@@ -324,7 +340,7 @@ export default function FinanceManagement({ user, profile }: Props) {
       {/* Payment Modal */}
       <AnimatePresence>
         {isPaying && selectedContract && (
-          <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-4">
+          <div key="payment-modal" className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

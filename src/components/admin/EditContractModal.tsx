@@ -94,6 +94,16 @@ export default function EditContractModal({ contract, packages, trainers, branch
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-zinc-400 mb-1">Giảm giá (VNĐ)</label>
+            <input 
+              type="number" 
+              value={formData.discount || 0}
+              onChange={e => setFormData({ ...formData, discount: Number(e.target.value) })}
+              className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-zinc-400 mb-1">Đã thanh toán (VNĐ)</label>
             <input 
               type="number" 

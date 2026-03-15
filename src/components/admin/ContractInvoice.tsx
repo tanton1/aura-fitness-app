@@ -85,13 +85,19 @@ export default function ContractInvoice({ student, contract, onClose }: Props) {
                   <span className="text-gray-600">Tổng giá trị HĐ:</span>
                   <span className="font-bold">{contract.totalPrice.toLocaleString('vi-VN')}đ</span>
                 </div>
+                {contract.discount && contract.discount > 0 && (
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span>Giảm giá:</span>
+                    <span>-{contract.discount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm text-emerald-600">
                   <span>Đã thanh toán:</span>
                   <span>{contract.paidAmount.toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t-2 border-black pt-2 mt-2">
                   <span>Còn nợ:</span>
-                  <span className="text-red-600">{(contract.totalPrice - contract.paidAmount).toLocaleString('vi-VN')}đ</span>
+                  <span className="text-red-600">{(contract.totalPrice - (contract.discount || 0) - contract.paidAmount).toLocaleString('vi-VN')}đ</span>
                 </div>
               </div>
             </div>
