@@ -321,28 +321,19 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
       {/* Header */}
       <div className="bg-zinc-900 p-6 rounded-b-3xl shadow-sm">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-serif font-medium text-white">
-              Chào {profile.name || auth.currentUser?.displayName || 'bạn'}!
-            </h1>
-            <p className="text-zinc-400 text-sm">Chỉ cần quay lại bữa tiếp theo là ổn nha!</p>
-          </div>
-          <div className="w-12 h-12">
-            <img 
-              src="/logo.png" 
-              alt="Aura Fitness" 
-              className="w-full h-full object-contain drop-shadow-[0_0_10px_rgba(255,0,255,0.3)]"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-                const fallback = document.getElementById('avatar-fallback');
-                if (fallback) fallback.style.display = 'flex';
-              }}
-            />
-            <div id="avatar-fallback" className="hidden w-full h-full bg-gradient-to-br from-pink-500 to-rose-500 rounded-full items-center justify-center shadow-lg shadow-pink-500/20">
-              <span className="text-xl font-bold text-white">
-                {profile.name?.charAt(0).toUpperCase() || auth.currentUser?.displayName?.charAt(0).toUpperCase() || 'A'}
-              </span>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Aura" className="h-10 w-10 object-contain" />
+            <div>
+              <h1 className="text-2xl font-serif font-medium text-white">
+                Chào {profile.name || auth.currentUser?.displayName || 'bạn'}!
+              </h1>
+              <p className="text-zinc-400 text-sm">Chỉ cần quay lại bữa tiếp theo là ổn nha!</p>
             </div>
+          </div>
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-lg shadow-pink-500/20">
+            <span className="text-xl font-bold text-white">
+              {profile.name?.charAt(0).toUpperCase() || auth.currentUser?.displayName?.charAt(0).toUpperCase() || 'A'}
+            </span>
           </div>
         </div>
 

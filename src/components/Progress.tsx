@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Calendar, Scale, Percent, Ruler, Accessibility, User, PlusCircle, X, Settings, LogOut, Camera, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Scale, Percent, Ruler, Accessibility, User, PlusCircle, X, Settings, LogOut, Camera, Trash2, Pencil, Heart, Circle, Activity, Dumbbell, Waves, Drumstick, Apple } from 'lucide-react';
 import { UserProfile, ProgressRecord } from '../types';
 import { calculateMacros } from '../utils/calculations';
 import { auth } from '../lib/firebase';
@@ -110,9 +110,12 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
         <div className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-zinc-800 cursor-pointer">
           <ArrowLeft className="w-6 h-6 text-pink-500 drop-shadow-[0_0_5px_rgba(255,0,127,0.8)]" />
         </div>
-        <h2 className="text-lg font-bold text-white drop-shadow-[0_0_5px_rgba(255,0,127,0.8)]">
-          Theo dõi tiến độ
-        </h2>
+        <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="Aura" className="h-8 w-8 object-contain" />
+            <h2 className="text-lg font-bold text-white drop-shadow-[0_0_5px_rgba(255,0,127,0.8)]">
+              Theo dõi tiến độ
+            </h2>
+        </div>
         <div className="flex w-10 items-center justify-end">
           <button onClick={onResetProfile} className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-transparent hover:bg-zinc-800" title="Thiết lập lại mục tiêu">
             <Settings className="w-6 h-6 text-pink-500 drop-shadow-[0_0_5px_rgba(255,0,127,0.8)]" />
@@ -204,7 +207,7 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
             <div className="flex items-center justify-between p-4 bg-zinc-900 border border-pink-500/20 rounded-xl shadow-[0_0_15px_rgba(0,255,255,0.05)]">
               <div className="flex items-center gap-3">
                 <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
-                  <Ruler className="w-5 h-5" />
+                  <Dumbbell className="w-5 h-5" />
                 </div>
                 <span className="font-medium text-zinc-200">Vòng tay</span>
               </div>
@@ -215,7 +218,7 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
             <div className="flex items-center justify-between p-4 bg-zinc-900 border border-pink-500/20 rounded-xl shadow-[0_0_15px_rgba(0,255,255,0.05)]">
               <div className="flex items-center gap-3">
                 <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
-                  <Ruler className="w-5 h-5" />
+                  <Circle className="w-5 h-5" />
                 </div>
                 <span className="font-medium text-zinc-200">Vòng eo</span>
               </div>
@@ -226,7 +229,7 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
             <div className="flex items-center justify-between p-4 bg-zinc-900 border border-pink-500/20 rounded-xl shadow-[0_0_15px_rgba(0,255,255,0.05)]">
               <div className="flex items-center gap-3">
                 <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
-                  <Accessibility className="w-5 h-5" />
+                  <Waves className="w-5 h-5" />
                 </div>
                 <span className="font-medium text-zinc-200">Vòng hông</span>
               </div>
@@ -237,23 +240,23 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
             <div className="flex items-center justify-between p-4 bg-zinc-900 border border-pink-500/20 rounded-xl shadow-[0_0_15px_rgba(0,255,255,0.05)]">
               <div className="flex items-center gap-3">
                 <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
-                  <User className="w-5 h-5" />
-                </div>
-                <span className="font-medium text-zinc-200">Vòng mông</span>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-white">{latestRecord?.butt ? `${latestRecord.butt} cm` : '--'}</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-zinc-900 border border-pink-500/20 rounded-xl shadow-[0_0_15px_rgba(0,255,255,0.05)] col-span-2">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
-                  <User className="w-5 h-5" />
+                  <Drumstick className="w-5 h-5" />
                 </div>
                 <span className="font-medium text-zinc-200">Vòng đùi</span>
               </div>
               <div className="text-right">
                 <p className="font-bold text-white">{latestRecord?.thigh ? `${latestRecord.thigh} cm` : '--'}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-zinc-900 border border-pink-500/20 rounded-xl shadow-[0_0_15px_rgba(0,255,255,0.05)] col-span-2">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
+                  <Apple className="w-5 h-5" />
+                </div>
+                <span className="font-medium text-zinc-200">Vòng mông</span>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-white">{latestRecord?.butt ? `${latestRecord.butt} cm` : '--'}</p>
               </div>
             </div>
           </div>
@@ -412,12 +415,31 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
                     {formData.photos.map((photo, idx) => (
                       <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-zinc-700 group">
                         <img src={photo} alt="Progress" className="w-full h-full object-cover" />
-                        <button 
-                          onClick={() => removePhoto(idx)}
-                          className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="w-5 h-5 text-red-500" />
-                        </button>
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2 transition-opacity">
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              fileInputRef.current?.click();
+                              removePhoto(idx);
+                            }}
+                            className="p-1.5 bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors"
+                          >
+                            <Pencil className="w-4 h-4 text-white" />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removePhoto(idx);
+                            }}
+                            className="p-1.5 bg-red-500/20 rounded-full hover:bg-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500 hover:text-white" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     {formData.photos.length < 3 && (

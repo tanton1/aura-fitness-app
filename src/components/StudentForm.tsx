@@ -15,7 +15,6 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
   const [sessions, setSessions] = useState(3);
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [weekOffset, setWeekOffset] = useState(0);
-  const [selectedDay, setSelectedDay] = useState<string>(DAYS[0]);
   
   const currentWeekDates = useMemo(() => getDatesForWeek(weekOffset), [weekOffset]);
 
@@ -144,33 +143,17 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
             </span>
           </div>
           
-          <div className="md:hidden flex w-full gap-1 mb-4">
-            {DAYS.map(day => (
-              <button
-                key={day}
-                type="button"
-                onClick={() => setSelectedDay(day)}
-                className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
-                  selectedDay === day
-                    ? 'bg-pink-500 text-white border-pink-500'
-                    : 'bg-zinc-950 text-zinc-400 border-zinc-800'
-                }`}
-              >
-                {day}
-              </button>
-            ))}
-          </div>
           
-          <div className="-mx-4 md:mx-0 overflow-x-auto hide-scrollbar md:rounded-xl border-y md:border border-zinc-800 bg-zinc-950 w-auto md:w-full">
-            <table className="w-full text-sm text-left border-collapse table-fixed">
+          <div className="mx-0 md:mx-0 overflow-hidden hide-scrollbar rounded-xl border border-zinc-800 bg-zinc-950 w-full">
+            <table className="w-full text-xs md:text-sm text-left border-collapse table-fixed">
               <thead>
                 <tr>
-                  <th className="border-b border-r border-zinc-800 p-2 bg-zinc-900 w-16 md:w-20 text-center font-bold text-zinc-400 uppercase sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">Giờ</th>
+                  <th className="border-b border-r border-zinc-800 p-1 md:p-2 bg-zinc-900 w-10 md:w-20 text-center font-bold text-zinc-400 uppercase sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">Giờ</th>
                   {DAYS.map(day => (
-                    <th key={day} className={`border-b border-r border-zinc-800 p-2 bg-zinc-900 text-center font-bold text-zinc-300 uppercase tracking-wider ${selectedDay !== day ? 'hidden md:table-cell' : ''}`}>
+                    <th key={day} className="border-b border-r border-zinc-800 p-1 md:p-2 bg-zinc-900 text-center font-bold text-zinc-300 uppercase tracking-wider">
                       <div className="flex flex-col items-center justify-center">
                         <span>{day}</span>
-                        <span className="text-[10px] text-zinc-500 font-normal mt-0.5">{currentWeekDates[day]?.display}</span>
+                        <span className="text-[9px] md:text-[10px] text-zinc-500 font-normal mt-0.5">{currentWeekDates[day]?.display}</span>
                       </div>
                     </th>
                   ))}
@@ -179,8 +162,8 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
               <tbody>
                 {HOURS.map(hour => (
                   <tr key={hour} className="group">
-                    <td className="border-b border-r border-zinc-800 p-2 text-center font-mono font-bold bg-zinc-900 text-zinc-400 group-hover:text-zinc-200 transition-colors sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">
-                      {hour}:00
+                    <td className="border-b border-r border-zinc-800 p-1 md:p-2 text-center font-mono font-bold bg-zinc-900 text-zinc-400 group-hover:text-zinc-200 transition-colors sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">
+                      {hour}h
                     </td>
                     {DAYS.map(day => {
                       const slotId = `${day}-${hour}`;
@@ -189,9 +172,7 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
                         <td 
                           key={slotId}
                           onClick={() => toggleSlot(slotId)}
-                          className={`border-b border-r border-zinc-800 p-2 text-center text-lg font-bold cursor-pointer transition-all duration-200 relative ${
-                            selectedDay !== day ? 'hidden md:table-cell' : ''
-                          } ${
+                          className={`border-b border-r border-zinc-800 p-1 md:p-2 text-center text-base md:text-lg font-bold cursor-pointer transition-all duration-200 relative ${
                             isSelected 
                               ? 'bg-pink-600/20 text-pink-400 font-bold shadow-[inset_0_0_15px_rgba(236,72,153,0.3)]' 
                               : 'hover:bg-zinc-800 text-transparent hover:text-zinc-600'

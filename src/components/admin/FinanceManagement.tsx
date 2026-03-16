@@ -261,7 +261,7 @@ export default function FinanceManagement({ user, profile }: Props) {
         )}
       </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap gap-2 items-center">
         <DateRangeFilter onFilter={(start, end) => setDateRange({ start, end })} />
         <select 
           value={selectedBranchId}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, ProgressRecord } from '../../types';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Scale, Percent, Ruler, Accessibility, User, PlusCircle, X, Camera, Trash2 } from 'lucide-react';
+import { Scale, Percent, Ruler, Accessibility, User, PlusCircle, X, Camera, Trash2, Pencil, Heart, Circle, Activity, Dumbbell, Waves, Drumstick, Apple } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { compressImage } from '../../utils/imageCompression';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -202,26 +202,31 @@ export default function StudentProgressAdmin({ studentId }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <Dumbbell className="w-4 h-4 text-pink-500 mx-auto mb-1" />
               <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng tay</p>
               <p className="text-white font-medium">{latestRecord?.arm ? `${latestRecord.arm} cm` : '--'}</p>
             </div>
             <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <Circle className="w-4 h-4 text-pink-500 mx-auto mb-1" />
               <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng eo</p>
               <p className="text-white font-medium">{latestRecord?.waist ? `${latestRecord.waist} cm` : '--'}</p>
             </div>
             <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <Waves className="w-4 h-4 text-pink-500 mx-auto mb-1" />
               <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng hông</p>
               <p className="text-white font-medium">{latestRecord?.hip ? `${latestRecord.hip} cm` : '--'}</p>
             </div>
             <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-              <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng mông</p>
-              <p className="text-white font-medium">{latestRecord?.butt ? `${latestRecord.butt} cm` : '--'}</p>
-            </div>
-            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center col-span-2">
+              <Drumstick className="w-4 h-4 text-pink-500 mx-auto mb-1" />
               <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng đùi</p>
               <p className="text-white font-medium">{latestRecord?.thigh ? `${latestRecord.thigh} cm` : '--'}</p>
+            </div>
+            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center col-span-2">
+              <Apple className="w-4 h-4 text-pink-500 mx-auto mb-1" />
+              <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng mông</p>
+              <p className="text-white font-medium">{latestRecord?.butt ? `${latestRecord.butt} cm` : '--'}</p>
             </div>
           </div>
 
@@ -395,12 +400,32 @@ export default function StudentProgressAdmin({ studentId }: Props) {
                     {formData.photos.map((photo, idx) => (
                       <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-zinc-700 group">
                         <img src={photo} alt="Progress" className="w-full h-full object-cover" />
-                        <button 
-                          onClick={() => removePhoto(idx)}
-                          className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="w-5 h-5 text-red-500" />
-                        </button>
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2 transition-opacity">
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              // Simple edit: trigger file input to replace
+                              fileInputRef.current?.click();
+                              removePhoto(idx);
+                            }}
+                            className="p-1.5 bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors"
+                          >
+                            <Pencil className="w-4 h-4 text-white" />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removePhoto(idx);
+                            }}
+                            className="p-1.5 bg-red-500/20 rounded-full hover:bg-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500 hover:text-white" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     {formData.photos.length < 3 && (

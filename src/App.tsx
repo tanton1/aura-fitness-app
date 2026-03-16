@@ -17,6 +17,7 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import PersonalDashboard from './components/admin/PersonalDashboard';
 
 import FoodDatabase from './components/FoodDatabase';
+import Logo from './components/Logo';
 
 export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -141,6 +142,8 @@ export default function App() {
 
   return (
     <div className={`bg-zinc-950 min-h-screen font-sans text-zinc-100 relative overflow-hidden shadow-2xl ${isFullWidth ? 'w-full' : 'max-w-md mx-auto'}`}>
+      <div className="p-4 flex justify-center">
+      </div>
       <AnimatePresence mode="wait">
         <motion.div
           key={currentScreen}
