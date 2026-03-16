@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Calendar, ShoppingCart, Target, LineChart, Settings, Users, DollarSign, Briefcase, CreditCard, User } from 'lucide-react';
+import { Home, Calendar, ShoppingCart, Target, LineChart, Settings, Users, DollarSign, Briefcase, CreditCard, User, Utensils } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface Props {
@@ -19,6 +19,7 @@ export default function BottomNav({ currentScreen, onNavigate, profile }: Props)
     navItems = [
       { id: 'personal', icon: User, label: 'Cá nhân' },
       { id: 'students', icon: Users, label: 'Học viên' },
+      { id: 'dishes', icon: Utensils, label: 'Món ăn' },
       { id: 'scheduler', icon: Calendar, label: 'Xếp lịch' },
     ];
 
@@ -39,6 +40,7 @@ export default function BottomNav({ currentScreen, onNavigate, profile }: Props)
     navItems = [
       { id: 'dashboard', icon: Home, label: 'Hôm nay' },
       { id: 'week_plan', icon: Calendar, label: 'Kế hoạch' },
+      { id: 'dishes', icon: Utensils, label: 'Món ăn' },
       { id: 'scheduler', icon: Calendar, label: 'Xếp lịch' },
       { id: 'progress', icon: LineChart, label: 'Tiến độ' },
       { id: 'grocery', icon: ShoppingCart, label: 'Đi chợ' },

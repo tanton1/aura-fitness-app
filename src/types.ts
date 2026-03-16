@@ -3,6 +3,20 @@ export type Day = 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7';
 export const DAYS: Day[] = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 export const HOURS = [6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20];
 
+export interface HealthyDish {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  category: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  ingredients: string[];
+  instructions?: string[];
+  portion?: string;
+  image?: string;
+}
+
 export interface Macros {
   kcal: number;
   protein: number;

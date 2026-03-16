@@ -11,9 +11,10 @@ interface Props {
   profile: UserProfile;
   onUpdateProfile: (profile: UserProfile) => void;
   onResetProfile: () => void;
+  onNavigate: (screen: string) => void;
 }
 
-export default function PersonalDashboard({ profile, onUpdateProfile, onResetProfile }: Props) {
+export default function PersonalDashboard({ profile, onUpdateProfile, onResetProfile, onNavigate }: Props) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'week_plan' | 'progress' | 'grocery' | 'check_in'>('dashboard');
 
   const tabs = [
@@ -53,7 +54,7 @@ export default function PersonalDashboard({ profile, onUpdateProfile, onResetPro
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto relative">
         {activeTab === 'dashboard' && <Dashboard profile={profile} onUpdateProfile={onUpdateProfile} />}
-        {activeTab === 'week_plan' && <WeekPlan profile={profile} />}
+        {activeTab === 'week_plan' && <WeekPlan profile={profile} onNavigate={onNavigate} />}
         {activeTab === 'progress' && <Progress profile={profile} onUpdateProfile={onUpdateProfile} onResetProfile={onResetProfile} />}
         {activeTab === 'grocery' && <GroceryList profile={profile} />}
         {activeTab === 'check_in' && <CheckIn />}

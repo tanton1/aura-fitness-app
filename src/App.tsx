@@ -17,6 +17,8 @@ import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import AdminDashboard from './components/admin/AdminDashboard';
 import PersonalDashboard from './components/admin/PersonalDashboard';
 
+import FoodDatabase from './components/FoodDatabase';
+
 export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState('dashboard');
@@ -110,7 +112,9 @@ export default function App() {
       case 'dashboard':
         return <Dashboard profile={profile} onUpdateProfile={handleUpdateProfile} />;
       case 'week_plan':
-        return <WeekPlan profile={profile} />;
+        return <WeekPlan profile={profile} onNavigate={setCurrentScreen} />;
+      case 'food_db':
+        return <FoodDatabase onNavigate={setCurrentScreen} />;
       case 'progress':
         return <Progress profile={profile} onUpdateProfile={handleUpdateProfile} onResetProfile={handleResetProfile} />;
       case 'grocery':
@@ -120,7 +124,7 @@ export default function App() {
       case 'scheduler':
         return <SchedulerWrapper user={user} profile={profile} />;
       case 'personal':
-        return <PersonalDashboard profile={profile} onUpdateProfile={handleUpdateProfile} onResetProfile={handleResetProfile} />;
+        return <PersonalDashboard profile={profile} onUpdateProfile={handleUpdateProfile} onResetProfile={handleResetProfile} onNavigate={setCurrentScreen} />;
       case 'overview':
         return <AdminDashboard user={user} profile={profile} activeTab="overview" onNavigate={setCurrentScreen} />;
       case 'students':

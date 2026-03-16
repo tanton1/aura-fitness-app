@@ -446,7 +446,7 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
                 return (
                   <div key={idx} className="flex items-center gap-2 text-sm text-zinc-300">
                     <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
-                    <span>{item.multiplier}x {food?.portion_common} {food?.name}</span>
+                    <span>{item.multiplier}x {food?.portion_common} {food?.name} <span className="text-zinc-500 text-xs">({food?.macros.kcal} kcal/chuẩn)</span></span>
                   </div>
                 );
               }) : (

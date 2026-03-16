@@ -25,6 +25,31 @@
         "packages": { "type": "array" },
         "sessions": { "type": "array" }
       }
+    },
+    "HealthyDish": {
+      "title": "HealthyDish",
+      "description": "Healthy Vietnamese dish information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "ingredients": { "type": "array" },
+        "portionSize": { "type": "string" },
+        "calories": { "type": "number" },
+        "category": { "type": "string" }
+      },
+      "required": ["name", "calories", "category"]
+    },
+    "MealPlan": {
+      "title": "MealPlan",
+      "description": "Weekly meal plan for a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "targetCalories": { "type": "number" },
+        "weekStartDate": { "type": "string" },
+        "days": { "type": "array" }
+      },
+      "required": ["userId", "targetCalories", "weekStartDate", "days"]
     }
   },
   "firestore": {
@@ -50,6 +75,14 @@
         }
       },
       "description": "Daily student check-ins"
+    },
+    "/healthyDishes/{dishId}": {
+      "schema": { "$ref": "HealthyDish" },
+      "description": "Healthy Vietnamese dishes"
+    },
+    "/mealPlans/{planId}": {
+      "schema": { "$ref": "MealPlan" },
+      "description": "Weekly meal plans"
     }
   }
 }
