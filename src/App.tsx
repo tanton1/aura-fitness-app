@@ -3,7 +3,6 @@ import { UserProfile } from './types';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 import WeekPlan from './components/WeekPlan';
-import GroceryList from './components/GroceryList';
 import CheckIn from './components/CheckIn';
 import SchedulerWrapper from './components/SchedulerWrapper';
 import Progress from './components/Progress';
@@ -117,8 +116,6 @@ export default function App() {
         return <FoodDatabase onNavigate={setCurrentScreen} />;
       case 'progress':
         return <Progress profile={profile} onUpdateProfile={handleUpdateProfile} onResetProfile={handleResetProfile} />;
-      case 'grocery':
-        return <GroceryList profile={profile} />;
       case 'check_in':
         return <CheckIn />;
       case 'scheduler':

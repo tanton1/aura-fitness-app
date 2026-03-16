@@ -54,6 +54,63 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
     XLSX.writeFile(wb, `Lich_Tap_PT_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.xlsx`);
   };
 
+  const handleExportPDF = () => {
+    let html = `
+      <html>
+      <head>
+        <title>Lịch Tập PT</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; color: #333; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .trainer-name { margin-bottom: 20px; font-size: 16px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <h1>Lịch Tập PT</h1>
+        <div class="trainer-name">Huấn luyện viên: ${trainers.find(t => t.id === selectedTrainerId)?.name || 'Tất cả'}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Giờ</th>
+              ${DAYS.map(day => `<th>${day}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${HOURS.map(hour => `
+              <tr>
+                <td><strong>${hour}:00</strong></td>
+                ${DAYS.map(day => {
+                  const slotId = `${day}-${hour}`;
+                  const slotEntries = schedule[slotId] || [];
+                  const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
+                  const studentNames = trainerEntries.map(e => getStudentName(e.studentId)).join('<br/>');
+                  return `<td>${studentNames}</td>`;
+                }).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    } else {
+      alert('Vui lòng cho phép mở popup để in PDF.');
+    }
+  };
+
   const openSlotEditor = (day: string, hour: number) => {
     if (currentTrainerId) return; // Only admin can edit
     const slotId = `${day}-${hour}`;
@@ -158,9 +215,9 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
           </AnimatePresence>
         </div>
         
-        <div className="flex gap-2 w-full md:w-auto shrink-0">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto shrink-0">
           {!currentTrainerId && (
-            <div className="relative w-full md:w-64 shrink-0">
+            <div className="relative w-full sm:w-64 shrink-0">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <User className="w-4 h-4 text-zinc-500" />
               </div>
@@ -178,12 +235,20 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
               </div>
             </div>
           )}
-          <button
-            onClick={handleExportExcel}
-            className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-emerald-500 transition-all flex items-center gap-2 shadow-sm shrink-0"
-          >
-            <Download className="w-4 h-4" /> Xuất Excel
-          </button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              onClick={handleExportExcel}
+              className="flex-1 sm:flex-none justify-center bg-emerald-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-emerald-500 transition-all flex items-center gap-2 shadow-sm shrink-0"
+            >
+              <Download className="w-4 h-4" /> Excel
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="flex-1 sm:flex-none justify-center bg-rose-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-rose-500 transition-all flex items-center gap-2 shadow-sm shrink-0"
+            >
+              <Download className="w-4 h-4" /> PDF
+            </button>
+          </div>
         </div>
       </div>
 

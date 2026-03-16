@@ -27,13 +27,13 @@ export default function BottomNav({ currentScreen, onNavigate, profile }: Props)
       navItems.push({ id: 'finance', icon: DollarSign, label: 'Tài chính' });
     }
     
-    if (isAdmin) {
-      navItems.push({ id: 'hr', icon: Settings, label: 'Cài đặt' });
-    }
-
     // Payroll for admin, manager, trainer
     if (['admin', 'manager', 'trainer'].includes(profile?.role || '')) {
       navItems.push({ id: 'payroll', icon: CreditCard, label: 'Lương' });
+    }
+
+    if (isAdmin) {
+      navItems.push({ id: 'hr', icon: Settings, label: 'Cài đặt' });
     }
   } else {
     navItems = [
@@ -41,7 +41,6 @@ export default function BottomNav({ currentScreen, onNavigate, profile }: Props)
       { id: 'week_plan', icon: Calendar, label: 'Kế hoạch' },
       { id: 'scheduler', icon: Calendar, label: 'Xếp lịch' },
       { id: 'progress', icon: LineChart, label: 'Tiến độ' },
-      { id: 'grocery', icon: ShoppingCart, label: 'Đi chợ' },
       { id: 'check_in', icon: Target, label: 'Check-in' },
     ];
   }

@@ -15,6 +15,7 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
   const [sessions, setSessions] = useState(3);
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [weekOffset, setWeekOffset] = useState(0);
+  const [selectedDay, setSelectedDay] = useState<string>(DAYS[0]);
   
   const currentWeekDates = useMemo(() => getDatesForWeek(weekOffset), [weekOffset]);
 
@@ -60,7 +61,7 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
   };
 
   return (
-    <div className="bg-zinc-900 p-6 md:p-8 rounded-2xl shadow-xl border border-zinc-800">
+    <div className="bg-transparent md:bg-zinc-900 p-0 md:p-6 md:rounded-2xl md:shadow-xl md:border border-zinc-800">
       <div className="mb-8 flex justify-between items-start">
         <div>
           <h2 className="text-xl md:text-2xl font-black text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] uppercase tracking-wide flex items-center gap-3 border-b-2 border-pink-500/30 pb-2 inline-block shadow-[0_4px_0_rgba(236,72,153,0.2)] rounded-xl">
@@ -143,55 +144,70 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
             </span>
           </div>
           
-          <div className="md:hidden text-xs text-zinc-500 italic">👉 Vuốt ngang để xem hết các ngày</div>
+          <div className="md:hidden flex w-full gap-1 mb-4">
+            {DAYS.map(day => (
+              <button
+                key={day}
+                type="button"
+                onClick={() => setSelectedDay(day)}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
+                  selectedDay === day
+                    ? 'bg-pink-500 text-white border-pink-500'
+                    : 'bg-zinc-950 text-zinc-400 border-zinc-800'
+                }`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
           
-          <div className="overflow-x-auto hide-scrollbar rounded-xl border border-zinc-800 bg-zinc-950">
-            <div className="min-w-[600px]">
-              <table className="w-full text-sm text-left border-collapse">
-                <thead>
-                  <tr>
-                    <th className="border-b border-r border-zinc-800 p-3 bg-zinc-900 w-20 text-center font-bold text-zinc-400 uppercase sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">Giờ</th>
-                    {DAYS.map(day => (
-                      <th key={day} className="border-b border-r border-zinc-800 p-3 bg-zinc-900 text-center font-bold text-zinc-300 uppercase">
-                        <div className="flex flex-col items-center justify-center">
-                          <span>{day}</span>
-                          <span className="text-[10px] text-zinc-500 font-normal mt-0.5">{currentWeekDates[day]?.display}</span>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {HOURS.map(hour => (
-                    <tr key={hour} className="group">
-                      <td className="border-b border-r border-zinc-800 p-3 text-center font-mono font-bold bg-zinc-900 text-zinc-400 group-hover:text-zinc-200 transition-colors sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">
-                        {hour}:00
-                      </td>
-                      {DAYS.map(day => {
-                        const slotId = `${day}-${hour}`;
-                        const isSelected = selectedSlots.has(slotId);
-                        return (
-                          <td 
-                            key={slotId}
-                            onClick={() => toggleSlot(slotId)}
-                            className={`border-b border-r border-zinc-800 p-3 text-center text-lg font-bold cursor-pointer transition-all duration-200 relative ${
-                              isSelected 
-                                ? 'bg-pink-600/20 text-pink-400 font-bold shadow-[inset_0_0_15px_rgba(236,72,153,0.3)]' 
-                                : 'hover:bg-zinc-800 text-transparent hover:text-zinc-600'
-                            }`}
-                          >
-                            {isSelected && (
-                              <div className="absolute inset-0 border-2 border-pink-500 rounded-sm m-0.5 shadow-[0_0_10px_rgba(236,72,153,0.5)]"></div>
-                            )}
-                            {isSelected ? '✓' : '+'}
-                          </td>
-                        );
-                      })}
-                    </tr>
+          <div className="-mx-4 md:mx-0 overflow-x-auto hide-scrollbar md:rounded-xl border-y md:border border-zinc-800 bg-zinc-950 w-auto md:w-full">
+            <table className="w-full text-sm text-left border-collapse table-fixed">
+              <thead>
+                <tr>
+                  <th className="border-b border-r border-zinc-800 p-2 bg-zinc-900 w-16 md:w-20 text-center font-bold text-zinc-400 uppercase sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">Giờ</th>
+                  {DAYS.map(day => (
+                    <th key={day} className={`border-b border-r border-zinc-800 p-2 bg-zinc-900 text-center font-bold text-zinc-300 uppercase tracking-wider ${selectedDay !== day ? 'hidden md:table-cell' : ''}`}>
+                      <div className="flex flex-col items-center justify-center">
+                        <span>{day}</span>
+                        <span className="text-[10px] text-zinc-500 font-normal mt-0.5">{currentWeekDates[day]?.display}</span>
+                      </div>
+                    </th>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </tr>
+              </thead>
+              <tbody>
+                {HOURS.map(hour => (
+                  <tr key={hour} className="group">
+                    <td className="border-b border-r border-zinc-800 p-2 text-center font-mono font-bold bg-zinc-900 text-zinc-400 group-hover:text-zinc-200 transition-colors sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">
+                      {hour}:00
+                    </td>
+                    {DAYS.map(day => {
+                      const slotId = `${day}-${hour}`;
+                      const isSelected = selectedSlots.has(slotId);
+                      return (
+                        <td 
+                          key={slotId}
+                          onClick={() => toggleSlot(slotId)}
+                          className={`border-b border-r border-zinc-800 p-2 text-center text-lg font-bold cursor-pointer transition-all duration-200 relative ${
+                            selectedDay !== day ? 'hidden md:table-cell' : ''
+                          } ${
+                            isSelected 
+                              ? 'bg-pink-600/20 text-pink-400 font-bold shadow-[inset_0_0_15px_rgba(236,72,153,0.3)]' 
+                              : 'hover:bg-zinc-800 text-transparent hover:text-zinc-600'
+                          }`}
+                        >
+                          {isSelected && (
+                            <div className="absolute inset-0 border-2 border-pink-500 rounded-sm m-0.5 shadow-[0_0_10px_rgba(236,72,153,0.5)]"></div>
+                          )}
+                          {isSelected ? '✓' : '+'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 

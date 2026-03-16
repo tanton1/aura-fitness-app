@@ -20,8 +20,10 @@ export default function StudentProgressAdmin({ studentId }: Props) {
   const [formData, setFormData] = useState({
     weight: '',
     body_fat: '',
+    arm: '',
     waist: '',
     hip: '',
+    butt: '',
     thigh: '',
     photos: [] as string[]
   });
@@ -91,8 +93,10 @@ export default function StudentProgressAdmin({ studentId }: Props) {
       weight: newWeight,
       photos: formData.photos,
       body_fat: formData.body_fat ? Number(formData.body_fat) : 0,
+      arm: formData.arm ? Number(formData.arm) : 0,
       waist: formData.waist ? Number(formData.waist) : 0,
       hip: formData.hip ? Number(formData.hip) : 0,
+      butt: formData.butt ? Number(formData.butt) : 0,
       thigh: formData.thigh ? Number(formData.thigh) : 0,
     };
 
@@ -165,7 +169,7 @@ export default function StudentProgressAdmin({ studentId }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-bold text-white">Chỉ số cơ thể</h3>
+        <h3 className="text-lg font-bold text-white">Chỉ số hình thể</h3>
         <button 
           onClick={() => setIsUpdating(true)}
           className="bg-pink-500/10 text-pink-500 hover:bg-pink-500 hover:text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-1"
@@ -200,6 +204,10 @@ export default function StudentProgressAdmin({ studentId }: Props) {
 
           <div className="grid grid-cols-3 gap-3">
             <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng tay</p>
+              <p className="text-white font-medium">{latestRecord?.arm ? `${latestRecord.arm} cm` : '--'}</p>
+            </div>
+            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
               <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng eo</p>
               <p className="text-white font-medium">{latestRecord?.waist ? `${latestRecord.waist} cm` : '--'}</p>
             </div>
@@ -208,6 +216,10 @@ export default function StudentProgressAdmin({ studentId }: Props) {
               <p className="text-white font-medium">{latestRecord?.hip ? `${latestRecord.hip} cm` : '--'}</p>
             </div>
             <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng mông</p>
+              <p className="text-white font-medium">{latestRecord?.butt ? `${latestRecord.butt} cm` : '--'}</p>
+            </div>
+            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center col-span-2">
               <p className="text-zinc-500 text-[10px] uppercase font-bold mb-1">Vòng đùi</p>
               <p className="text-white font-medium">{latestRecord?.thigh ? `${latestRecord.thigh} cm` : '--'}</p>
             </div>
@@ -261,12 +273,26 @@ export default function StudentProgressAdmin({ studentId }: Props) {
           <div>
             <h4 className="text-sm font-bold text-white mb-3">Hình ảnh tiến độ</h4>
             {profile.history.some(r => r.photos && r.photos.length > 0) ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {profile.history.filter(r => r.photos && r.photos.length > 0).slice(-3).map((record, idx, arr) => (
-                  <div key={record.id} className="relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700">
-                    <img className="w-full h-full object-cover" alt={`Ảnh tiến độ ${record.date}`} src={record.photos[0]} />
-                    <div className={`absolute top-2 left-2 px-2 py-1 rounded-md text-[10px] font-bold ${idx === arr.length - 1 ? 'bg-pink-500 text-zinc-900' : 'bg-zinc-900/60 backdrop-blur-sm text-white'}`}>
-                      {new Date(record.date).toLocaleDateString('vi-VN')}
+              <div className="space-y-6">
+                {profile.history.filter(r => r.photos && r.photos.length > 0).slice(-3).reverse().map((record, idx) => (
+                  <div key={record.id} className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2 py-1 rounded-md text-xs font-bold ${idx === 0 ? 'bg-pink-500 text-zinc-900' : 'bg-zinc-800 text-zinc-300'}`}>
+                        {idx === 0 ? 'Mới nhất (' : 'Lần trước ('}{new Date(record.date).toLocaleDateString('vi-VN')})
+                      </span>
+                      <span className="text-[10px] font-medium text-zinc-500 bg-zinc-900 px-2 py-1 rounded-md">{record.photos.length} ảnh</span>
+                    </div>
+                    <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 hide-scrollbar">
+                      {record.photos.map((photo, pIdx) => (
+                        <div key={pIdx} className="relative w-[75%] sm:w-[45%] aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700 snap-center shrink-0">
+                          <img className="w-full h-full object-cover" alt={`Ảnh tiến độ ${record.date} - ${pIdx + 1}`} src={photo} />
+                          {record.photos.length > 1 && (
+                            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-md">
+                              {pIdx + 1} / {record.photos.length}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -317,11 +343,11 @@ export default function StudentProgressAdmin({ studentId }: Props) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-400 mb-1">Mỡ cơ thể (%)</label>
+                    <label className="block text-sm font-medium text-zinc-400 mb-1">Vòng tay (cm)</label>
                     <input 
                       type="number" 
-                      value={formData.body_fat}
-                      onChange={e => setFormData({...formData, body_fat: e.target.value})}
+                      value={formData.arm}
+                      onChange={e => setFormData({...formData, arm: e.target.value})}
                       className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
                     />
                   </div>
@@ -340,6 +366,15 @@ export default function StudentProgressAdmin({ studentId }: Props) {
                       type="number" 
                       value={formData.hip}
                       onChange={e => setFormData({...formData, hip: e.target.value})}
+                      className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-1">Vòng mông (cm)</label>
+                    <input 
+                      type="number" 
+                      value={formData.butt}
+                      onChange={e => setFormData({...formData, butt: e.target.value})}
                       className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
                     />
                   </div>

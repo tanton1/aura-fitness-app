@@ -20,8 +20,10 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
   const [formData, setFormData] = useState({
     weight: profile.weight?.toString() || '',
     body_fat: '',
+    arm: '',
     waist: '',
     hip: '',
+    butt: '',
     thigh: '',
     photos: [] as string[]
   });
@@ -71,8 +73,10 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
       weight: newWeight,
       photos: formData.photos,
       body_fat: formData.body_fat ? Number(formData.body_fat) : 0,
+      arm: formData.arm ? Number(formData.arm) : 0,
       waist: formData.waist ? Number(formData.waist) : 0,
       hip: formData.hip ? Number(formData.hip) : 0,
+      butt: formData.butt ? Number(formData.butt) : 0,
       thigh: formData.thigh ? Number(formData.thigh) : 0,
     };
 
@@ -195,8 +199,19 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
 
         {/* Body Measurements */}
         <div className="px-4 py-4">
-          <h2 className="text-zinc-100 text-xl font-bold mb-4">Số đo cơ thể</h2>
-          <div className="grid grid-cols-1 gap-3">
+          <h2 className="text-zinc-100 text-xl font-bold mb-4">Chỉ số hình thể</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between p-4 bg-zinc-900 border border-pink-500/20 rounded-xl shadow-[0_0_15px_rgba(0,255,255,0.05)]">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
+                  <Ruler className="w-5 h-5" />
+                </div>
+                <span className="font-medium text-zinc-200">Vòng tay</span>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-white">{latestRecord?.arm ? `${latestRecord.arm} cm` : '--'}</p>
+              </div>
+            </div>
             <div className="flex items-center justify-between p-4 bg-zinc-900 border border-pink-500/20 rounded-xl shadow-[0_0_15px_rgba(0,255,255,0.05)]">
               <div className="flex items-center gap-3">
                 <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
@@ -224,6 +239,17 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
                 <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
                   <User className="w-5 h-5" />
                 </div>
+                <span className="font-medium text-zinc-200">Vòng mông</span>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-white">{latestRecord?.butt ? `${latestRecord.butt} cm` : '--'}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-zinc-900 border border-pink-500/20 rounded-xl shadow-[0_0_15px_rgba(0,255,255,0.05)] col-span-2">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-500 border border-pink-500/30">
+                  <User className="w-5 h-5" />
+                </div>
                 <span className="font-medium text-zinc-200">Vòng đùi</span>
               </div>
               <div className="text-right">
@@ -237,12 +263,26 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
         <div className="px-4 py-4">
           <h2 className="text-zinc-100 text-xl font-bold mb-4">Hình ảnh thay đổi</h2>
           {profile.history && profile.history.some(r => r.photos && r.photos.length > 0) ? (
-            <div className="grid grid-cols-2 gap-4">
-              {profile.history.filter(r => r.photos && r.photos.length > 0).slice(-2).map((record, idx, arr) => (
-                <div key={record.id} className="relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700">
-                  <img className="w-full h-full object-cover" alt={`Ảnh tiến độ ${record.date}`} src={record.photos[0]} />
-                  <div className={`absolute top-2 left-2 px-2 py-1 rounded-md text-xs font-bold ${idx === arr.length - 1 ? 'bg-pink-500 text-zinc-900' : 'bg-zinc-900/60 backdrop-blur-sm text-white'}`}>
-                    {new Date(record.date).toLocaleDateString('vi-VN')}
+            <div className="space-y-8">
+              {profile.history.filter(r => r.photos && r.photos.length > 0).slice(-2).reverse().map((record, idx) => (
+                <div key={record.id} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className={`px-3 py-1 rounded-lg text-sm font-bold ${idx === 0 ? 'bg-pink-500 text-zinc-900' : 'bg-zinc-800 text-zinc-300'}`}>
+                      {idx === 0 ? 'Mới nhất (' : 'Lần trước ('}{new Date(record.date).toLocaleDateString('vi-VN')})
+                    </span>
+                    <span className="text-xs font-medium text-zinc-500 bg-zinc-900 px-2 py-1 rounded-md">{record.photos.length} ảnh</span>
+                  </div>
+                  <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 hide-scrollbar -mx-4 px-4">
+                    {record.photos.map((photo, pIdx) => (
+                      <div key={pIdx} className="relative w-[85%] max-w-[300px] aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-800 border border-zinc-700 snap-center shrink-0 shadow-lg">
+                        <img className="w-full h-full object-cover" alt={`Ảnh tiến độ ${record.date} - ${pIdx + 1}`} src={photo} />
+                        {record.photos.length > 1 && (
+                          <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md text-white text-xs font-bold px-2 py-1 rounded-lg">
+                            {pIdx + 1} / {record.photos.length}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -320,6 +360,15 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-1">Vòng tay (cm)</label>
+                    <input 
+                      type="number" 
+                      value={formData.arm}
+                      onChange={e => setFormData({...formData, arm: e.target.value})}
+                      className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                    />
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-zinc-400 mb-1">Vòng eo (cm)</label>
                     <input 
                       type="number" 
@@ -334,6 +383,15 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
                       type="number" 
                       value={formData.hip}
                       onChange={e => setFormData({...formData, hip: e.target.value})}
+                      className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-1">Vòng mông (cm)</label>
+                    <input 
+                      type="number" 
+                      value={formData.butt}
+                      onChange={e => setFormData({...formData, butt: e.target.value})}
                       className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
                     />
                   </div>

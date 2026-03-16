@@ -517,7 +517,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const myContracts = contracts.filter(c => c.studentId === currentUserStudent?.id);
 
   return (
-    <div className="p-4 md:p-6 space-y-6 pb-24 w-full">
+    <div className="p-2 md:p-6 space-y-6 pb-24 w-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl md:text-3xl font-black text-white uppercase tracking-wider">Lịch Tập Của Tôi</h1>
       </div>
@@ -755,7 +755,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                 </div>
 
                 {/* Schedule Registration Info */}
-                <div className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 shadow-xl">
+                <div className="bg-zinc-900 p-4 md:p-6 rounded-3xl border border-zinc-800 shadow-xl overflow-hidden">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-lg font-bold text-white">Lịch rảnh đã đăng ký</h2>
                     <button 
@@ -767,7 +767,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                   </div>
                   
                   {editingStudent?.id === currentUserStudent.id || !currentUserStudent.isScheduleConfirmed ? (
-                    <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800">
+                    <div className="mt-4">
                       <StudentForm 
                         onSave={(s) => {
                           handleUserSaveStudent(s);

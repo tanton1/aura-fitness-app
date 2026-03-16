@@ -323,7 +323,7 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-2xl font-serif font-medium text-white">
-              Chào {auth.currentUser?.displayName || 'bạn'}!
+              Chào {profile.name || auth.currentUser?.displayName || 'bạn'}!
             </h1>
             <p className="text-zinc-400 text-sm">Chỉ cần quay lại bữa tiếp theo là ổn nha!</p>
           </div>
@@ -340,11 +340,36 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
             />
             <div id="avatar-fallback" className="hidden w-full h-full bg-gradient-to-br from-pink-500 to-rose-500 rounded-full items-center justify-center shadow-lg shadow-pink-500/20">
               <span className="text-xl font-bold text-white">
-                {auth.currentUser?.displayName?.charAt(0).toUpperCase() || 'A'}
+                {profile.name?.charAt(0).toUpperCase() || auth.currentUser?.displayName?.charAt(0).toUpperCase() || 'A'}
               </span>
             </div>
           </div>
         </div>
+
+        {/* Package Expiry Warning */}
+        {activeContract && (
+          (() => {
+            const daysRemaining = Math.ceil((new Date(activeContract.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+            const sessionsRemaining = activeContract.totalSessions - activeContract.usedSessions;
+            
+            if (daysRemaining <= 7 || sessionsRemaining <= 2) {
+              return (
+                <div className="mb-6 bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-2xl flex items-start gap-3">
+                  <div className="mt-0.5 w-8 h-8 bg-yellow-500/20 rounded-full flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-4 h-4 text-yellow-500" />
+                  </div>
+                  <div>
+                    <h4 className="text-yellow-400 font-bold text-sm">Gói tập sắp hết hạn!</h4>
+                    <p className="text-zinc-300 text-xs mt-1">
+                      Gói <span className="font-bold">{activeContract.packageName}</span> của bạn còn {daysRemaining} ngày hoặc {sessionsRemaining} buổi tập. Hãy gia hạn sớm nhé!
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()
+        )}
 
         {/* Payment Notifications */}
         {(overdueContracts.length > 0 || upcomingContracts.length > 0) && (

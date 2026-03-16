@@ -3,9 +3,8 @@ import { UserProfile } from '../../types';
 import Dashboard from '../Dashboard';
 import WeekPlan from '../WeekPlan';
 import Progress from '../Progress';
-import GroceryList from '../GroceryList';
 import CheckIn from '../CheckIn';
-import { Home, Calendar, LineChart, ShoppingCart, Target } from 'lucide-react';
+import { Home, Calendar, LineChart, Target } from 'lucide-react';
 
 interface Props {
   profile: UserProfile;
@@ -15,13 +14,12 @@ interface Props {
 }
 
 export default function PersonalDashboard({ profile, onUpdateProfile, onResetProfile, onNavigate }: Props) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'week_plan' | 'progress' | 'grocery' | 'check_in'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'week_plan' | 'progress' | 'check_in'>('dashboard');
 
   const tabs = [
     { id: 'dashboard', label: 'Hôm nay', icon: Home },
     { id: 'week_plan', label: 'Kế hoạch', icon: Calendar },
     { id: 'progress', label: 'Tiến độ', icon: LineChart },
-    { id: 'grocery', label: 'Đi chợ', icon: ShoppingCart },
     { id: 'check_in', label: 'Check-in', icon: Target },
   ] as const;
 
@@ -56,7 +54,6 @@ export default function PersonalDashboard({ profile, onUpdateProfile, onResetPro
         {activeTab === 'dashboard' && <Dashboard profile={profile} onUpdateProfile={onUpdateProfile} />}
         {activeTab === 'week_plan' && <WeekPlan profile={profile} onNavigate={onNavigate} />}
         {activeTab === 'progress' && <Progress profile={profile} onUpdateProfile={onUpdateProfile} onResetProfile={onResetProfile} />}
-        {activeTab === 'grocery' && <GroceryList profile={profile} />}
         {activeTab === 'check_in' && <CheckIn />}
       </div>
     </div>
