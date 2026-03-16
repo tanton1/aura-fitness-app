@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Calendar, ShoppingCart, Target, LineChart, Settings, Users, DollarSign, Briefcase, CreditCard, User, Utensils } from 'lucide-react';
+import { Home, Calendar, ShoppingCart, Target, LineChart, Settings, Users, DollarSign, Briefcase, CreditCard, User } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface Props {
@@ -19,7 +19,6 @@ export default function BottomNav({ currentScreen, onNavigate, profile }: Props)
     navItems = [
       { id: 'personal', icon: User, label: 'Cá nhân' },
       { id: 'students', icon: Users, label: 'Học viên' },
-      { id: 'dishes', icon: Utensils, label: 'Món ăn' },
       { id: 'scheduler', icon: Calendar, label: 'Xếp lịch' },
     ];
 
@@ -40,7 +39,6 @@ export default function BottomNav({ currentScreen, onNavigate, profile }: Props)
     navItems = [
       { id: 'dashboard', icon: Home, label: 'Hôm nay' },
       { id: 'week_plan', icon: Calendar, label: 'Kế hoạch' },
-      { id: 'dishes', icon: Utensils, label: 'Món ăn' },
       { id: 'scheduler', icon: Calendar, label: 'Xếp lịch' },
       { id: 'progress', icon: LineChart, label: 'Tiến độ' },
       { id: 'grocery', icon: ShoppingCart, label: 'Đi chợ' },
@@ -58,11 +56,15 @@ export default function BottomNav({ currentScreen, onNavigate, profile }: Props)
             key={item.id}
             onClick={() => onNavigate(item.id)}
             className={`flex flex-1 flex-col items-center gap-1 transition-colors ${
-              isActive ? 'text-pink-500 drop-shadow-[0_0_5px_rgba(255,0,127,0.8)]' : 'text-zinc-500 hover:text-zinc-300'
+              item.id === 'scheduler' 
+                ? 'text-pink-500 font-bold' 
+                : isActive 
+                  ? 'text-pink-500 drop-shadow-[0_0_5px_rgba(255,0,127,0.8)]' 
+                  : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            <Icon className={`w-6 h-6 ${isActive ? 'fill-pink-500/20' : ''}`} />
-            <span className={`font-medium tracking-wide text-center leading-tight mt-1 ${navItems.length > 5 ? 'text-[9px]' : 'text-[10px]'}`}>{item.label}</span>
+            <Icon className={`${item.id === 'scheduler' ? 'w-8 h-8' : 'w-6 h-6'} ${isActive ? 'fill-pink-500/20' : ''}`} />
+            <span className={`font-medium tracking-wide text-center leading-tight mt-1 ${item.id === 'scheduler' ? 'text-[11px]' : navItems.length > 5 ? 'text-[9px]' : 'text-[10px]'}`}>{item.label}</span>
           </button>
         );
       })}
