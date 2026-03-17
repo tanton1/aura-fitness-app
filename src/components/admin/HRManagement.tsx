@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Trainer, Branch, StaffMember } from '../../types';
 import PackageSettings from './PackageSettings';
+import { LOGO_URL } from '../../constants';
 
 interface Props {
   user: FirebaseUser | null;
@@ -301,11 +302,14 @@ export default function HRManagement({ user }: Props) {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-serif font-medium text-white tracking-tight">
-          Cài đặt hệ thống
-        </h1>
-        <p className="text-zinc-400 mt-2">Quản lý nhân sự, chi nhánh và các gói tập</p>
+      <div className="mb-8 flex items-center gap-3">
+        <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
+        <div>
+          <h1 className="text-3xl md:text-4xl font-serif font-medium text-white tracking-tight">
+            Cài đặt hệ thống
+          </h1>
+          <p className="text-zinc-400 mt-2">Quản lý nhân sự, chi nhánh và các gói tập</p>
+        </div>
       </div>
 
       <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 overflow-x-auto hide-scrollbar">

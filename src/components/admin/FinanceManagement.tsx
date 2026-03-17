@@ -6,6 +6,7 @@ import { db } from '../../lib/firebase';
 import { DollarSign, TrendingUp, AlertCircle, Plus, CheckCircle, Clock, Calendar as CalendarIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DateRangeFilter from './DateRangeFilter';
+import { LOGO_URL } from '../../constants';
 
 interface Props {
   user: User | null;
@@ -285,11 +286,14 @@ export default function FinanceManagement({ user, profile }: Props) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="flex justify-between items-start">
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
-            Tài chính
-          </h1>
-          <p className="text-zinc-400 mt-2">Quản lý doanh thu và công nợ</p>
+        <div className="mb-8 flex items-center gap-3">
+          <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
+          <div>
+            <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
+              Tài chính
+            </h1>
+            <p className="text-zinc-400 mt-2">Quản lý doanh thu và công nợ</p>
+          </div>
         </div>
         {profile?.role === 'admin' && (
           <button 

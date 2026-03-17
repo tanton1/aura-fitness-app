@@ -5,6 +5,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Package, Plus, Edit2, Trash2, Clock, Hash, DollarSign, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { LOGO_URL } from '../../constants';
 
 interface Props {
   user: User | null;
@@ -97,10 +98,13 @@ export default function PackageSettings({ user }: Props) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="flex justify-between items-center bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
-        <h2 className="text-xl font-bold text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] flex items-center gap-2 border-b-2 border-pink-500/30 pb-2 inline-block shadow-[0_4px_0_rgba(236,72,153,0.2)] rounded-xl">
-          <Package className="w-5 h-5 text-pink-500" />
-          Danh sách gói tập
-        </h2>
+        <div className="flex items-center gap-3">
+          <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
+          <h2 className="text-xl font-bold text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] flex items-center gap-2 border-b-2 border-pink-500/30 pb-2 inline-block shadow-[0_4px_0_rgba(236,72,153,0.2)] rounded-xl">
+            <Package className="w-5 h-5 text-pink-500" />
+            Danh sách gói tập
+          </h2>
+        </div>
         <button 
           onClick={() => {
             setEditingPackage(null);

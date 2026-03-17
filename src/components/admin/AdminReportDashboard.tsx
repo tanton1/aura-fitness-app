@@ -23,6 +23,7 @@ import {
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Session, Trainer, StudentContract, Student, PaymentRecord, Branch } from '../../types';
+import { LOGO_URL } from '../../constants';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6'];
 
@@ -262,7 +263,7 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="mb-4 sm:mb-0 flex items-center gap-3">
-          <img src="/logo.png" alt="Aura" className="h-10 w-10 object-contain" />
+          <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
           <div>
             <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
               Tổng quan báo cáo

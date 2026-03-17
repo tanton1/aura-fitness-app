@@ -5,6 +5,7 @@ import { User as FirebaseUser } from 'firebase/auth';
 import { Trainer, Session, Payroll, Branch, StudentContract, UserProfile, Student, HOURS } from '../../types';
 import { CheckCircle, XCircle, DollarSign, Calendar, Trash2, RotateCcw, User as UserIcon, Clock, Filter, Edit2 } from 'lucide-react';
 import DateRangeFilter from './DateRangeFilter';
+import { LOGO_URL } from '../../constants';
 
 interface Props {
   user: FirebaseUser | null;
@@ -204,7 +205,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="mb-8 flex items-center gap-3">
-        <img src="/logo.png" alt="Aura" className="h-10 w-10 object-contain" />
+        <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
         <div>
           <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
             Lương PT

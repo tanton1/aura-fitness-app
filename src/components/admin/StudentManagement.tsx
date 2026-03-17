@@ -10,6 +10,7 @@ import { Search, Plus, Edit2, Trash2, Phone, Mail, Calendar, CheckCircle, XCircl
 import { motion, AnimatePresence } from 'motion/react';
 import StudentDetail from './StudentDetail';
 import DateRangeFilter from './DateRangeFilter';
+import { LOGO_URL } from '../../constants';
 
 interface Props {
   user: User | null;
@@ -377,11 +378,14 @@ export default function StudentManagement({ user, profile }: Props) {
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
-          Học viên
-        </h1>
-        <p className="text-zinc-400 mt-2">Quản lý danh sách học viên và hợp đồng</p>
+      <div className="mb-8 flex items-center gap-3">
+        <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
+        <div>
+          <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
+            Học viên
+          </h1>
+          <p className="text-zinc-400 mt-2">Quản lý danh sách học viên và hợp đồng</p>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
