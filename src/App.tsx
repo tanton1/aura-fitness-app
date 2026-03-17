@@ -1,72 +1,105 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { UserProfile } from './types';
-import Onboarding from './components/Onboarding';
-import Dashboard from './components/Dashboard';
-import WeekPlan from './components/WeekPlan';
-import CheckIn from './components/CheckIn';
-import SchedulerWrapper from './components/SchedulerWrapper';
-import Progress from './components/Progress';
-import BottomNav from './components/BottomNav';
-import AuthScreen from './components/AuthScreen';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db } from './lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
-import AdminDashboard from './components/admin/AdminDashboard';
-import PersonalDashboard from './components/admin/PersonalDashboard';
+// Lazy load components for faster initial load
+const Onboarding = lazy(() => import('./components/Onboarding'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const WeekPlan = lazy(() => import('./components/WeekPlan'));
+const CheckIn = lazy(() => import('./components/CheckIn'));
+const SchedulerWrapper = lazy(() => import('./components/SchedulerWrapper'));
+const Progress = lazy(() => import('./components/Progress'));
+const BottomNav = lazy(() => import('./components/BottomNav'));
+const AuthScreen = lazy(() => import('./components/AuthScreen'));
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
+const PersonalDashboard = lazy(() => import('./components/admin/PersonalDashboard'));
+const FoodDatabase = lazy(() => import('./components/FoodDatabase'));
 
-import FoodDatabase from './components/FoodDatabase';
+const LoadingSpinner = () => (
+  <div className="bg-zinc-950 min-h-screen flex items-center justify-center">
+    <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+);
 
 export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState('dashboard');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthInitializing, setIsAuthInitializing] = useState(true);
 
   // Initialize Firebase Auth
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    // Try to load cached profile immediately for instant perceived load
+    const cachedProfile = localStorage.getItem('aura_profile');
+    if (cachedProfile) {
+      try {
+        const parsed = JSON.parse(cachedProfile);
+        setProfile(parsed);
+        if (['admin', 'manager'].includes(parsed.role || '')) {
+          setCurrentScreen('overview');
+        } else if (['trainer', 'sales'].includes(parsed.role || '')) {
+          setCurrentScreen('personal');
+        }
+        setLoading(false); // Instant load if we have cache
+      } catch (e) {
+        console.error("Failed to parse cached profile", e);
+      }
+    }
+
+    let unsubSnapshot: () => void;
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setIsAuthInitializing(false);
+      
       if (currentUser) {
         // Force sign out if the user is anonymous (from previous version)
         if (currentUser.isAnonymous) {
-          await auth.signOut();
+          auth.signOut();
           return;
         }
 
         setUser(currentUser);
-        // Load profile from Firestore
+        
+        // Listen for real-time updates (this also does the initial fetch)
         const docRef = doc(db, 'users', currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data() as UserProfile;
-          setProfile(data);
-          if (['admin', 'manager'].includes(data.role || '')) {
-            setCurrentScreen('overview');
-          } else if (['trainer', 'sales'].includes(data.role || '')) {
-            setCurrentScreen('personal');
+        unsubSnapshot = onSnapshot(docRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data() as UserProfile;
+            setProfile(data);
+            localStorage.setItem('aura_profile', JSON.stringify(data));
+            
+            // Only redirect if we haven't already from cache, or if role changed
+            if (!cachedProfile || JSON.parse(cachedProfile).role !== data.role) {
+              if (['admin', 'manager'].includes(data.role || '')) {
+                setCurrentScreen('overview');
+              } else if (['trainer', 'sales'].includes(data.role || '')) {
+                setCurrentScreen('personal');
+              }
+            }
           }
-        }
-        
-        // Listen for real-time updates
-        const unsubSnapshot = onSnapshot(docRef, (doc) => {
-          if (doc.exists()) {
-            setProfile(doc.data() as UserProfile);
-          }
+          setLoading(false);
+        }, (error) => {
+          console.error("Error fetching profile:", error);
+          setLoading(false);
         });
         
-        setLoading(false);
-        return () => unsubSnapshot();
       } else {
         setUser(null);
         setProfile(null);
         localStorage.removeItem('aura_profile');
         setLoading(false);
+        if (unsubSnapshot) unsubSnapshot();
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubSnapshot) unsubSnapshot();
+    };
   }, []);
 
   const handleOnboardingComplete = async (newProfile: UserProfile) => {
@@ -91,19 +124,23 @@ export default function App() {
   };
 
   if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!user && !isAuthInitializing && !profile) {
     return (
-      <div className="bg-zinc-950 min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
+      <Suspense fallback={<LoadingSpinner />}>
+        <AuthScreen />
+      </Suspense>
     );
   }
 
-  if (!user) {
-    return <AuthScreen />;
-  }
-
   if (!profile || currentScreen === 'onboarding') {
-    return <Onboarding onComplete={handleOnboardingComplete} initialData={profile || undefined} />;
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <Onboarding onComplete={handleOnboardingComplete} initialData={profile || undefined} />
+      </Suspense>
+    );
   }
 
   const renderScreen = () => {
@@ -152,10 +189,14 @@ export default function App() {
           transition={{ duration: 0.2 }}
           className="h-full"
         >
-          {renderScreen()}
+          <Suspense fallback={<LoadingSpinner />}>
+            {renderScreen()}
+          </Suspense>
         </motion.div>
       </AnimatePresence>
-      <BottomNav currentScreen={currentScreen} onNavigate={setCurrentScreen} profile={profile} />
+      <Suspense fallback={null}>
+        <BottomNav currentScreen={currentScreen} onNavigate={setCurrentScreen} profile={profile} />
+      </Suspense>
     </div>
   );
 }

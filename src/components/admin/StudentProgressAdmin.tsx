@@ -369,11 +369,11 @@ export default function StudentProgressAdmin({ studentId }: Props) {
                     </div>
                     <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 hide-scrollbar">
                       {progressPhotos[record.id].map((photo, pIdx) => (
-                        <div key={pIdx} className="relative w-[75%] sm:w-[45%] aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700 snap-center shrink-0 group">
+                        <div key={pIdx} className="relative w-[75%] sm:w-[45%] aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700 snap-center shrink-0">
                           <img className="w-full h-full object-cover" alt={`Ảnh tiến độ ${record.date} - ${pIdx + 1}`} src={photo} />
                           <button
                             onClick={() => handleDeletePhoto(record.id, pIdx)}
-                            className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white p-1.5 rounded-full shadow-md transition-opacity"
                             title="Xoá ảnh này"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

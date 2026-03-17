@@ -82,7 +82,8 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
     };
 
     fetchAndMigratePhotos();
-  }, [profile.history, onUpdateProfile]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.history?.length, onUpdateProfile]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -382,11 +383,11 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
                   </div>
                   <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-4 hide-scrollbar -mx-4 px-4">
                     {progressPhotos[record.id].map((photo, pIdx) => (
-                      <div key={pIdx} className="relative w-[85%] max-w-[300px] aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-800 border border-zinc-700 snap-center shrink-0 shadow-lg group">
+                        <div key={pIdx} className="relative w-[85%] max-w-[300px] aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-800 border border-zinc-700 snap-center shrink-0 shadow-lg">
                         <img className="w-full h-full object-cover" alt={`Ảnh tiến độ ${record.date} - ${pIdx + 1}`} src={photo} />
                         <button
                           onClick={() => handleDeletePhoto(record.id, pIdx)}
-                          className="absolute top-3 right-3 bg-red-500/80 hover:bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-3 right-3 bg-red-500/80 hover:bg-red-500 text-white p-2 rounded-full shadow-md transition-opacity"
                           title="Xoá ảnh này"
                         >
                           <Trash2 className="w-4 h-4" />
