@@ -203,11 +203,14 @@ export default function TrainerPayroll({ user, profile }: Props) {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
-          Lương PT
-        </h1>
-        <p className="text-zinc-400 mt-2">Quản lý lịch dạy và chấm công</p>
+      <div className="mb-8 flex items-center gap-3">
+        <img src="/logo.png" alt="Aura" className="h-10 w-10 object-contain" />
+        <div>
+          <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
+            Lương PT
+          </h1>
+          <p className="text-zinc-400 mt-2">Quản lý lịch dạy và chấm công</p>
+        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">

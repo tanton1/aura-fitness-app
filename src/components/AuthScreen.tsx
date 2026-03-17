@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { auth } from '../lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { LOGO_URL } from '../constants';
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -53,11 +54,11 @@ export default function AuthScreen() {
       >
         <div className="text-center mb-10">
           <img 
-            src="/logo.png" 
+            src={LOGO_URL} 
             alt="Aura Fitness Logo" 
             className="w-32 h-32 mx-auto mb-6 object-contain drop-shadow-[0_0_15px_rgba(255,0,255,0.3)]"
             onError={(e) => {
-              // Fallback if logo.png is not found
+              // Fallback if logo is not found
               (e.target as HTMLImageElement).style.display = 'none';
               const fallback = document.getElementById('logo-fallback');
               if (fallback) fallback.style.display = 'flex';

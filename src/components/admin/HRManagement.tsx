@@ -94,6 +94,9 @@ export default function HRManagement({ user }: Props) {
       
       try {
         await setDoc(docRef, { trainers: newTrainers, staff: newStaff }, { merge: true });
+        setTrainers(newTrainers);
+        setStaff(newStaff);
+        setAlertMessage('Đã lưu thông tin PT thành công!');
       } catch (e) {
         console.error("Error saving trainers:", e);
         setError("Lỗi lưu dữ liệu PT: " + (e as Error).message);
@@ -115,6 +118,8 @@ export default function HRManagement({ user }: Props) {
       }
       try {
         await setDoc(docRef, { branches: newBranches }, { merge: true });
+        setBranches(newBranches);
+        setAlertMessage('Đã lưu thông tin chi nhánh thành công!');
       } catch (e) {
         console.error("Error saving branches:", e);
         setError("Lỗi lưu dữ liệu chi nhánh: " + (e as Error).message);
@@ -226,6 +231,9 @@ export default function HRManagement({ user }: Props) {
 
         try {
           await setDoc(docRef, { staff: finalStaff, trainers: finalTrainers }, { merge: true });
+          setStaff(finalStaff);
+          setTrainers(finalTrainers);
+          setAlertMessage('Đã lưu thông tin nhân viên thành công!');
         } catch (e) {
           console.error("Error saving staff:", e);
           setError("Lỗi lưu dữ liệu nhân viên: " + (e as Error).message);
@@ -256,13 +264,17 @@ export default function HRManagement({ user }: Props) {
     try {
       if (activeSubTab === 'trainers') {
         await setDoc(docRef, { trainers: updatedTrainers }, { merge: true });
+        setTrainers(updatedTrainers);
       } else if (activeSubTab === 'branches') {
         await setDoc(docRef, { branches: updatedBranches }, { merge: true });
+        setBranches(updatedBranches);
       } else if (activeSubTab === 'staff') {
         await setDoc(docRef, { 
           staff: updatedStaff,
           trainers: updatedTrainers
         }, { merge: true });
+        setStaff(updatedStaff);
+        setTrainers(updatedTrainers);
       }
       
       // Also try to delete from users collection if it's a staff/trainer

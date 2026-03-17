@@ -17,7 +17,6 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import PersonalDashboard from './components/admin/PersonalDashboard';
 
 import FoodDatabase from './components/FoodDatabase';
-import Logo from './components/Logo';
 
 export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);

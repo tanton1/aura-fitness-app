@@ -261,11 +261,14 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
     <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="mb-4 sm:mb-0">
-          <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
-            Tổng quan báo cáo
-          </h1>
-          <p className="text-zinc-400 text-sm mt-3">Theo dõi hiệu suất kinh doanh và hoạt động của phòng tập.</p>
+        <div className="mb-4 sm:mb-0 flex items-center gap-3">
+          <img src="/logo.png" alt="Aura" className="h-10 w-10 object-contain" />
+          <div>
+            <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
+              Tổng quan báo cáo
+            </h1>
+            <p className="text-zinc-400 text-sm mt-3">Theo dõi hiệu suất kinh doanh và hoạt động của phòng tập.</p>
+          </div>
         </div>
         <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
           <button

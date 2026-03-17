@@ -57,6 +57,11 @@ export default function AdminDashboard({ user, profile, activeTab, onNavigate }:
 
   return (
     <div className="min-h-screen bg-zinc-950 pb-24">
+      {/* Header */}
+      <div className="bg-zinc-900 p-6 rounded-b-3xl shadow-sm flex items-center gap-3">
+        <img src="/logo.png" alt="Aura" className="h-10 w-10 object-contain" />
+        <h1 className="text-xl font-bold text-white">Aura Fitness Admin</h1>
+      </div>
       {/* Tab Content */}
       <div className="p-4 pt-6">
         {activeTab === 'overview' && <AdminReportDashboard onNavigate={onNavigate} />}

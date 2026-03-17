@@ -246,3 +246,17 @@ export interface DailyCheckin {
   sleepQuality?: number;
   createdAt: any;
 }
+
+export interface HealthyDish {
+  id: string;
+  name: string;
+  image: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  category: string;
+  ingredients: string[];
+  portion?: string;
+  instructions?: string[];
+}

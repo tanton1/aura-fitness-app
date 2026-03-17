@@ -6,6 +6,7 @@ import { calculateMacros } from '../utils/calculations';
 import { auth } from '../lib/firebase';
 import { compressImage } from '../utils/imageCompression';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LOGO_URL } from '../constants';
 
 interface Props {
   profile: UserProfile;
@@ -111,7 +112,7 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
           <ArrowLeft className="w-6 h-6 text-pink-500 drop-shadow-[0_0_5px_rgba(255,0,127,0.8)]" />
         </div>
         <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Aura" className="h-8 w-8 object-contain" />
+            <img src={LOGO_URL} alt="Aura" className="h-8 w-8 object-contain" />
             <h2 className="text-lg font-bold text-white drop-shadow-[0_0_5px_rgba(255,0,127,0.8)]">
               Theo dõi tiến độ
             </h2>
