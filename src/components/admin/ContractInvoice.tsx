@@ -35,7 +35,7 @@ export default function ContractInvoice({ student, contract, onClose }: Props) {
         {/* Printable Content */}
         <div className="p-8 text-black print:p-0">
           <div className="text-center mb-8 border-b-2 border-black pb-6">
-            <h1 className="text-3xl font-black tracking-tighter uppercase"></h1>
+            <h1 className="text-3xl font-black tracking-tighter uppercase">Aura Fitness</h1>
             <p className="text-sm text-gray-600 mt-1">Sức khỏe của bạn, Đam mê của chúng tôi</p>
             <h2 className="text-2xl font-bold mt-6 uppercase">Hợp đồng Huấn luyện cá nhân</h2>
             <p className="text-sm font-mono mt-1">Mã HĐ: HD-{contract.id.slice(-6)}</p>

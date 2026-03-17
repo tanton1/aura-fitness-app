@@ -330,7 +330,7 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
             </div>
           </div>
           <div className="w-12 h-12 rounded-full flex items-center justify-center">
-            <img src={LOGO_URL} alt="Aura Logo" className="w-full h-full object-contain" />
+            <img src={LOGO_URL} alt="Logo" className="w-full h-full object-contain" />
           </div>
         </div>
 
@@ -784,7 +784,7 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
               onClick={handleEatOutConfirm}
               className="w-full bg-pink-600 text-white py-3 rounded-xl font-medium hover:bg-pink-700 transition-colors shadow-[0_0_15px_rgba(255,0,127,0.4)]"
             >
-              Cảm ơn Aura
+              Cảm ơn bạn
             </button>
             <button 
               onClick={() => setShowEatOutModal(false)}

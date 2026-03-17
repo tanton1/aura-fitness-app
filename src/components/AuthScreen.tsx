@@ -55,7 +55,7 @@ export default function AuthScreen() {
         <div className="text-center mb-10">
           <img 
             src={LOGO_URL} 
-            alt="Logo" 
+            alt="Aura Logo" 
             className="w-32 h-32 mx-auto mb-6 object-contain drop-shadow-[0_0_15px_rgba(255,0,255,0.3)]"
             onError={(e) => {
               // Fallback if logo is not found
@@ -65,7 +65,7 @@ export default function AuthScreen() {
             }}
           />
           <div id="logo-fallback" className="hidden w-20 h-20 bg-gradient-to-br from-pink-500 to-rose-500 rounded-3xl mx-auto mb-6 items-center justify-center shadow-lg shadow-pink-500/20">
-            <span className="text-4xl font-bold text-white">A</span>
+            <span className="text-4xl font-bold text-white">Aura</span>
           </div>
           <h1 className="text-3xl font-bold mb-2"></h1>
           <p className="text-zinc-400">Hành trình dinh dưỡng của riêng bạn</p>
