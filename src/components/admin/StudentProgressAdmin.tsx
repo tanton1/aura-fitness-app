@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, ProgressRecord } from '../../types';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getDocs, collection, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Scale, Percent, Ruler, Accessibility, User, PlusCircle, X, Camera, Trash2, Pencil, Heart, Circle, Activity, Dumbbell, Waves, Drumstick, Apple } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -28,33 +28,70 @@ export default function StudentProgressAdmin({ studentId }: Props) {
     photos: [] as string[]
   });
 
+  const [progressPhotos, setProgressPhotos] = useState<Record<string, string[]>>({});
+  const [isLoadingPhotos, setIsLoadingPhotos] = useState(true);
+
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchProfileAndPhotos = async () => {
       try {
         const docRef = doc(db, 'users', studentId);
         const docSnap = await getDoc(docRef);
+        
         if (docSnap.exists()) {
-          const data = docSnap.data() as UserProfile;
-          setProfile(data);
+          let data = docSnap.data() as UserProfile;
+          
           setFormData({
             weight: data.weight?.toString() || '',
             body_fat: '',
+            arm: '',
             waist: '',
             hip: '',
+            butt: '',
             thigh: '',
             photos: []
           });
+
+          // Fetch photos
+          let needsMigration = false;
+          const newHistory = [...(data.history || [])];
+          const photosMap: Record<string, string[]> = {};
+
+          const photosSnapshot = await getDocs(collection(db, 'users', studentId, 'progress_photos'));
+          photosSnapshot.forEach(doc => {
+            photosMap[doc.id] = doc.data().photos || [];
+          });
+
+          for (let i = 0; i < newHistory.length; i++) {
+            const record = newHistory[i];
+            if (record.photos && record.photos.length > 0) {
+              await setDoc(doc(db, 'users', studentId, 'progress_photos', record.id), {
+                photos: record.photos
+              });
+              photosMap[record.id] = record.photos;
+              newHistory[i] = { ...record, photos: [] };
+              needsMigration = true;
+            }
+          }
+
+          setProgressPhotos(photosMap);
+
+          if (needsMigration) {
+            data = { ...data, history: newHistory };
+            await setDoc(docRef, data, { merge: true });
+          }
+          
+          setProfile(data);
         } else {
-          // If no profile exists, we can create a basic one or just show empty state
           setProfile(null);
         }
       } catch (error) {
         console.error("Error fetching profile:", error);
       } finally {
         setLoading(false);
+        setIsLoadingPhotos(false);
       }
     };
-    fetchProfile();
+    fetchProfileAndPhotos();
   }, [studentId]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,11 +124,13 @@ export default function StudentProgressAdmin({ studentId }: Props) {
     const newWeight = Number(formData.weight);
     if (!newWeight) return;
 
+    const recordId = Date.now().toString();
+
     const newRecord: ProgressRecord = {
-      id: Date.now().toString(),
+      id: recordId,
       date: new Date().toISOString().split('T')[0],
       weight: newWeight,
-      photos: formData.photos,
+      photos: [],
       body_fat: formData.body_fat ? Number(formData.body_fat) : 0,
       arm: formData.arm ? Number(formData.arm) : 0,
       waist: formData.waist ? Number(formData.waist) : 0,
@@ -99,6 +138,17 @@ export default function StudentProgressAdmin({ studentId }: Props) {
       butt: formData.butt ? Number(formData.butt) : 0,
       thigh: formData.thigh ? Number(formData.thigh) : 0,
     };
+
+    if (formData.photos.length > 0) {
+      try {
+        await setDoc(doc(db, 'users', studentId, 'progress_photos', recordId), {
+          photos: formData.photos
+        });
+        setProgressPhotos(prev => ({ ...prev, [recordId]: formData.photos }));
+      } catch (error) {
+        console.error('Error saving photos:', error);
+      }
+    }
 
     let updatedProfile: UserProfile;
     
@@ -141,14 +191,40 @@ export default function StudentProgressAdmin({ studentId }: Props) {
       setFormData({
         weight: newWeight.toString(),
         body_fat: '',
+        arm: '',
         waist: '',
         hip: '',
+        butt: '',
         thigh: '',
         photos: []
       });
     } catch (error) {
       console.error("Error saving progress:", error);
       alert("Lỗi khi lưu tiến độ");
+    }
+  };
+
+  const handleDeletePhoto = async (recordId: string, photoIndex: number) => {
+    try {
+      const currentPhotos = progressPhotos[recordId] || [];
+      const newPhotos = [...currentPhotos];
+      newPhotos.splice(photoIndex, 1);
+      
+      if (newPhotos.length === 0) {
+        await deleteDoc(doc(db, 'users', studentId, 'progress_photos', recordId));
+      } else {
+        await setDoc(doc(db, 'users', studentId, 'progress_photos', recordId), {
+          photos: newPhotos
+        });
+      }
+      
+      setProgressPhotos(prev => ({
+        ...prev,
+        [recordId]: newPhotos
+      }));
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      alert('Có lỗi xảy ra khi xoá ảnh.');
     }
   };
 
@@ -277,23 +353,34 @@ export default function StudentProgressAdmin({ studentId }: Props) {
 
           <div>
             <h4 className="text-sm font-bold text-white mb-3">Hình ảnh tiến độ</h4>
-            {profile.history.some(r => r.photos && r.photos.length > 0) ? (
+            {isLoadingPhotos ? (
+              <div className="flex justify-center py-6">
+                <div className="w-6 h-6 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : profile.history.some(r => progressPhotos[r.id] && progressPhotos[r.id].length > 0) ? (
               <div className="space-y-6">
-                {profile.history.filter(r => r.photos && r.photos.length > 0).slice(-3).reverse().map((record, idx) => (
+                {profile.history.filter(r => progressPhotos[r.id] && progressPhotos[r.id].length > 0).reverse().map((record, idx) => (
                   <div key={record.id} className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className={`px-2 py-1 rounded-md text-xs font-bold ${idx === 0 ? 'bg-pink-500 text-zinc-900' : 'bg-zinc-800 text-zinc-300'}`}>
                         {idx === 0 ? 'Mới nhất (' : 'Lần trước ('}{new Date(record.date).toLocaleDateString('vi-VN')})
                       </span>
-                      <span className="text-[10px] font-medium text-zinc-500 bg-zinc-900 px-2 py-1 rounded-md">{record.photos.length} ảnh</span>
+                      <span className="text-[10px] font-medium text-zinc-500 bg-zinc-900 px-2 py-1 rounded-md">{progressPhotos[record.id].length} ảnh</span>
                     </div>
                     <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 hide-scrollbar">
-                      {record.photos.map((photo, pIdx) => (
-                        <div key={pIdx} className="relative w-[75%] sm:w-[45%] aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700 snap-center shrink-0">
+                      {progressPhotos[record.id].map((photo, pIdx) => (
+                        <div key={pIdx} className="relative w-[75%] sm:w-[45%] aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 border border-zinc-700 snap-center shrink-0 group">
                           <img className="w-full h-full object-cover" alt={`Ảnh tiến độ ${record.date} - ${pIdx + 1}`} src={photo} />
-                          {record.photos.length > 1 && (
+                          <button
+                            onClick={() => handleDeletePhoto(record.id, pIdx)}
+                            className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Xoá ảnh này"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          {progressPhotos[record.id].length > 1 && (
                             <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-md">
-                              {pIdx + 1} / {record.photos.length}
+                              {pIdx + 1} / {progressPhotos[record.id].length}
                             </div>
                           )}
                         </div>
