@@ -48,7 +48,7 @@ export default function Onboarding({ onComplete, initialData }: Props) {
       tdee,
       target_macros,
       current_mode: 'standard',
-      role: 'user'
+      role: formData.role || 'user'
     };
 
     onComplete(finalProfile);

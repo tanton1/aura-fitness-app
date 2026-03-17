@@ -108,7 +108,14 @@ export default function App() {
     if (user) {
       await setDoc(doc(db, 'users', user.uid), newProfile, { merge: true });
     }
-    setCurrentScreen('dashboard');
+    
+    if (['admin', 'manager'].includes(newProfile.role || '')) {
+      setCurrentScreen('overview');
+    } else if (['trainer', 'sales'].includes(newProfile.role || '')) {
+      setCurrentScreen('personal');
+    } else {
+      setCurrentScreen('dashboard');
+    }
   };
 
   const handleUpdateProfile = async (updatedProfile: UserProfile) => {

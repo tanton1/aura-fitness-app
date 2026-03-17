@@ -300,16 +300,43 @@ export default function HRManagement({ user }: Props) {
     setShowDeleteConfirm(true);
   };
 
+  const handleRestoreRoles = async () => {
+    if (!user || !isLoaded) return;
+    try {
+      setAlertMessage('Đang khôi phục phân quyền...');
+      let count = 0;
+      for (const s of staff) {
+        if (s.id && s.role) {
+          await setDoc(doc(db, 'users', s.id), { role: s.role }, { merge: true });
+          count++;
+        }
+      }
+      setAlertMessage(`Đã khôi phục phân quyền cho ${count} tài khoản thành công!`);
+      setTimeout(() => setAlertMessage(null), 3000);
+    } catch (error) {
+      console.error("Error restoring roles:", error);
+      setError("Lỗi khi khôi phục phân quyền.");
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="mb-8 flex items-center gap-3">
-        <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
-        <div>
-          <h1 className="text-3xl md:text-4xl font-serif font-medium text-white tracking-tight">
-            Cài đặt hệ thống
-          </h1>
-          <p className="text-zinc-400 mt-2">Quản lý nhân sự, chi nhánh và các gói tập</p>
+      <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
+          <div>
+            <h1 className="text-3xl md:text-4xl font-serif font-medium text-white tracking-tight">
+              Cài đặt hệ thống
+            </h1>
+            <p className="text-zinc-400 mt-2">Quản lý nhân sự, chi nhánh và các gói tập</p>
+          </div>
         </div>
+        <button
+          onClick={handleRestoreRoles}
+          className="bg-pink-500/10 text-pink-500 hover:bg-pink-500 hover:text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors border border-pink-500/20"
+        >
+          Khôi phục phân quyền
+        </button>
       </div>
 
       <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 overflow-x-auto hide-scrollbar">
