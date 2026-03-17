@@ -120,7 +120,8 @@ export default function FinanceManagement({ user, profile }: Props) {
     }
     if (dateRange) {
       filtered = filtered.filter(p => {
-        const pDate = new Date(p.date);
+        const contract = contracts.find(c => c.id === p.contractId);
+        const pDate = contract?.startDate ? new Date(contract.startDate) : new Date(p.date);
         return pDate >= dateRange.start && pDate <= dateRange.end;
       });
     }

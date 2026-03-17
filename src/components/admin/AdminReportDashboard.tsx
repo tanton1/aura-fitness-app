@@ -90,9 +90,10 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
     }
   });
 
-  const { currentStartDate, previousStartDate, previousEndDate } = useMemo(() => {
+  const { currentStartDate, currentEndDate, previousStartDate, previousEndDate } = useMemo(() => {
     const now = new Date();
     let currentStart = new Date(now);
+    let currentEnd = new Date(now);
     let prevStart = new Date(now);
     let prevEnd = new Date(now);
 
@@ -104,13 +105,18 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
       currentStart.setDate(now.getDate() - 30);
       prevEnd = new Date(currentStart);
       prevStart.setDate(prevEnd.getDate() - 30);
+    } else if (timeRange === 'lastMonth') {
+      currentStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      currentEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      prevStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      prevEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59, 999);
     } else if (timeRange === 'year') {
       currentStart = new Date(now.getFullYear(), 0, 1);
       prevEnd = new Date(now.getFullYear(), 0, 1);
       prevEnd.setMilliseconds(-1);
       prevStart = new Date(now.getFullYear() - 1, 0, 1);
     }
-    return { currentStartDate: currentStart, previousStartDate: prevStart, previousEndDate: prevEnd };
+    return { currentStartDate: currentStart, currentEndDate: currentEnd, previousStartDate: prevStart, previousEndDate: prevEnd };
   }, [timeRange]);
 
   const filteredPayments = allPayments.filter(p => {
@@ -119,14 +125,15 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
     const selectedId = selectedBranchId === 'none' ? undefined : selectedBranchId;
     const inBranch = selectedBranchId === 'all' || branchId === selectedId;
 
-    const pDate = new Date(p.date);
-    return inBranch && pDate >= currentStartDate;
+    // Use contract.startDate if available, otherwise fallback to p.date
+    const pDate = contract?.startDate ? new Date(contract.startDate) : new Date(p.date);
+    return inBranch && pDate >= currentStartDate && pDate <= currentEndDate;
   });
 
   const filteredStudentsForKPI = filteredStudents.filter(s => {
     if (!s.joinDate) return false;
     const sDate = new Date(s.joinDate);
-    return sDate >= currentStartDate;
+    return sDate >= currentStartDate && sDate <= currentEndDate;
   });
 
   const previousPayments = allPayments.filter(p => {
@@ -135,14 +142,14 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
     const selectedId = selectedBranchId === 'none' ? undefined : selectedBranchId;
     const inBranch = selectedBranchId === 'all' || branchId === selectedId;
 
-    const pDate = new Date(p.date);
-    return inBranch && pDate >= previousStartDate && pDate < previousEndDate;
+    const pDate = contract?.startDate ? new Date(contract.startDate) : new Date(p.date);
+    return inBranch && pDate >= previousStartDate && pDate <= previousEndDate;
   });
 
   const previousStudents = filteredStudents.filter(s => {
     if (!s.joinDate) return false;
     const sDate = new Date(s.joinDate);
-    return sDate >= previousStartDate && sDate < previousEndDate;
+    return sDate >= previousStartDate && sDate <= previousEndDate;
   });
 
   const currentRevenue = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -174,7 +181,7 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
     const sessionsInTimeRange = filteredSessions.filter(s => {
       if (s.trainerId !== t.id || s.status !== 'completed' || !s.verifiedByStudent) return false;
       const sDate = new Date(s.date);
-      return sDate >= currentStartDate;
+      return sDate >= currentStartDate && sDate <= currentEndDate;
     });
     return { name: t.name, count: sessionsInTimeRange.length };
   });
@@ -184,14 +191,14 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
     const sessionsInTimeRange = filteredSessions.filter(s => {
       if (s.trainerId !== t.id || s.status !== 'completed' || !s.verifiedByStudent) return false;
       const sDate = new Date(s.date);
-      return sDate >= currentStartDate;
+      return sDate >= currentStartDate && sDate <= currentEndDate;
     });
     const sessionComm = sessionsInTimeRange.length * (t.commissionPerSession || 0);
     
     const referralContractsInTimeRange = filteredContracts.filter(c => {
       if (c.referralCode !== t.employeeCode) return false;
       const cDate = new Date(c.startDate || new Date());
-      return cDate >= currentStartDate;
+      return cDate >= currentStartDate && cDate <= currentEndDate;
     });
     const referralComm = referralContractsInTimeRange.reduce((s, c) => s + (c.referralCommission || 0), 0);
     
@@ -213,14 +220,41 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
   // Revenue Data based on timeRange
   const revenueData = useMemo(() => {
     const now = new Date();
+    
+    // Helper to get the correct date for a payment (contract start date)
+    const getPaymentDate = (p: PaymentRecord) => {
+      const contract = contracts.find(c => c.id === p.contractId);
+      return contract?.startDate ? new Date(contract.startDate) : new Date(p.date);
+    };
+
     if (timeRange === 'year') {
       return Array.from({ length: 12 }).map((_, i) => {
         const month = i;
         const total = filteredPayments.filter(p => {
-          const d = new Date(p.date);
+          const d = getPaymentDate(p);
           return d.getFullYear() === now.getFullYear() && d.getMonth() === month;
         }).reduce((sum, p) => sum + p.amount, 0);
         return { name: `T${month + 1}`, total };
+      });
+    } else if (timeRange === 'lastMonth') {
+      const lastMonth = now.getMonth() - 1;
+      const year = lastMonth < 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const month = lastMonth < 0 ? 11 : lastMonth;
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      return Array.from({ length: daysInMonth }).map((_, i) => {
+        const d = new Date(year, month, i + 1);
+        const dateStr = d.toISOString().split('T')[0];
+        const total = filteredPayments
+          .filter(p => {
+            const pd = getPaymentDate(p);
+            return pd.toISOString().split('T')[0] === dateStr;
+          })
+          .reduce((sum, p) => sum + p.amount, 0);
+        return { 
+          name: `${d.getDate()}/${d.getMonth() + 1}`, 
+          total 
+        };
       });
     } else {
       const days = timeRange === '30days' ? 30 : 7;
@@ -229,7 +263,10 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
         d.setDate(d.getDate() - (days - 1 - i));
         const dateStr = d.toISOString().split('T')[0];
         const total = filteredPayments
-          .filter(p => p.date.startsWith(dateStr))
+          .filter(p => {
+            const pd = getPaymentDate(p);
+            return pd.toISOString().split('T')[0] === dateStr;
+          })
           .reduce((sum, p) => sum + p.amount, 0);
         return { 
           name: days === 7 ? d.toLocaleDateString('vi-VN', { weekday: 'short' }) : `${d.getDate()}/${d.getMonth() + 1}`, 
@@ -237,7 +274,7 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
         };
       });
     }
-  }, [timeRange, filteredPayments]);
+  }, [timeRange, filteredPayments, contracts]);
 
   // Package Distribution
   const packageData = Object.entries(filteredContracts.filter(c => c.status === 'active').reduce((acc, c) => {
@@ -247,16 +284,26 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
 
   // Recent Transactions
   const recentTransactions = filteredPayments
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .sort((a, b) => {
+      const contractA = contracts.find(c => c.id === a.contractId);
+      const contractB = contracts.find(c => c.id === b.contractId);
+      const dateA = contractA?.startDate ? new Date(contractA.startDate).getTime() : new Date(a.date).getTime();
+      const dateB = contractB?.startDate ? new Date(contractB.startDate).getTime() : new Date(b.date).getTime();
+      return dateB - dateA;
+    })
     .slice(0, 5)
-    .map(p => ({
-      id: p.id,
-      user: students.find(s => s.id === p.studentId)?.name || 'Học viên ẩn (Đã xóa)',
-      package: filteredContracts.find(c => c.id === p.contractId)?.packageName || 'N/A',
-      amount: p.amount.toLocaleString('vi-VN') + 'đ',
-      status: 'Thành công',
-      date: new Date(p.date).toLocaleString('vi-VN')
-    }));
+    .map(p => {
+      const contract = contracts.find(c => c.id === p.contractId);
+      const pDate = contract?.startDate ? new Date(contract.startDate) : new Date(p.date);
+      return {
+        id: p.id,
+        user: students.find(s => s.id === p.studentId)?.name || 'Học viên ẩn (Đã xóa)',
+        package: contract?.packageName || 'N/A',
+        amount: p.amount.toLocaleString('vi-VN') + 'đ',
+        status: 'Thành công',
+        date: pDate.toLocaleString('vi-VN')
+      };
+    });
 
   return (
     <div className="space-y-6 pb-24">
@@ -299,7 +346,7 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
             <option value="none">Chưa phân chi nhánh</option>
             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-          {['7days', '30days', 'year'].map((range) => (
+          {['7days', '30days', 'lastMonth', 'year'].map((range) => (
             <button
               key={range}
               onClick={() => setTimeRange(range)}
@@ -309,7 +356,7 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
                   : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              {range === '7days' ? '7 Ngày' : range === '30days' ? '30 Ngày' : 'Năm nay'}
+              {range === '7days' ? '7 Ngày' : range === '30days' ? '30 Ngày' : range === 'lastMonth' ? 'Tháng trước' : 'Năm nay'}
             </button>
           ))}
         </div>
