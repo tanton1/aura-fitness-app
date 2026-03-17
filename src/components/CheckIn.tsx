@@ -115,7 +115,7 @@ export default function CheckIn() {
           </div>
           <h2 className="text-2xl font-serif font-medium text-white mb-2">Tuyệt vời!</h2>
           <p className="text-zinc-400 mb-8">
-            Bạn đã hoàn thành check-in hôm nay. Aura đã ghi nhận và sẽ điều chỉnh plan ngày mai cho phù hợp nhé.
+            Bạn đã hoàn thành check-in hôm nay. Chúng tôi đã ghi nhận và sẽ điều chỉnh plan ngày mai cho phù hợp nhé.
           </p>
           <div className="space-y-3">
             <button 
@@ -208,7 +208,7 @@ export default function CheckIn() {
           <Target className="w-6 h-6 text-pink-500" />
           Check-in cuối ngày
         </h1>
-        <p className="text-zinc-400 text-sm mt-2">Dành 30s để Aura hiểu bạn hơn nhé.</p>
+        <p className="text-zinc-400 text-sm mt-2">Dành 30s để chúng tôi hiểu bạn hơn nhé.</p>
       </div>
 
       <div className="p-6 space-y-8">

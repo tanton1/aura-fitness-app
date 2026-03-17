@@ -128,7 +128,7 @@ export default function Progress({ profile, onUpdateProfile, onResetProfile }: P
         {/* Encouragement Message */}
         <div className="px-4 pt-6 pb-2">
           <h3 className="text-2xl font-bold leading-tight text-center text-white">
-            Bạn đang làm rất tốt, <span className="text-pink-500 drop-shadow-[0_0_5px_rgba(255,0,127,0.8)]">Aura</span> tự hào về bạn!
+            Bạn đang làm rất tốt, tự hào về bạn!
           </h3>
         </div>
 

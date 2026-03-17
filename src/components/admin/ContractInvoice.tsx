@@ -35,7 +35,7 @@ export default function ContractInvoice({ student, contract, onClose }: Props) {
         {/* Printable Content */}
         <div className="p-8 text-black print:p-0">
           <div className="text-center mb-8 border-b-2 border-black pb-6">
-            <h1 className="text-3xl font-black tracking-tighter uppercase">AURA FITNESS</h1>
+            <h1 className="text-3xl font-black tracking-tighter uppercase"></h1>
             <p className="text-sm text-gray-600 mt-1">Sức khỏe của bạn, Đam mê của chúng tôi</p>
             <h2 className="text-2xl font-bold mt-6 uppercase">Hợp đồng Huấn luyện cá nhân</h2>
             <p className="text-sm font-mono mt-1">Mã HĐ: HD-{contract.id.slice(-6)}</p>
@@ -43,7 +43,7 @@ export default function ContractInvoice({ student, contract, onClose }: Props) {
           </div>
 
           <div className="mb-6">
-            <h3 className="text-lg font-bold border-b border-gray-300 pb-2 mb-3">Bên A: Trung tâm Aura Fitness</h3>
+            <h3 className="text-lg font-bold border-b border-gray-300 pb-2 mb-3">Bên A: Trung tâm</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <p><span className="font-medium">Đại diện:</span> Ban Quản lý</p>
               <p><span className="font-medium">Điện thoại:</span> 1900 1234</p>
@@ -116,7 +116,7 @@ export default function ContractInvoice({ student, contract, onClose }: Props) {
               <p className="text-gray-400">(Ký & ghi rõ họ tên)</p>
             </div>
             <div className="text-center">
-              <p className="font-bold mb-16">Bên A (Đại diện Aura Fitness)</p>
+              <p className="font-bold mb-16">Bên A (Đại diện)</p>
               <p className="text-gray-400">(Ký & ghi rõ họ tên)</p>
             </div>
           </div>

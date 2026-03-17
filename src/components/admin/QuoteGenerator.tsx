@@ -430,7 +430,7 @@ export default function QuoteGenerator({ user }: Props) {
               <div className="p-8 text-black print:p-0">
                 <div className="flex justify-between items-start mb-8 border-b-2 border-black pb-6">
                   <div>
-                    <h1 className="text-3xl font-black tracking-tighter uppercase">AURA FITNESS</h1>
+                    <h1 className="text-3xl font-black tracking-tighter uppercase"></h1>
                     <p className="text-sm text-gray-600 mt-1">Sức khỏe của bạn, Đam mê của chúng tôi</p>
                   </div>
                   <div className="text-right">
@@ -500,7 +500,7 @@ export default function QuoteGenerator({ user }: Props) {
                     <p className="text-gray-400">(Ký & ghi rõ họ tên)</p>
                   </div>
                   <div className="text-center">
-                    <p className="font-bold mb-16">Đại diện Aura Fitness</p>
+                    <p className="font-bold mb-16">Đại diện</p>
                     <p className="text-gray-400">(Ký & ghi rõ họ tên)</p>
                   </div>
                 </div>

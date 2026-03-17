@@ -27,6 +27,7 @@ export default function FinanceManagement({ user, profile }: Props) {
   const [installmentCount, setInstallmentCount] = useState(1);
   const [installments, setInstallments] = useState<{date: string, amount: number}[]>([]);
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+  const [debtFilter, setDebtFilter] = useState<'all' | 'overdue' | 'this-week' | 'this-month'>('all');
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -130,7 +131,46 @@ export default function FinanceManagement({ user, profile }: Props) {
     const debt = c.totalPrice - c.paidAmount;
     return debt > 0 ? sum + debt : sum;
   }, 0);
-  const contractsWithDebt = filteredContracts.filter(c => c.totalPrice > c.paidAmount);
+
+  const contractsWithDebt = useMemo(() => {
+    const withDebt = filteredContracts.filter(c => c.totalPrice > c.paidAmount);
+    
+    if (debtFilter === 'all') return withDebt;
+
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    return withDebt.filter(c => {
+      const pendingInstallments = c.installments?.filter(i => i.status === 'pending') || [];
+      const nextInstallment = pendingInstallments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+      const dueDateStr = nextInstallment?.date || c.nextPaymentDate;
+      
+      if (!dueDateStr) return debtFilter === 'all';
+      
+      const dueDate = new Date(dueDateStr);
+
+      if (debtFilter === 'overdue') {
+        return dueDate < now;
+      }
+      if (debtFilter === 'this-week') {
+        return dueDate >= startOfWeek && dueDate <= endOfWeek;
+      }
+      if (debtFilter === 'this-month') {
+        return dueDate >= startOfMonth && dueDate <= endOfMonth;
+      }
+      return true;
+    });
+  }, [filteredContracts, debtFilter]);
+
   const contractsOverpaid = filteredContracts.filter(c => c.paidAmount > c.totalPrice);
 
   const confirmCleanup = async () => {
@@ -308,10 +348,33 @@ export default function FinanceManagement({ user, profile }: Props) {
 
       {/* Debt List */}
       <div>
-        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-pink-500" />
-          Danh sách cần thu
-        </h3>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-pink-500" />
+            Danh sách cần thu
+          </h3>
+          
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'all', label: 'Tất cả' },
+              { id: 'overdue', label: 'Quá hạn' },
+              { id: 'this-week', label: 'Tuần này' },
+              { id: 'this-month', label: 'Tháng này' },
+            ].map(filter => (
+              <button
+                key={filter.id}
+                onClick={() => setDebtFilter(filter.id as any)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  debtFilter === filter.id 
+                    ? 'bg-pink-500 text-white shadow-[0_0_10px_rgba(236,72,153,0.4)]' 
+                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
         
         <div className="space-y-3">
           {contractsWithDebt.length > 0 ? (
