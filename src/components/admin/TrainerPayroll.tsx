@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import React, { useState } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Trainer, Session, Payroll, Branch, StudentContract, UserProfile, Student, HOURS } from '../../types';
 import { CheckCircle, XCircle, DollarSign, Calendar, Trash2, RotateCcw, User as UserIcon, Clock, Filter, Edit2 } from 'lucide-react';
 import DateRangeFilter from './DateRangeFilter';
 import { LOGO_URL } from '../../constants';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface Props {
   user: FirebaseUser | null;
@@ -13,12 +12,7 @@ interface Props {
 }
 
 export default function TrainerPayroll({ user, profile }: Props) {
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [payroll, setPayroll] = useState<Payroll[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [contracts, setContracts] = useState<StudentContract[]>([]);
+  const { trainers, sessions, students, branches, contracts, updateSession, deleteSession, addSession, updateContract } = useDatabase();
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<number | 'all'>('all');
   const [sessionSearch, setSessionSearch] = useState('');
@@ -28,88 +22,72 @@ export default function TrainerPayroll({ user, profile }: Props) {
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [editFormData, setEditFormData] = useState({ date: '', hour: 0, trainerId: '' });
 
-  useEffect(() => {
-    if (user) {
-      const docRef = doc(db, 'schedules', 'global_schedule');
-      const unsub = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setTrainers(data.trainers || []);
-          setSessions(data.sessions || []);
-          setStudents(data.students || []);
-          setPayroll(data.payroll || []);
-          setBranches(data.branches || []);
-          setContracts(data.contracts || []);
-        }
-      });
-      return () => unsub();
-    }
-  }, [user]);
-
   const markSession = async (sessionId: string, status: 'completed' | 'cancelled' | 'scheduled') => {
     if (!user) return;
-    const docRef = doc(db, 'schedules', 'global_schedule');
     
     const session = sessions.find(s => s.id === sessionId);
     if (!session) return;
 
-    // Sync logic: If undoing a verified session, restore usedSessions and remove from attendedClasses
-    let newContracts = [...contracts];
-    // If the session was verified (which now also means completed), and we are changing it to something else
+    let contractToUpdate = null;
     if (session.verifiedByStudent && status !== 'completed') {
       const classIdToRemove = `${session.id.split('-').slice(0, 2).join('-')}-${session.date}`;
-      newContracts = contracts.map(c => {
-        if (c.studentId === session.studentId && c.attendedClasses?.includes(classIdToRemove)) {
-          const newUsedSessions = Math.max(0, c.usedSessions - 1);
-          return { 
-            ...c, 
-            usedSessions: newUsedSessions,
-            status: newUsedSessions < c.totalSessions ? 'active' : c.status,
-            attendedClasses: c.attendedClasses.filter(id => id !== classIdToRemove)
-          };
-        }
-        return c;
-      });
+      const contract = contracts.find(c => c.studentId === session.studentId && c.attendedClasses?.includes(classIdToRemove));
+      if (contract) {
+        const newUsedSessions = Math.max(0, contract.usedSessions - 1);
+        contractToUpdate = { 
+          ...contract, 
+          usedSessions: newUsedSessions,
+          status: newUsedSessions < contract.totalSessions ? 'active' : contract.status,
+          attendedClasses: contract.attendedClasses.filter(id => id !== classIdToRemove)
+        };
+      }
     }
 
-    const newSessions = sessions.map(s => s.id === sessionId ? { ...s, status, verifiedByStudent: status === 'scheduled' ? false : s.verifiedByStudent } : s);
+    const updatedSession: Session = { 
+      ...session, 
+      status, 
+      verifiedByStudent: status === 'scheduled' ? false : session.verifiedByStudent 
+    };
     
-    await setDoc(docRef, { 
-      sessions: newSessions,
-      contracts: newContracts
-    }, { merge: true });
+    try {
+      await updateSession(updatedSession);
+      if (contractToUpdate) {
+        await updateContract(contractToUpdate);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const deleteSession = async (sessionId: string) => {
+  const handleDeleteSession = async (sessionId: string) => {
     if (!user || !confirm('Bạn có chắc chắn muốn xóa buổi tập này?')) return;
-    const docRef = doc(db, 'schedules', 'global_schedule');
     
     const session = sessions.find(s => s.id === sessionId);
     if (!session) return;
 
-    // Sync logic: If deleting a verified session, restore usedSessions and remove from attendedClasses
-    let newContracts = [...contracts];
+    let contractToUpdate = null;
     if (session.verifiedByStudent) {
       const classIdToRemove = `${session.id.split('-').slice(0, 2).join('-')}-${session.date}`;
-      newContracts = contracts.map(c => {
-        if (c.studentId === session.studentId && c.attendedClasses?.includes(classIdToRemove)) {
-          const newUsedSessions = Math.max(0, c.usedSessions - 1);
-          return { 
-            ...c, 
-            usedSessions: newUsedSessions,
-            status: newUsedSessions < c.totalSessions ? 'active' : c.status,
-            attendedClasses: c.attendedClasses.filter(id => id !== classIdToRemove)
-          };
-        }
-        return c;
-      });
+      const contract = contracts.find(c => c.studentId === session.studentId && c.attendedClasses?.includes(classIdToRemove));
+      if (contract) {
+        const newUsedSessions = Math.max(0, contract.usedSessions - 1);
+        contractToUpdate = { 
+          ...contract, 
+          usedSessions: newUsedSessions,
+          status: newUsedSessions < contract.totalSessions ? 'active' : contract.status,
+          attendedClasses: contract.attendedClasses.filter(id => id !== classIdToRemove)
+        };
+      }
     }
 
-    const newSessions = sessions.filter(s => s.id !== sessionId);
-    await setDoc(docRef, { 
-      sessions: newSessions,
-      contracts: newContracts
-    }, { merge: true });
+    try {
+      await deleteSession(sessionId);
+      if (contractToUpdate) {
+        await updateContract(contractToUpdate);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleEditSession = (session: Session) => {
@@ -125,9 +103,8 @@ export default function TrainerPayroll({ user, profile }: Props) {
   const saveEditedSession = async () => {
     if (!user || !editingSession) return;
     
-    // Calculate new ID based on new date and hour
     const dateObj = new Date(editFormData.date);
-    const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 1 is Monday
+    const dayOfWeek = dateObj.getDay();
     const dayCode = dayOfWeek === 0 ? 'CN' : `T${dayOfWeek + 1}`;
     const newId = `${dayCode}-${editFormData.hour}-${editingSession.studentId}-${editFormData.date}`;
 
@@ -136,13 +113,15 @@ export default function TrainerPayroll({ user, profile }: Props) {
       id: newId,
       date: editFormData.date,
       trainerId: editFormData.trainerId,
-      // If trainer changed, we might want to mark it as substitute, but for simplicity we just update it
     };
 
-    const newSessions = sessions.map(s => s.id === editingSession.id ? updatedSession : s);
-    
     try {
-      await setDoc(doc(db, 'schedules', 'global_schedule'), { sessions: JSON.parse(JSON.stringify(newSessions)) }, { merge: true });
+      if (editingSession.id !== newId) {
+        await deleteSession(editingSession.id);
+        await addSession(updatedSession);
+      } else {
+        await updateSession(updatedSession);
+      }
       setEditingSession(null);
     } catch (e) {
       alert('Lỗi khi lưu: ' + (e as Error).message);

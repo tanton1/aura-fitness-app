@@ -6,10 +6,11 @@ import { foodDb } from '../data/foodDb';
 import { getMealsForDay } from '../utils/mealPlan';
 import { swapRules } from '../data/swapRules';
 import { mealTemplates } from '../data/mealTemplates';
-import { auth, db } from '../lib/firebase';
-import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
+import { auth } from '../lib/firebase';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getWeekRange, getMonthRange, isSameDayOrAfter } from '../utils/dateUtils';
 import { LOGO_URL } from '../constants';
+import { useDatabase } from '../contexts/DatabaseContext';
 
 interface Props {
   profile: UserProfile;
@@ -17,14 +18,13 @@ interface Props {
 }
 
 export default function Dashboard({ profile, onUpdateProfile }: Props) {
+  const { contracts, sessions } = useDatabase();
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [swapStep, setSwapStep] = useState<'menu' | 'swap_meal' | 'swap_item'>('menu');
   const [itemToSwap, setItemToSwap] = useState<{ foodId: string, rule: any } | null>(null);
   const [swapSearchTerm, setSwapSearchTerm] = useState('');
   const [showEatOutModal, setShowEatOutModal] = useState(false);
   const [showCravingsModal, setShowCravingsModal] = useState(false);
-  const [myContracts, setMyContracts] = useState<StudentContract[]>([]);
-  const [mySessions, setMySessions] = useState<Session[]>([]);
   const [sessionFilter, setSessionFilter] = useState<'upcoming' | 'history' | 'this_week'>('upcoming');
   const [customRange, setCustomRange] = useState<{ start: string, end: string }>({
     start: new Date().toISOString().split('T')[0],
@@ -33,6 +33,9 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
   
   // Track local swapped meals (in a real app, this would be saved to profile/db)
   const [swappedMeals, setSwappedMeals] = useState<Record<string, MealTemplate>>({});
+
+  const myContracts = useMemo(() => contracts.filter(c => c.studentId === auth.currentUser?.uid), [contracts]);
+  const mySessions = useMemo(() => sessions.filter(s => s.studentId === auth.currentUser?.uid), [sessions]);
 
   const activeContract = myContracts.find(c => c.status === 'active');
 
@@ -54,21 +57,6 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
 
   const upcomingSessions = filteredSessions.filter(s => s.status === 'scheduled');
   const historySessions = filteredSessions.filter(s => s.status === 'completed' || s.status === 'cancelled');
-
-  useEffect(() => {
-    if (auth.currentUser) {
-      const unsub = onSnapshot(doc(db, 'schedules', 'global_schedule'), (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
-          const contracts: StudentContract[] = data.contracts || [];
-          const sessions: Session[] = data.sessions || [];
-          setMyContracts(contracts.filter(c => c.studentId === auth.currentUser?.uid));
-          setMySessions(sessions.filter(s => s.studentId === auth.currentUser?.uid));
-        }
-      });
-      return () => unsub();
-    }
-  }, []);
 
   const currentMacros = profile.target_macros?.[profile.current_mode || 'standard'] || { kcal: 0, protein: 0, carb: 0, fat: 0 };
   const todayDateStr = new Date().toISOString().split('T')[0];

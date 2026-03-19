@@ -10,6 +10,7 @@ import { User } from 'firebase/auth';
 import { doc, setDoc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getDatesForCurrentWeek, getDatesForWeek, getWeekRange, getMonthRange, isSameDayOrAfter } from '../utils/dateUtils';
+import { useDatabase } from '../contexts/DatabaseContext';
 
 interface Props {
   user: User | null;
@@ -17,15 +18,13 @@ interface Props {
 }
 
 export default function SchedulerWrapper({ user, profile }: Props) {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [contracts, setContracts] = useState<StudentContract[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [schedule, setSchedule] = useState<Schedule>({});
-  const [warnings, setWarnings] = useState<Warning[]>([]);
+  const { 
+    students, trainers, branches, contracts, sessions, schedule, warnings, 
+    updateStudent, updateScheduleData, addSession, updateContract, updateSession
+  } = useDatabase();
+  
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<'schedule' | 'students' | 'trainers'>('schedule');
   const [studentTab, setStudentTab] = useState<'overview' | 'schedule' | 'profile'>('overview');
   const [weekOffset, setWeekOffset] = useState(0);
@@ -35,51 +34,6 @@ export default function SchedulerWrapper({ user, profile }: Props) {
 
   const isAdmin = profile?.role === 'admin';
   const isTrainer = profile?.role === 'trainer';
-
-  useEffect(() => {
-    if (user) {
-      const docRef = doc(db, 'schedules', 'global_schedule');
-      const unsub = onSnapshot(docRef, (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
-          setStudents((data.students || []).map((s: any) => ({
-            ...s, 
-            availableSlots: s.availableSlots || []
-          })));
-          
-          // Merge explicit trainers and staff with trainer role
-          const explicitTrainers = data.trainers || [];
-          const staffTrainers = (data.staff || [])
-            .filter((s: any) => s.role === 'trainer')
-            .map((s: any) => ({
-              ...s,
-              commissionRate: s.commissionRate || 0,
-              status: s.status || 'active'
-            }));
-          
-          // De-duplicate by ID
-          const allTrainersMap = new Map();
-          [...explicitTrainers, ...staffTrainers].forEach(t => {
-            allTrainersMap.set(t.id, t);
-          });
-          
-          setTrainers(Array.from(allTrainersMap.values()));
-          setBranches(data.branches || []);
-          setContracts(data.contracts || []);
-          setSessions(data.sessions || []);
-          setSchedule(data.schedule || {});
-          setWarnings(data.warnings || []);
-        }
-        setIsLoaded(true);
-      }, (error) => {
-        console.error("Error fetching schedule:", error);
-        setIsLoaded(true);
-      });
-      return () => unsub();
-    } else {
-      setIsLoaded(true);
-    }
-  }, [user]);
 
   const filteredStudents = useMemo(() => {
     let filtered = students;
@@ -120,17 +74,6 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     });
   }, [warnings, students, selectedBranchId]);
 
-  const saveToFirebase = async (newStudents: Student[], newTrainers: Trainer[], newSchedule: Schedule, newWarnings: Warning[]) => {
-    if (user) {
-      await setDoc(doc(db, 'schedules', 'global_schedule'), {
-        students: newStudents,
-        trainers: newTrainers,
-        schedule: newSchedule,
-        warnings: newWarnings
-      }, { merge: true });
-    }
-  };
-
   const handleResetSchedule = () => {
     if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch đã xếp không? Các ca đã khóa thủ công cũng sẽ bị xóa.')) {
       return;
@@ -141,9 +84,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         emptySchedule[`${day}-${hour}`] = [];
       }
     }
-    setSchedule(emptySchedule);
-    setWarnings([]);
-    saveToFirebase(students, trainers, emptySchedule, []);
+    updateScheduleData(emptySchedule, []);
   };
 
   const handleGenerate = () => {
@@ -154,9 +95,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
       }
     }
     const result = generateSchedule(students, trainers, contracts, schedule);
-    setSchedule(result.schedule);
-    setWarnings(result.warnings);
-    saveToFirebase(students, trainers, result.schedule, result.warnings);
+    updateScheduleData(result.schedule, result.warnings);
   };
 
   const handleDeploySchedule = async () => {
@@ -189,11 +128,13 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     });
 
     if (user) {
-      const allSessions = [...sessions, ...newSessions];
-      // Filter out duplicates just in case (by ID)
-      const uniqueSessions = Array.from(new Map(allSessions.map(s => [s.id, s])).values());
-      
-      await setDoc(doc(db, 'schedules', 'global_schedule'), { sessions: uniqueSessions }, { merge: true });
+      // Add new sessions using context
+      for (const session of newSessions) {
+        // Check if session already exists
+        if (!sessions.find(s => s.id === session.id)) {
+          await addSession(session);
+        }
+      }
       alert(`Đã triển khai ${newSessions.length} buổi tập vào danh sách chấm công!`);
     }
   };
@@ -349,10 +290,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               {editingStudent && (
                 <StudentForm 
                   onSave={(s) => {
-                    const newStudents = students.map(st => st.id === s.id ? s : st);
+                    updateStudent(s);
                     setEditingStudent(null);
-                    setStudents(newStudents);
-                    saveToFirebase(newStudents, trainers, schedule, warnings);
                   }}
                   initialData={editingStudent}
                   onCancelEdit={() => setEditingStudent(null)}
@@ -386,9 +325,10 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                 branches={branches}
                 onEdit={setEditingStudent}
                 onToggleConfirm={(id) => {
-                  const newStudents = students.map(s => s.id === id ? { ...s, isScheduleConfirmed: !s.isScheduleConfirmed } : s);
-                  setStudents(newStudents);
-                  saveToFirebase(newStudents, trainers, schedule, warnings);
+                  const student = students.find(s => s.id === id);
+                  if (student) {
+                    updateStudent({ ...student, isScheduleConfirmed: !student.isScheduleConfirmed });
+                  }
                 }}
                 onToggleLockSchedule={(id) => {
                   const newSchedule = { ...schedule };
@@ -410,8 +350,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                     );
                   });
 
-                  setSchedule(newSchedule);
-                  saveToFirebase(students, trainers, newSchedule, warnings);
+                  updateScheduleData(newSchedule, warnings);
                 }}
               />
             </div>
@@ -424,8 +363,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               trainers={trainers} 
               weekOffset={weekOffset} 
               onUpdateSchedule={(newSchedule) => {
-                setSchedule(newSchedule);
-                saveToFirebase(students, trainers, newSchedule, warnings);
+                updateScheduleData(newSchedule, warnings);
               }}
             />
           )}
@@ -448,21 +386,12 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     
     const studentId = currentUserStudent ? currentUserStudent.id : user.uid;
     const newStudent = { ...s, id: studentId, name: profile?.name || s.name, isScheduleConfirmed: true };
-    let newStudents;
-    if (currentUserStudent) {
-      newStudents = students.map(st => st.id === studentId ? newStudent : st);
-    } else {
-      newStudents = [...students, newStudent];
-    }
-    setStudents(newStudents);
-    saveToFirebase(newStudents, trainers, schedule, warnings);
+    updateStudent(newStudent);
   };
 
   const handleToggleConfirm = () => {
     if (!user || !currentUserStudent) return;
-    const newStudents = students.map(st => st.id === currentUserStudent.id ? { ...st, isScheduleConfirmed: !st.isScheduleConfirmed } : st);
-    setStudents(newStudents);
-    saveToFirebase(newStudents, trainers, schedule, warnings);
+    updateStudent({ ...currentUserStudent, isScheduleConfirmed: !currentUserStudent.isScheduleConfirmed });
   };
 
   const handleConfirmAttendance = async (contractId: string, classId: string) => {
@@ -488,29 +417,18 @@ export default function SchedulerWrapper({ user, profile }: Props) {
       attendedClasses: [...(contract.attendedClasses || []), classId]
     } as StudentContract;
     
-    const newContracts = contracts.map(c => c.id === contractId ? updatedContract : c);
-    
     // Also update the session status to verified and completed
-    const newSessions = sessions.map(s => {
-      // Session ID is `${slotId}-${entry.studentId}-${dateStr}`
-      // classId is `${slotId}-${dateStr}`
+    const sessionToUpdate = sessions.find(s => {
       const sessionSlotId = s.id.split('-').slice(0, 2).join('-');
       const sessionClassId = `${sessionSlotId}-${s.date}`;
-      
-      if (s.studentId === currentUserStudent?.id && sessionClassId === classId) {
-        return { ...s, verifiedByStudent: true, status: 'completed' as const };
-      }
-      return s;
+      return s.studentId === currentUserStudent?.id && sessionClassId === classId;
     });
 
-    setContracts(newContracts);
-    setSessions(newSessions);
-
     if (user) {
-      await setDoc(doc(db, 'schedules', 'global_schedule'), { 
-        contracts: newContracts,
-        sessions: newSessions
-      }, { merge: true });
+      await updateContract(updatedContract);
+      if (sessionToUpdate) {
+        await updateSession({ ...sessionToUpdate, verifiedByStudent: true, status: 'completed' });
+      }
     }
   };
 

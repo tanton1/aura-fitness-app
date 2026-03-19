@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ContractInvoice from './ContractInvoice';
 import EditContractModal from './EditContractModal';
 import StudentProgressAdmin from './StudentProgressAdmin';
-import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface Props {
   student: Student;
@@ -21,6 +20,7 @@ interface Props {
 }
 
 export default function StudentDetail({ student, contracts, packages, trainers, branches, sessions, onBack, onSaveContract, onUpdateContract }: Props) {
+  const { dailyCheckins: allDailyCheckins } = useDatabase();
   const [isAddingPackage, setIsAddingPackage] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [selectedTrainerId, setSelectedTrainerId] = useState('');
@@ -46,26 +46,14 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
 
   useEffect(() => {
     if (activeTab === 'checkin') {
-      const fetchCheckins = async () => {
-        setLoadingCheckins(true);
-        try {
-          const q = query(
-            collection(db, 'dailyCheckins'),
-            where('studentId', '==', student.id),
-            orderBy('date', 'desc')
-          );
-          const querySnapshot = await getDocs(q);
-          const checkins = querySnapshot.docs.map(doc => doc.data() as DailyCheckin);
-          setDailyCheckins(checkins);
-        } catch (error) {
-          console.error("Error fetching check-ins:", error);
-        } finally {
-          setLoadingCheckins(false);
-        }
-      };
-      fetchCheckins();
+      setLoadingCheckins(true);
+      const checkins = allDailyCheckins
+        .filter(c => c.studentId === student.id)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setDailyCheckins(checkins);
+      setLoadingCheckins(false);
     }
-  }, [activeTab, student.id]);
+  }, [activeTab, student.id, allDailyCheckins]);
 
   useEffect(() => {
     const pkg = packages.find(p => p.id === selectedPackageId);

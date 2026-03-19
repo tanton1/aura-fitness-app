@@ -1,85 +1,85 @@
 import React, { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../../lib/firebase';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import firebaseConfig from '../../../firebase-applet-config.json';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { User as UserIcon, Building, Plus, Trash2, Edit2, ShieldCheck, Users, Package, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Trainer, Branch, StaffMember } from '../../types';
 import PackageSettings from './PackageSettings';
 import { LOGO_URL } from '../../constants';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface Props {
   user: FirebaseUser | null;
 }
 
 export default function HRManagement({ user }: Props) {
+  const {
+    trainers,
+    branches,
+    staff,
+    addTrainer,
+    updateTrainer,
+    deleteTrainer,
+    addBranch,
+    updateBranch,
+    deleteBranch,
+    addStaff,
+    updateStaff,
+    deleteStaff,
+    updateUserProfile
+  } = useDatabase();
+
   const [activeSubTab, setActiveSubTab] = useState<'trainers' | 'branches' | 'staff' | 'packages'>('trainers');
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [editingItem, setEditingItem] = useState<Partial<Trainer | Branch | StaffMember> | null>(null);
   const [formData, setFormData] = useState<Partial<Trainer | Branch | StaffMember>>({});
-  const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'staff' | 'branch'} | null>(null);
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      const docRef = doc(db, 'schedules', 'global_schedule');
-      const unsubscribe = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setTrainers(data.trainers || []);
-          setBranches(data.branches || []);
-          setStaff(data.staff || []);
-        }
-        setIsLoaded(true);
-      }, (error) => {
-        console.error("Firestore Error in HRManagement:", error);
-      });
-      return () => unsubscribe();
-    }
-  }, [user]);
-
   const handleSave = async () => {
-    if (!user || !isLoaded) return;
+    if (!user) return;
     console.log('Saving...', activeSubTab, formData);
-    const docRef = doc(db, 'schedules', 'global_schedule');
     
     if (activeSubTab === 'trainers') {
-      let newTrainers = [...trainers];
-      let newStaff = [...staff];
-      
       if (editingItem?.id) {
         const updatedTrainer = { ...editingItem, ...formData } as Trainer;
-        newTrainers = trainers.map(t => t.id === editingItem.id ? updatedTrainer : t);
         
         // Sync with staff array
-        newStaff = staff.map(s => s.id === editingItem.id ? {
-          ...s,
-          name: updatedTrainer.name,
-          email: updatedTrainer.email || s.email,
-          phone: updatedTrainer.phone || s.phone,
-          branchId: updatedTrainer.branchId || s.branchId,
-          status: updatedTrainer.status
-        } : s);
+        const staffMember = staff.find(s => s.id === editingItem.id);
+        if (staffMember) {
+            await updateStaff({
+              ...staffMember,
+              name: updatedTrainer.name,
+              email: updatedTrainer.email || staffMember.email,
+              phone: updatedTrainer.phone || staffMember.phone,
+              branchId: updatedTrainer.branchId || staffMember.branchId,
+              status: updatedTrainer.status
+            });
+        }
 
         // Sync with users collection
-        await setDoc(doc(db, 'users', editingItem.id), {
+        await updateUserProfile(editingItem.id, {
           name: updatedTrainer.name,
           branchId: updatedTrainer.branchId || '',
           employeeCode: updatedTrainer.employeeCode || '',
-        }, { merge: true });
+        });
 
+        try {
+          await updateTrainer(updatedTrainer);
+          setAlertMessage('Đã lưu thông tin PT thành công!');
+        } catch (e) {
+          console.error("Error saving trainers:", e);
+          setError("Lỗi lưu dữ liệu PT: " + (e as Error).message);
+          return;
+        }
       } else {
-        // This case shouldn't happen often as trainers are usually created via staff tab
         const newTrainer = {
           id: Date.now().toString(),
           status: 'active',
@@ -87,47 +87,47 @@ export default function HRManagement({ user }: Props) {
           commissionPerSession: 50000,
           ...formData
         } as Trainer;
-        newTrainers = [...trainers, newTrainer];
+        try {
+          await addTrainer(newTrainer);
+          setAlertMessage('Đã lưu thông tin PT thành công!');
+        } catch (e) {
+          console.error("Error saving trainers:", e);
+          setError("Lỗi lưu dữ liệu PT: " + (e as Error).message);
+          return;
+        }
       }
       
-      try {
-        await setDoc(docRef, { trainers: newTrainers, staff: newStaff }, { merge: true });
-        setTrainers(newTrainers);
-        setStaff(newStaff);
-        setAlertMessage('Đã lưu thông tin PT thành công!');
-      } catch (e) {
-        console.error("Error saving trainers:", e);
-        setError("Lỗi lưu dữ liệu PT: " + (e as Error).message);
-        return;
-      }
       setIsAdding(false);
       setEditingItem(null);
       setFormData({});
     } else if (activeSubTab === 'branches') {
-      let newBranches;
       if (editingItem?.id) {
-        newBranches = branches.map(b => b.id === editingItem.id ? { ...b, ...formData } as Branch : b);
+        try {
+          await updateBranch({ ...editingItem, ...formData } as Branch);
+          setAlertMessage('Đã lưu thông tin chi nhánh thành công!');
+        } catch (e) {
+          console.error("Error saving branches:", e);
+          setError("Lỗi lưu dữ liệu chi nhánh: " + (e as Error).message);
+          return;
+        }
       } else {
         const newBranch = {
           id: Date.now().toString(),
           ...formData
         } as Branch;
-        newBranches = [...branches, newBranch];
-      }
-      try {
-        await setDoc(docRef, { branches: newBranches }, { merge: true });
-        setBranches(newBranches);
-        setAlertMessage('Đã lưu thông tin chi nhánh thành công!');
-      } catch (e) {
-        console.error("Error saving branches:", e);
-        setError("Lỗi lưu dữ liệu chi nhánh: " + (e as Error).message);
-        return;
+        try {
+          await addBranch(newBranch);
+          setAlertMessage('Đã lưu thông tin chi nhánh thành công!');
+        } catch (e) {
+          console.error("Error saving branches:", e);
+          setError("Lỗi lưu dữ liệu chi nhánh: " + (e as Error).message);
+          return;
+        }
       }
       setIsAdding(false);
       setEditingItem(null);
       setFormData({});
     } else if (activeSubTab === 'staff') {
-      let newStaff = [...staff];
       let staffUid = (editingItem as StaffMember)?.id;
 
       if (!editingItem?.id) {
@@ -180,56 +180,45 @@ export default function HRManagement({ user }: Props) {
           role: role // Ensure role is explicitly set in the object
         }) as StaffMember;
 
-        // Use functional-like approach to get latest state if possible, 
-        // but since we are in an async function, we'll just use the current state variables
-        // and ensure we don't overwrite with stale data.
-        const currentStaff = [...staff];
-        const currentTrainers = [...trainers];
-
-        let finalStaff;
-        if (editingItem?.id) {
-          finalStaff = currentStaff.map(s => s.id === editingItem.id ? newMember : s);
-        } else {
-          finalStaff = [...currentStaff, newMember];
-        }
-
-        // Sync with trainers array
-        let finalTrainers = [...currentTrainers];
-        const existingTrainerIndex = finalTrainers.findIndex(t => t.id === staffUid);
-        
-        if (existingTrainerIndex >= 0) {
-          // If they are already in the trainers list, update their info regardless of their new role
-          finalTrainers[existingTrainerIndex] = {
-            ...finalTrainers[existingTrainerIndex],
-            name: newMember.name,
-            email: newMember.email,
-            phone: newMember.phone,
-            branchId: newMember.branchId,
-            status: newMember.status,
-            // Preserve commission fields and employee code if they exist
-            commissionRate: (formData as any).commissionRate ?? finalTrainers[existingTrainerIndex].commissionRate ?? 5,
-            commissionPerSession: (formData as any).commissionPerSession ?? finalTrainers[existingTrainerIndex].commissionPerSession ?? 50000,
-            employeeCode: (formData as any).employeeCode ?? finalTrainers[existingTrainerIndex].employeeCode ?? ''
-          };
-        } else if (role === 'trainer') {
-          // If they are not in the trainers list, only add them if their role is 'trainer'
-          finalTrainers.push({
-            id: staffUid,
-            name: newMember.name,
-            email: newMember.email,
-            phone: newMember.phone,
-            branchId: newMember.branchId,
-            status: newMember.status,
-            commissionRate: (formData as any).commissionRate ?? 5,
-            commissionPerSession: (formData as any).commissionPerSession ?? 50000,
-            employeeCode: (formData as any).employeeCode ?? ''
-          });
-        }
-
         try {
-          await setDoc(docRef, { staff: finalStaff, trainers: finalTrainers }, { merge: true });
-          setStaff(finalStaff);
-          setTrainers(finalTrainers);
+          if (editingItem?.id) {
+            await updateStaff(newMember);
+          } else {
+            await addStaff(newMember);
+          }
+
+          // Sync with trainers array
+          const existingTrainer = trainers.find(t => t.id === staffUid);
+          
+          if (existingTrainer) {
+            // If they are already in the trainers list, update their info regardless of their new role
+            await updateTrainer({
+              ...existingTrainer,
+              name: newMember.name,
+              email: newMember.email,
+              phone: newMember.phone,
+              branchId: newMember.branchId,
+              status: newMember.status,
+              // Preserve commission fields and employee code if they exist
+              commissionRate: (formData as any).commissionRate ?? existingTrainer.commissionRate ?? 5,
+              commissionPerSession: (formData as any).commissionPerSession ?? existingTrainer.commissionPerSession ?? 50000,
+              employeeCode: (formData as any).employeeCode ?? existingTrainer.employeeCode ?? ''
+            });
+          } else if (role === 'trainer') {
+            // If they are not in the trainers list, only add them if their role is 'trainer'
+            await addTrainer({
+              id: staffUid,
+              name: newMember.name,
+              email: newMember.email,
+              phone: newMember.phone,
+              branchId: newMember.branchId,
+              status: newMember.status,
+              commissionRate: (formData as any).commissionRate ?? 5,
+              commissionPerSession: (formData as any).commissionPerSession ?? 50000,
+              employeeCode: (formData as any).employeeCode ?? ''
+            });
+          }
+
           setAlertMessage('Đã lưu thông tin nhân viên thành công!');
         } catch (e) {
           console.error("Error saving staff:", e);
@@ -251,21 +240,14 @@ export default function HRManagement({ user }: Props) {
   const executeDelete = async () => {
     if (!user || !itemToDelete) return;
     const { id, type } = itemToDelete;
-    const docRef = doc(db, 'schedules', 'global_schedule');
-    
-    // Always filter both arrays to ensure complete removal
-    const updatedTrainers = trainers.filter(t => t.id !== id);
-    const updatedStaff = staff.filter(s => s.id !== id);
-    const updatedBranches = branches.filter(b => b.id !== id);
 
     try {
       if (activeSubTab === 'trainers' || activeSubTab === 'staff') {
-        await setDoc(docRef, { 
-          staff: updatedStaff,
-          trainers: updatedTrainers
-        }, { merge: true });
-        setStaff(updatedStaff);
-        setTrainers(updatedTrainers);
+        await deleteStaff(id);
+        const trainer = trainers.find(t => t.id === id);
+        if (trainer) {
+          await deleteTrainer(id);
+        }
         
         try {
           await deleteDoc(doc(db, 'users', id));
@@ -273,8 +255,7 @@ export default function HRManagement({ user }: Props) {
           console.error("Error deleting user doc:", e);
         }
       } else if (activeSubTab === 'branches') {
-        await setDoc(docRef, { branches: updatedBranches }, { merge: true });
-        setBranches(updatedBranches);
+        await deleteBranch(id);
       }
       
       setAlertMessage('Đã xóa thành công!');
@@ -292,7 +273,7 @@ export default function HRManagement({ user }: Props) {
   };
 
   const handleRestoreRoles = async () => {
-    if (!user || !isLoaded) return;
+    if (!user) return;
     try {
       setAlertMessage('Đang khôi phục phân quyền...');
       let count = 0;
@@ -613,7 +594,6 @@ export default function HRManagement({ user }: Props) {
                 <button 
                   onClick={async () => {
                     setShowCleanupConfirm(false);
-                    const docRef = doc(db, 'schedules', 'global_schedule');
                     
                     // Remove duplicates and invalid entries
                     const cleanTrainers = trainers.filter((t, index, self) => 
@@ -624,10 +604,14 @@ export default function HRManagement({ user }: Props) {
                     );
                     
                     try {
-                      await setDoc(docRef, { 
-                        trainers: cleanTrainers,
-                        staff: cleanStaff
-                      }, { merge: true });
+                      // We don't have a bulk update in DatabaseContext, so we'll just delete the duplicates
+                      const duplicateTrainers = trainers.filter(t => !cleanTrainers.includes(t));
+                      const duplicateStaff = staff.filter(s => !cleanStaff.includes(s));
+                      
+                      await Promise.all([
+                        ...duplicateTrainers.map(t => deleteTrainer(t.id)),
+                        ...duplicateStaff.map(s => deleteStaff(s.id))
+                      ]);
                       setAlertMessage('Đã dọn dẹp dữ liệu thành công!');
                     } catch (e) {
                       setAlertMessage('Lỗi khi dọn dẹp: ' + (e as Error).message);

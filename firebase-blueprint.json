@@ -12,19 +12,112 @@
       },
       "required": ["name", "role"]
     },
-    "Schedule": {
-      "title": "Schedule",
-      "description": "Global schedule information",
+    "Student": {
+      "title": "Student",
+      "description": "Student information",
       "type": "object",
       "properties": {
-        "trainers": { "type": "array" },
-        "branches": { "type": "array" },
-        "staff": { "type": "array" },
-        "students": { "type": "array" },
-        "contracts": { "type": "array" },
-        "packages": { "type": "array" },
-        "sessions": { "type": "array" }
-      }
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "branchId": { "type": "string" },
+        "status": { "type": "string" },
+        "joinDate": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Contract": {
+      "title": "Contract",
+      "description": "Student contract information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "packageId": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "branchId": { "type": "string" },
+        "totalPrice": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "studentId", "packageId"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "contractId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "method": { "type": "string" }
+      },
+      "required": ["id", "contractId", "amount", "date"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "Training session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "trainerId": { "type": "string" },
+        "branchId": { "type": "string" },
+        "date": { "type": "string" },
+        "hour": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "studentId", "trainerId", "date", "hour"]
+    },
+    "Trainer": {
+      "title": "Trainer",
+      "description": "Trainer information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "branchId": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Branch": {
+      "title": "Branch",
+      "description": "Branch information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Package": {
+      "title": "Package",
+      "description": "Training package information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "totalSessions": { "type": "number" },
+        "price": { "type": "number" }
+      },
+      "required": ["id", "name", "totalSessions", "price"]
+    },
+    "Staff": {
+      "title": "Staff",
+      "description": "Staff information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "branchId": { "type": "string" }
+      },
+      "required": ["id", "name", "role"]
     },
     "HealthyDish": {
       "title": "HealthyDish",
@@ -57,9 +150,37 @@
       "schema": { "$ref": "User" },
       "description": "User profiles"
     },
-    "/schedules/global_schedule": {
-      "schema": { "$ref": "Schedule" },
-      "description": "Global schedule data"
+    "/students/{studentId}": {
+      "schema": { "$ref": "Student" },
+      "description": "Students collection"
+    },
+    "/contracts/{contractId}": {
+      "schema": { "$ref": "Contract" },
+      "description": "Contracts collection"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "Payment" },
+      "description": "Payments collection"
+    },
+    "/sessions/{sessionId}": {
+      "schema": { "$ref": "Session" },
+      "description": "Sessions collection"
+    },
+    "/trainers/{trainerId}": {
+      "schema": { "$ref": "Trainer" },
+      "description": "Trainers collection"
+    },
+    "/branches/{branchId}": {
+      "schema": { "$ref": "Branch" },
+      "description": "Branches collection"
+    },
+    "/packages/{packageId}": {
+      "schema": { "$ref": "Package" },
+      "description": "Packages collection"
+    },
+    "/staff/{staffId}": {
+      "schema": { "$ref": "Staff" },
+      "description": "Staff collection"
     },
     "/dailyCheckins/{checkinId}": {
       "schema": {

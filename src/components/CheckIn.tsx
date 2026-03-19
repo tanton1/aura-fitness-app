@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle2, Smile, Zap, Target, Droplets, Moon, Loader2, History } from 'lucide-react';
-import { auth, db } from '../lib/firebase';
-import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { auth } from '../lib/firebase';
 import { DailyCheckin } from '../types';
+import { useDatabase } from '../contexts/DatabaseContext';
 
 export default function CheckIn() {
+  const { dailyCheckins, addDailyCheckin } = useDatabase();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -19,53 +20,31 @@ export default function CheckIn() {
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      if (!auth.currentUser) return;
-      try {
-        const q = query(
-          collection(db, 'dailyCheckins'),
-          where('studentId', '==', auth.currentUser.uid),
-          orderBy('date', 'desc')
-        );
-        const querySnapshot = await getDocs(q);
-        const historyData = querySnapshot.docs.map(doc => doc.data() as DailyCheckin);
-        setHistory(historyData);
-      } catch (error) {
-        console.error("Error fetching check-in history:", error);
-      }
-    };
-    if (showHistory) {
-      fetchHistory();
+    if (showHistory && auth.currentUser) {
+      const userCheckins = dailyCheckins
+        .filter(c => c.studentId === auth.currentUser?.uid)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setHistory(userCheckins);
     }
-  }, [showHistory]);
+  }, [showHistory, dailyCheckins]);
 
   const today = new Date().toISOString().split('T')[0];
   const checkinId = `${auth.currentUser?.uid}_${today}`;
 
   useEffect(() => {
-    const checkExisting = async () => {
-      if (!auth.currentUser) return;
-      try {
-        const docRef = doc(db, 'dailyCheckins', checkinId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data() as DailyCheckin;
-          setHunger(data.hunger);
-          setEnergy(data.energy);
-          setCompliance(data.compliance);
-          setWater(data.waterIntake || 2);
-          setSleep(data.sleepQuality || 7);
-          setNote(data.note);
-          setStep(2); // Already completed
-        }
-      } catch (error) {
-        console.error("Error checking existing check-in:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkExisting();
-  }, [checkinId]);
+    if (!auth.currentUser) return;
+    const existingCheckin = dailyCheckins.find(c => c.id === checkinId);
+    if (existingCheckin) {
+      setHunger(existingCheckin.hunger);
+      setEnergy(existingCheckin.energy);
+      setCompliance(existingCheckin.compliance);
+      setWater(existingCheckin.waterIntake || 2);
+      setSleep(existingCheckin.sleepQuality || 7);
+      setNote(existingCheckin.note || '');
+      setStep(2); // Already completed
+    }
+    setLoading(false);
+  }, [checkinId, dailyCheckins]);
 
   const handleComplete = async () => {
     if (!auth.currentUser) return;
@@ -81,10 +60,10 @@ export default function CheckIn() {
         waterIntake: water,
         sleepQuality: sleep,
         note,
-        createdAt: serverTimestamp()
+        createdAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'dailyCheckins', checkinId), checkinData);
+      await addDailyCheckin(checkinData);
       setStep(2);
     } catch (error) {
       console.error("Error saving check-in:", error);

@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Student, UserProfile, StudentContract, TrainingPackage, Trainer, Branch, Session, PaymentRecord } from '../../types';
 import { User } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
-import { auth, db } from '../../lib/firebase';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import firebaseConfig from '../../../firebase-applet-config.json';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { Search, Plus, Edit2, Trash2, Phone, Mail, Calendar, CheckCircle, XCircle, AlertCircle, User as UserIcon, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import StudentDetail from './StudentDetail';
 import DateRangeFilter from './DateRangeFilter';
 import { LOGO_URL } from '../../constants';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface Props {
   user: User | null;
@@ -18,13 +19,14 @@ interface Props {
 }
 
 export default function StudentManagement({ user, profile }: Props) {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [contracts, setContracts] = useState<StudentContract[]>([]);
-  const [payments, setPayments] = useState<PaymentRecord[]>([]);
-  const [packages, setPackages] = useState<TrainingPackage[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const { 
+    students, contracts, payments, packages, trainers, branches, sessions,
+    addStudent, updateStudent, deleteStudent,
+    addContract, updateContract, deleteContract,
+    addPayment, deletePayment, deleteSession,
+    updateUserProfile
+  } = useDatabase();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
   const [contractFilter, setContractFilter] = useState<'active' | 'expiring_week' | 'expiring_month' | 'expired' | 'all'>('active');
@@ -119,44 +121,6 @@ export default function StudentManagement({ user, profile }: Props) {
     return filtered;
   }, [students, searchTerm, dateRange, selectedBranchId, profile, contracts, contractFilter]);
 
-  useEffect(() => {
-    if (user) {
-      const docRef = doc(db, 'schedules', 'global_schedule');
-      const unsub = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setStudents(data.students || []);
-          setContracts(data.contracts || []);
-          setPayments(data.payments || []);
-          setTrainers(data.trainers || []);
-          setBranches(data.branches || []);
-          setSessions(data.sessions || []);
-          
-          if (!data.packages || data.packages.length === 0) {
-            setPackages([
-              { id: 'p1', name: 'Gói 12 buổi', totalSessions: 12, price: 4200000, durationMonths: 1 },
-              { id: 'p2', name: 'Gói 36 buổi', totalSessions: 36, price: 10800000, durationMonths: 3 }
-            ]);
-          } else {
-            setPackages(data.packages);
-          }
-        }
-      });
-      return () => unsub();
-    }
-  }, [user]);
-
-  const saveToFirebase = async (newStudents: Student[]) => {
-    if (user) {
-      try {
-        await setDoc(doc(db, 'schedules', 'global_schedule'), { students: JSON.parse(JSON.stringify(newStudents)) }, { merge: true });
-      } catch (e) {
-        console.error("Error saving students:", e);
-        setAlertMessage("Lỗi lưu dữ liệu học viên: " + (e as Error).message);
-      }
-    }
-  };
-
   const handleSaveContract = async (newContract: StudentContract) => {
     try {
       if (newContract.trainerId) {
@@ -168,16 +132,12 @@ export default function StudentManagement({ user, profile }: Props) {
       }
 
       const student = students.find(s => s.id === newContract.studentId);
-      let updatedStudents = students;
       if (student && student.status !== 'active') {
-        updatedStudents = students.map(s => s.id === student.id ? { ...s, status: 'active' } : s);
-        setStudents(updatedStudents);
+        await updateStudent({ ...student, status: 'active' });
       }
 
-      const newContracts = [...contracts, newContract];
-      setContracts(newContracts);
+      await addContract(newContract);
 
-      let newPayments = payments;
       if (newContract.paidAmount > 0) {
         const payment: PaymentRecord = {
           id: Date.now().toString() + '-p',
@@ -188,16 +148,7 @@ export default function StudentManagement({ user, profile }: Props) {
           method: 'transfer',
           note: 'Thanh toán lần đầu khi đăng ký gói'
         };
-        newPayments = [...payments, payment];
-        setPayments(newPayments);
-      }
-
-      if (user) {
-        await setDoc(doc(db, 'schedules', 'global_schedule'), { 
-          contracts: newContracts,
-          students: updatedStudents,
-          payments: newPayments
-        }, { merge: true });
+        await addPayment(payment);
       }
     } catch (e) {
       console.error("Error saving contract:", e);
@@ -208,10 +159,8 @@ export default function StudentManagement({ user, profile }: Props) {
   const handleUpdateContract = async (updatedContract: StudentContract) => {
     try {
       const oldContract = contracts.find(c => c.id === updatedContract.id);
-      const newContracts = contracts.map(c => c.id === updatedContract.id ? updatedContract : c);
-      setContracts(newContracts);
+      await updateContract(updatedContract);
       
-      let newPayments = payments;
       if (oldContract && updatedContract.paidAmount > oldContract.paidAmount) {
         const diff = updatedContract.paidAmount - oldContract.paidAmount;
         const payment: PaymentRecord = {
@@ -223,8 +172,7 @@ export default function StudentManagement({ user, profile }: Props) {
           method: 'transfer',
           note: 'Thanh toán thêm (cập nhật hợp đồng)'
         };
-        newPayments = [...payments, payment];
-        setPayments(newPayments);
+        await addPayment(payment);
       } else if (oldContract && updatedContract.paidAmount < oldContract.paidAmount) {
         const diff = oldContract.paidAmount - updatedContract.paidAmount;
         // Find the most recent payment for this contract with the exact amount
@@ -233,16 +181,8 @@ export default function StudentManagement({ user, profile }: Props) {
           // Sort by date descending to get the most recent one
           contractPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           const paymentToRemove = contractPayments[0];
-          newPayments = payments.filter(p => p.id !== paymentToRemove.id);
-          setPayments(newPayments);
+          await deletePayment(paymentToRemove.id);
         }
-      }
-
-      if (user) {
-        await setDoc(doc(db, 'schedules', 'global_schedule'), { 
-          contracts: newContracts,
-          payments: newPayments
-        }, { merge: true });
       }
     } catch (e) {
       console.error("Error updating contract:", e);
@@ -280,18 +220,16 @@ export default function StudentManagement({ user, profile }: Props) {
       return newObj;
     };
 
-    const currentStudents = [...students];
-    let finalStudents: Student[] = [];
-    
     if (editingStudent) {
-      finalStudents = currentStudents.map(s => s.id === editingStudent.id ? sanitize({ ...s, ...formData }) as Student : s);
+      const updatedStudent = sanitize({ ...editingStudent, ...formData }) as Student;
+      await updateStudent(updatedStudent);
       
       // Update User Profile in Firestore if it exists
       try {
-        await setDoc(doc(db, 'users', editingStudent.id), {
+        await updateUserProfile(editingStudent.id, {
           name: formData.name,
           branchId: formData.branchId || profile?.branchId || '',
-        }, { merge: true });
+        });
       } catch (e) {
         console.error("Error updating user profile:", e);
       }
@@ -329,11 +267,9 @@ export default function StudentManagement({ user, profile }: Props) {
         branchId: formData.branchId || profile?.branchId || '',
       };
       
-      finalStudents = [...students, newStudent];
+      await addStudent(newStudent);
     }
 
-    setStudents(finalStudents);
-    await saveToFirebase(finalStudents);
     setIsAdding(false);
     setEditingStudent(null);
     setFormData({ name: '', phone: '', email: '', dob: '', sessionsPerWeek: 3, availableSlots: [], status: 'active', branchId: '' });
@@ -349,36 +285,38 @@ export default function StudentManagement({ user, profile }: Props) {
     if (!studentToDelete) return;
     
     const id = studentToDelete;
-    const newStudents = students.filter(s => s.id !== id);
-    const newContracts = contracts.filter(c => c.studentId !== id);
-    const newPayments = payments.filter(p => p.studentId !== id);
-    const newSessions = sessions.filter(s => s.studentId !== id);
     
-    setStudents(newStudents);
-    setContracts(newContracts);
-    setPayments(newPayments);
-    setSessions(newSessions);
-    
-    if (user) {
-      try {
-        await setDoc(doc(db, 'schedules', 'global_schedule'), { 
-          students: newStudents,
-          contracts: newContracts,
-          payments: newPayments,
-          sessions: newSessions
-        }, { merge: true });
-        
-        try {
-          await deleteDoc(doc(db, 'users', id));
-        } catch (e) {
-          console.error("Error deleting user doc:", e);
-        }
-        
-        setAlertMessage("Đã xóa học viên thành công!");
-      } catch (e) {
-        console.error("Error deleting student data:", e);
-        setAlertMessage("Lỗi xóa dữ liệu học viên: " + (e as Error).message);
+    try {
+      await deleteStudent(id);
+      
+      // Delete associated contracts
+      const studentContracts = contracts.filter(c => c.studentId === id);
+      for (const c of studentContracts) {
+        await deleteContract(c.id);
       }
+
+      // Delete associated payments
+      const studentPayments = payments.filter(p => p.studentId === id);
+      for (const p of studentPayments) {
+        await deletePayment(p.id);
+      }
+
+      // Delete associated sessions
+      const studentSessions = sessions.filter(s => s.studentId === id);
+      for (const s of studentSessions) {
+        await deleteSession(s.id);
+      }
+      
+      try {
+        await deleteDoc(doc(db, 'users', id));
+      } catch (e) {
+        console.error("Error deleting user doc:", e);
+      }
+      
+      setAlertMessage("Đã xóa học viên thành công!");
+    } catch (e) {
+      console.error("Error deleting student data:", e);
+      setAlertMessage("Lỗi xóa dữ liệu học viên: " + (e as Error).message);
     }
     
     setShowDeleteConfirm(false);

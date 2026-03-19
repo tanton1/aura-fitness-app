@@ -20,10 +20,9 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { Session, Trainer, StudentContract, Student, PaymentRecord, Branch } from '../../types';
 import { LOGO_URL } from '../../constants';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6'];
 
@@ -32,31 +31,10 @@ interface Props {
 }
 
 export default function AdminReportDashboard({ onNavigate }: Props) {
+  const { sessions, trainers, contracts, students, payments, branches } = useDatabase();
   const [timeRange, setTimeRange] = useState('7days');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'overview' | 'pt'>('overview');
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [trainers, setTrainers] = useState<Trainer[]>([]);
-  const [contracts, setContracts] = useState<StudentContract[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [payments, setPayments] = useState<PaymentRecord[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-
-  useEffect(() => {
-    const docRef = doc(db, 'schedules', 'global_schedule');
-    const unsub = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setSessions(data.sessions || []);
-        setTrainers(data.trainers || []);
-        setContracts(data.contracts || []);
-        setStudents(data.students || []);
-        setPayments(data.payments || []);
-        setBranches(data.branches || []);
-      }
-    });
-    return () => unsub();
-  }, []);
 
   // Filter data by branch
   const filterByBranch = (items: any[]) => {

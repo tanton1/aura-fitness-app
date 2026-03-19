@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Student, StudentContract, PaymentRecord, Installment, UserProfile, Branch } from '../../types';
 import { User } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
-import { DollarSign, TrendingUp, AlertCircle, Plus, CheckCircle, Clock, Calendar as CalendarIcon, X, Trash2 } from 'lucide-react';
+import { DollarSign, TrendingUp, AlertCircle, Plus, CheckCircle, Clock, Calendar as CalendarIcon, X, Trash2, Undo2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DateRangeFilter from './DateRangeFilter';
 import { LOGO_URL } from '../../constants';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface Props {
   user: User | null;
@@ -14,12 +13,21 @@ interface Props {
 }
 
 export default function FinanceManagement({ user, profile }: Props) {
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const { 
+    branches, 
+    contracts, 
+    students, 
+    payments, 
+    sessions, 
+    updateContract, 
+    addPayment, 
+    deletePayment,
+    deleteContract,
+    deleteSession,
+    isMigrating
+  } = useDatabase();
+
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
-  const [contracts, setContracts] = useState<StudentContract[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [payments, setPayments] = useState<PaymentRecord[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   const [isPaying, setIsPaying] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
@@ -31,23 +39,6 @@ export default function FinanceManagement({ user, profile }: Props) {
   const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
   const [debtFilter, setDebtFilter] = useState<'all' | 'overdue' | 'this-week' | 'this-month'>('all');
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      const docRef = doc(db, 'schedules', 'global_schedule');
-      const unsub = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setContracts(data.contracts || []);
-          setStudents(data.students || []);
-          setPayments(data.payments || []);
-          setSessions(data.sessions || []);
-          setBranches(data.branches || []);
-        }
-      });
-      return () => unsub();
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!selectedContract || !isPaying) {
@@ -181,21 +172,18 @@ export default function FinanceManagement({ user, profile }: Props) {
     
     const validStudentIds = new Set(students.map(s => s.id).filter(Boolean));
     const validContractIds = new Set(contracts.map(c => c.id).filter(Boolean));
-    const newContracts = contracts.filter(c => c.studentId && validStudentIds.has(c.studentId));
-    const newPayments = payments.filter(p => p.studentId && validStudentIds.has(p.studentId) && p.contractId && validContractIds.has(p.contractId));
-    const newSessions = sessions.filter(s => s.studentId && validStudentIds.has(s.studentId));
     
-    setContracts(newContracts);
-    setPayments(newPayments);
-    setSessions(newSessions);
+    const orphanedContracts = contracts.filter(c => !c.studentId || !validStudentIds.has(c.studentId));
+    const orphanedPayments = payments.filter(p => !p.studentId || !validStudentIds.has(p.studentId) || !p.contractId || !validContractIds.has(p.contractId));
+    const orphanedSessions = sessions.filter(s => !s.studentId || !validStudentIds.has(s.studentId));
     
     if (user) {
       try {
-        await setDoc(doc(db, 'schedules', 'global_schedule'), { 
-          contracts: newContracts,
-          payments: newPayments,
-          sessions: newSessions
-        }, { merge: true });
+        await Promise.all([
+          ...orphanedContracts.map(c => deleteContract(c.id)),
+          ...orphanedPayments.map(p => deletePayment(p.id)),
+          ...orphanedSessions.map(s => deleteSession(s.id))
+        ]);
         setAlertMessage('Đã dọn dẹp dữ liệu mồ côi thành công!');
       } catch (e) {
         console.error("Error cleaning up data:", e);
@@ -217,14 +205,14 @@ export default function FinanceManagement({ user, profile }: Props) {
       return;
     }
 
-    const newPayments = payments.filter(p => p.id !== paymentToDelete);
-    const newContracts = contracts.map(c => {
-      if (c.id === payment.contractId) {
-        const newPaidAmount = Math.max(0, c.paidAmount - payment.amount);
-        let newInstallments = [...(c.installments || [])];
+    const contract = contracts.find(c => c.id === payment.contractId);
+    
+    if (contract) {
+      const newPaidAmount = Math.max(0, contract.paidAmount - payment.amount);
+      let newInstallments = payment.previousInstallments || [...(contract.installments || [])];
+      
+      if (!payment.previousInstallments) {
         let amountToRevert = payment.amount;
-
-        // Try to find a 'paid' installment with the exact amount, searching backwards
         let exactMatchIndex = -1;
         for (let i = newInstallments.length - 1; i >= 0; i--) {
           if (newInstallments[i].status === 'paid' && newInstallments[i].amount === amountToRevert) {
@@ -234,10 +222,8 @@ export default function FinanceManagement({ user, profile }: Props) {
         }
         
         if (exactMatchIndex >= 0) {
-          // Revert the paid installment back to pending
           newInstallments[exactMatchIndex] = { ...newInstallments[exactMatchIndex], status: 'pending' };
         } else {
-          // If no exact match, add a new pending installment
           newInstallments.push({
             id: Date.now().toString(),
             amount: amountToRevert,
@@ -245,33 +231,34 @@ export default function FinanceManagement({ user, profile }: Props) {
             status: 'pending'
           });
         }
-
-        // Sort pending installments by date to find the next payment date
-        const pendingInstallments = newInstallments.filter(i => i.status === 'pending');
-        pendingInstallments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-        return {
-          ...c,
-          paidAmount: newPaidAmount,
-          installments: newInstallments,
-          nextPaymentDate: pendingInstallments.length > 0 ? pendingInstallments[0].date : undefined
-        };
       }
-      return c;
-    });
 
-    setPayments(newPayments);
-    setContracts(newContracts);
+      const pendingInstallments = newInstallments.filter(i => i.status === 'pending');
+      pendingInstallments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    try {
-      await setDoc(doc(db, 'schedules', 'global_schedule'), { 
-        contracts: JSON.parse(JSON.stringify(newContracts)),
-        payments: JSON.parse(JSON.stringify(newPayments))
-      }, { merge: true });
-      setAlertMessage('Đã xóa phiếu thu và hoàn lại công nợ thành công!');
-    } catch (e) {
-      console.error("Error deleting payment:", e);
-      setAlertMessage("Có lỗi khi xóa phiếu thu!");
+      const updatedContract = {
+        ...contract,
+        paidAmount: newPaidAmount,
+        installments: newInstallments,
+        nextPaymentDate: pendingInstallments.length > 0 ? pendingInstallments[0].date : undefined
+      };
+
+      try {
+        await updateContract(updatedContract);
+        await deletePayment(paymentToDelete);
+        setAlertMessage('Đã hoàn tác phiếu thu và khôi phục công nợ thành công!');
+      } catch (e) {
+        console.error("Error deleting payment:", e);
+        setAlertMessage("Có lỗi khi hoàn tác phiếu thu!");
+      }
+    } else {
+      try {
+        await deletePayment(paymentToDelete);
+        setAlertMessage('Đã xóa phiếu thu thành công!');
+      } catch (e) {
+        console.error("Error deleting payment:", e);
+        setAlertMessage("Có lỗi khi xóa phiếu thu!");
+      }
     }
     
     setPaymentToDelete(null);
@@ -323,7 +310,8 @@ export default function FinanceManagement({ user, profile }: Props) {
       amount: amount,
       date: new Date().toISOString(),
       method: 'transfer',
-      note: 'Thanh toán công nợ'
+      note: 'Thanh toán công nợ',
+      previousInstallments: selectedContract.installments || []
     };
 
     const updatedContract = {
@@ -338,18 +326,10 @@ export default function FinanceManagement({ user, profile }: Props) {
       delete updatedContract.nextPaymentDate;
     }
 
-    const newContracts = contracts.map(c => c.id === selectedContract.id ? updatedContract : c);
-    const newPayments = [...payments, newPayment];
-
-    setContracts(newContracts);
-    setPayments(newPayments);
-
     if (user) {
       try {
-        await setDoc(doc(db, 'schedules', 'global_schedule'), { 
-          contracts: JSON.parse(JSON.stringify(newContracts)),
-          payments: JSON.parse(JSON.stringify(newPayments))
-        }, { merge: true });
+        await updateContract(updatedContract);
+        await addPayment(newPayment);
       } catch (e) {
         console.error("Error saving payment:", e);
         setAlertMessage("Có lỗi khi lưu phiếu thu!");
@@ -579,10 +559,11 @@ export default function FinanceManagement({ user, profile }: Props) {
                         {!p.id.startsWith('auto-') && (
                           <button 
                             onClick={() => setPaymentToDelete(p.id)}
-                            className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                            title="Xóa phiếu thu"
+                            className="p-2 text-zinc-500 hover:text-amber-400 hover:bg-amber-400/10 rounded-lg transition-colors flex items-center gap-1"
+                            title="Hoàn tác phiếu thu"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Undo2 className="w-4 h-4" />
+                            <span className="text-xs font-medium hidden sm:inline">Hoàn tác</span>
                           </button>
                         )}
                       </div>
@@ -782,9 +763,9 @@ export default function FinanceManagement({ user, profile }: Props) {
               <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Xóa phiếu thu?</h3>
+              <h3 className="text-xl font-bold text-white mb-2">Hoàn tác phiếu thu?</h3>
               <p className="text-zinc-400 mb-6">
-                Bạn có chắc chắn muốn xóa phiếu thu này? Số tiền đã thu sẽ được hoàn lại vào công nợ của học viên.
+                Bạn có chắc chắn muốn hoàn tác phiếu thu này? Số tiền đã thu sẽ được hoàn lại vào công nợ của học viên và lịch trả góp sẽ được khôi phục.
               </p>
               <div className="flex gap-3">
                 <button 
@@ -795,9 +776,9 @@ export default function FinanceManagement({ user, profile }: Props) {
                 </button>
                 <button 
                   onClick={executeDeletePayment}
-                  className="flex-1 py-3 rounded-xl font-medium text-white bg-red-500 hover:bg-red-600 transition-colors shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                  className="flex-1 py-3 rounded-xl font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-[0_0_15px_rgba(245,158,11,0.4)]"
                 >
-                  Đồng ý xóa
+                  Đồng ý hoàn tác
                 </button>
               </div>
             </motion.div>

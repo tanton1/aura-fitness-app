@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { TrainingPackage, Branch } from '../../types';
 import { User } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { Package, Plus, Edit2, Trash2, Clock, Hash, DollarSign, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LOGO_URL } from '../../constants';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface Props {
   user: User | null;
 }
 
 export default function PackageSettings({ user }: Props) {
-  const [packages, setPackages] = useState<TrainingPackage[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { packages, branches, addPackage, updatePackage, deletePackage } = useDatabase();
   const [isEditing, setIsEditing] = useState(false);
   const [editingPackage, setEditingPackage] = useState<TrainingPackage | null>(null);
   
@@ -27,42 +24,13 @@ export default function PackageSettings({ user }: Props) {
     branchId: ''
   });
 
-  useEffect(() => {
-    if (user) {
-      const docRef = doc(db, 'schedules', 'global_schedule');
-      const unsub = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setBranches(data.branches || []);
-          if (!data.packages || data.packages.length === 0) {
-            setPackages([
-              { id: 'p1', name: 'Gói 12 buổi', totalSessions: 12, price: 4200000, durationMonths: 1 },
-              { id: 'p2', name: 'Gói 36 buổi', totalSessions: 36, price: 10800000, durationMonths: 3 }
-            ]);
-          } else {
-            setPackages(data.packages);
-          }
-        } else {
-          setPackages([
-            { id: 'p1', name: 'Gói 12 buổi', totalSessions: 12, price: 4200000, durationMonths: 1 },
-            { id: 'p2', name: 'Gói 36 buổi', totalSessions: 36, price: 10800000, durationMonths: 3 }
-          ]);
-        }
-        setIsLoaded(true);
-      });
-      return () => unsub();
-    }
-  }, [user]);
-
   const handleSave = async () => {
-    if (!formData.name || !formData.totalSessions || !formData.price || !isLoaded) {
-      if (!isLoaded) alert('Đang tải dữ liệu, vui lòng chờ...');
+    if (!formData.name || !formData.totalSessions || !formData.price) {
       return;
     }
 
-    let newPackages = [...packages];
     if (editingPackage) {
-      newPackages = newPackages.map(p => p.id === editingPackage.id ? { ...p, ...formData } as TrainingPackage : p);
+      await updatePackage({ ...editingPackage, ...formData } as TrainingPackage);
     } else {
       const newPkg: TrainingPackage = {
         id: Date.now().toString(),
@@ -70,14 +38,9 @@ export default function PackageSettings({ user }: Props) {
         totalSessions: formData.totalSessions,
         price: formData.price,
         durationMonths: formData.durationMonths || 1,
-        branchId: formData.branchId || null,
+        branchId: formData.branchId || undefined,
       };
-      newPackages.push(newPkg);
-    }
-
-    setPackages(newPackages);
-    if (user) {
-      await setDoc(doc(db, 'schedules', 'global_schedule'), { packages: newPackages }, { merge: true });
+      await addPackage(newPkg);
     }
 
     setIsEditing(false);
@@ -87,11 +50,7 @@ export default function PackageSettings({ user }: Props) {
 
   const handleDelete = async (id: string) => {
     if (confirm('Bạn có chắc chắn muốn xóa gói tập này?')) {
-      const newPackages = packages.filter(p => p.id !== id);
-      setPackages(newPackages);
-      if (user) {
-        await setDoc(doc(db, 'schedules', 'global_schedule'), { packages: newPackages }, { merge: true });
-      }
+      await deletePackage(id);
     }
   };
 
@@ -260,7 +219,7 @@ export default function PackageSettings({ user }: Props) {
                   </button>
                   <button 
                     onClick={handleSave}
-                    disabled={!formData.name || !formData.totalSessions || !formData.price || !isLoaded}
+                    disabled={!formData.name || !formData.totalSessions || !formData.price}
                     className="flex-1 py-3 rounded-xl font-medium text-white bg-pink-500 hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_15px_rgba(255,0,127,0.4)]"
                   >
                     Lưu gói tập
