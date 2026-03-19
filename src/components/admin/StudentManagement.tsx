@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Student, UserProfile, StudentContract, TrainingPackage, Trainer, Branch, Session, PaymentRecord } from '../../types';
 import { User } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '../../lib/firebase';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import firebaseConfig from '../../../firebase-applet-config.json';
@@ -225,6 +225,17 @@ export default function StudentManagement({ user, profile }: Props) {
         };
         newPayments = [...payments, payment];
         setPayments(newPayments);
+      } else if (oldContract && updatedContract.paidAmount < oldContract.paidAmount) {
+        const diff = oldContract.paidAmount - updatedContract.paidAmount;
+        // Find the most recent payment for this contract with the exact amount
+        const contractPayments = payments.filter(p => p.contractId === updatedContract.id && p.amount === diff);
+        if (contractPayments.length > 0) {
+          // Sort by date descending to get the most recent one
+          contractPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          const paymentToRemove = contractPayments[0];
+          newPayments = payments.filter(p => p.id !== paymentToRemove.id);
+          setPayments(newPayments);
+        }
       }
 
       if (user) {
@@ -274,6 +285,16 @@ export default function StudentManagement({ user, profile }: Props) {
     
     if (editingStudent) {
       finalStudents = currentStudents.map(s => s.id === editingStudent.id ? sanitize({ ...s, ...formData }) as Student : s);
+      
+      // Update User Profile in Firestore if it exists
+      try {
+        await setDoc(doc(db, 'users', editingStudent.id), {
+          name: formData.name,
+          branchId: formData.branchId || profile?.branchId || '',
+        }, { merge: true });
+      } catch (e) {
+        console.error("Error updating user profile:", e);
+      }
     } else {
       let studentId = Date.now().toString();
       if (formData.phone) {
@@ -346,6 +367,13 @@ export default function StudentManagement({ user, profile }: Props) {
           payments: newPayments,
           sessions: newSessions
         }, { merge: true });
+        
+        try {
+          await deleteDoc(doc(db, 'users', id));
+        } catch (e) {
+          console.error("Error deleting user doc:", e);
+        }
+        
         setAlertMessage("Đã xóa học viên thành công!");
       } catch (e) {
         console.error("Error deleting student data:", e);

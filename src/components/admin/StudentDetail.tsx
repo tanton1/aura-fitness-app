@@ -223,6 +223,34 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     setPayingInstallmentId(null);
   };
 
+  const handleUndoInstallment = (contractId: string, installmentId: string) => {
+    const contract = contracts.find(c => c.id === contractId);
+    if (!contract || !contract.installments) return;
+
+    const installmentToUndo = contract.installments.find(i => i.id === installmentId);
+    if (!installmentToUndo) return;
+
+    if (!confirm(`Xác nhận hoàn tác thu tiền kỳ này: ${installmentToUndo.amount.toLocaleString('vi-VN')}đ? Số tiền đã thu sẽ bị trừ đi và phiếu thu tương ứng sẽ bị xóa.`)) return;
+
+    const updatedInstallments = contract.installments.map(inst => 
+      inst.id === installmentId ? { ...inst, status: 'pending' as const } : inst
+    );
+
+    const newPaidAmount = Math.max(0, contract.paidAmount - installmentToUndo.amount);
+    
+    // Find next pending installment date
+    const nextPending = updatedInstallments.find(i => i.status === 'pending');
+
+    const updatedContract = {
+      ...contract,
+      installments: updatedInstallments,
+      paidAmount: newPaidAmount,
+      nextPaymentDate: nextPending ? nextPending.date : undefined
+    };
+
+    onUpdateContract(updatedContract);
+  };
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
       <button onClick={onBack} className="flex items-center gap-2 text-zinc-400 hover:text-white mb-2 transition-colors">
@@ -474,9 +502,20 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                         
                         <div className="flex items-center gap-2">
                           {inst.status === 'paid' ? (
-                            <span className="flex items-center gap-1 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-md">
-                              <CheckCircle className="w-3 h-3" /> Đã thu
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="flex items-center gap-1 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-md">
+                                <CheckCircle className="w-3 h-3" /> Đã thu
+                              </span>
+                              {isManagingDebt && (
+                                <button 
+                                  onClick={() => handleUndoInstallment(activeContract.id, inst.id)}
+                                  className="text-xs font-bold bg-zinc-800 text-zinc-400 px-3 py-1.5 rounded-lg hover:bg-zinc-700 hover:text-white transition-colors shadow-sm"
+                                  title="Hoàn tác thu tiền"
+                                >
+                                  Hoàn tác
+                                </button>
+                              )}
+                            </div>
                           ) : isManagingDebt ? (
                             <button 
                               onClick={() => handlePayInstallment(activeContract.id, inst.id)}

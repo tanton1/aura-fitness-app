@@ -3,7 +3,7 @@ import { Student, StudentContract, PaymentRecord, Installment, UserProfile, Bran
 import { User } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { DollarSign, TrendingUp, AlertCircle, Plus, CheckCircle, Clock, Calendar as CalendarIcon, X } from 'lucide-react';
+import { DollarSign, TrendingUp, AlertCircle, Plus, CheckCircle, Clock, Calendar as CalendarIcon, X, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DateRangeFilter from './DateRangeFilter';
 import { LOGO_URL } from '../../constants';
@@ -28,6 +28,7 @@ export default function FinanceManagement({ user, profile }: Props) {
   const [installmentCount, setInstallmentCount] = useState(1);
   const [installments, setInstallments] = useState<{date: string, amount: number}[]>([]);
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
   const [debtFilter, setDebtFilter] = useState<'all' | 'overdue' | 'this-week' | 'this-month'>('all');
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
@@ -207,13 +208,94 @@ export default function FinanceManagement({ user, profile }: Props) {
     setShowCleanupConfirm(true);
   };
 
+  const executeDeletePayment = async () => {
+    if (!user || !paymentToDelete) return;
+    
+    const payment = payments.find(p => p.id === paymentToDelete);
+    if (!payment) {
+      setPaymentToDelete(null);
+      return;
+    }
+
+    const newPayments = payments.filter(p => p.id !== paymentToDelete);
+    const newContracts = contracts.map(c => {
+      if (c.id === payment.contractId) {
+        const newPaidAmount = Math.max(0, c.paidAmount - payment.amount);
+        let newInstallments = [...(c.installments || [])];
+        let amountToRevert = payment.amount;
+
+        // Try to find a 'paid' installment with the exact amount, searching backwards
+        let exactMatchIndex = -1;
+        for (let i = newInstallments.length - 1; i >= 0; i--) {
+          if (newInstallments[i].status === 'paid' && newInstallments[i].amount === amountToRevert) {
+            exactMatchIndex = i;
+            break;
+          }
+        }
+        
+        if (exactMatchIndex >= 0) {
+          // Revert the paid installment back to pending
+          newInstallments[exactMatchIndex] = { ...newInstallments[exactMatchIndex], status: 'pending' };
+        } else {
+          // If no exact match, add a new pending installment
+          newInstallments.push({
+            id: Date.now().toString(),
+            amount: amountToRevert,
+            date: new Date().toISOString().split('T')[0],
+            status: 'pending'
+          });
+        }
+
+        // Sort pending installments by date to find the next payment date
+        const pendingInstallments = newInstallments.filter(i => i.status === 'pending');
+        pendingInstallments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        return {
+          ...c,
+          paidAmount: newPaidAmount,
+          installments: newInstallments,
+          nextPaymentDate: pendingInstallments.length > 0 ? pendingInstallments[0].date : undefined
+        };
+      }
+      return c;
+    });
+
+    setPayments(newPayments);
+    setContracts(newContracts);
+
+    try {
+      await setDoc(doc(db, 'schedules', 'global_schedule'), { 
+        contracts: JSON.parse(JSON.stringify(newContracts)),
+        payments: JSON.parse(JSON.stringify(newPayments))
+      }, { merge: true });
+      setAlertMessage('Đã xóa phiếu thu và hoàn lại công nợ thành công!');
+    } catch (e) {
+      console.error("Error deleting payment:", e);
+      setAlertMessage("Có lỗi khi xóa phiếu thu!");
+    }
+    
+    setPaymentToDelete(null);
+  };
+
   const handlePayment = async () => {
     if (!selectedContract || !payAmount) return;
     const amount = Number(payAmount);
     if (amount <= 0) return;
     
     const remainingDebt = selectedContract.totalPrice - selectedContract.paidAmount - amount;
-    let finalInstallments: Installment[] = [];
+    
+    // Preserve existing paid installments
+    const existingPaidInstallments = (selectedContract.installments || []).filter(i => i.status === 'paid');
+    
+    // Create a new paid installment for the current payment
+    const newPaidInstallment: Installment = {
+      id: Date.now().toString() + '-paid',
+      amount: amount,
+      date: new Date().toISOString().split('T')[0],
+      status: 'paid'
+    };
+
+    let finalInstallments: Installment[] = [...existingPaidInstallments, newPaidInstallment];
     
     if (remainingDebt > 0) {
       const sum = installments.reduce((a, b) => a + b.amount, 0);
@@ -225,12 +307,13 @@ export default function FinanceManagement({ user, profile }: Props) {
         setAlertMessage('Vui lòng chọn ngày hẹn trả cho tất cả các kỳ!');
         return;
       }
-      finalInstallments = installments.map((inst, idx) => ({
+      const newPendingInstallments = installments.map((inst, idx) => ({
         id: Date.now().toString() + '-' + idx,
         amount: inst.amount,
         date: inst.date,
-        status: 'pending'
+        status: 'pending' as const
       }));
+      finalInstallments = [...finalInstallments, ...newPendingInstallments];
     }
 
     const newPayment: PaymentRecord = {
@@ -491,7 +574,18 @@ export default function FinanceManagement({ user, profile }: Props) {
                         <p className="text-white font-medium">{getStudentName(p.studentId)}</p>
                         <p className="text-xs text-zinc-500">{new Date(p.date).toLocaleDateString('vi-VN')}</p>
                       </div>
-                      <p className="text-emerald-400 font-bold">{p.amount.toLocaleString('vi-VN')}đ</p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-emerald-400 font-bold">{p.amount.toLocaleString('vi-VN')}đ</p>
+                        {!p.id.startsWith('auto-') && (
+                          <button 
+                            onClick={() => setPaymentToDelete(p.id)}
+                            className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                            title="Xóa phiếu thu"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))
                 ) : (
@@ -658,6 +752,49 @@ export default function FinanceManagement({ user, profile }: Props) {
                 </button>
                 <button 
                   onClick={confirmCleanup}
+                  className="flex-1 py-3 rounded-xl font-medium text-white bg-red-500 hover:bg-red-600 transition-colors shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                >
+                  Đồng ý xóa
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm Delete Payment Modal */}
+      <AnimatePresence>
+        {paymentToDelete && (
+          <div key="delete-payment-confirm" className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setPaymentToDelete(null)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-zinc-900 rounded-3xl p-6 shadow-2xl border border-zinc-800 text-center"
+            >
+              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Xóa phiếu thu?</h3>
+              <p className="text-zinc-400 mb-6">
+                Bạn có chắc chắn muốn xóa phiếu thu này? Số tiền đã thu sẽ được hoàn lại vào công nợ của học viên.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setPaymentToDelete(null)}
+                  className="flex-1 py-3 rounded-xl font-medium text-zinc-400 bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={executeDeletePayment}
                   className="flex-1 py-3 rounded-xl font-medium text-white bg-red-500 hover:bg-red-600 transition-colors shadow-[0_0_15px_rgba(239,68,68,0.4)]"
                 >
                   Đồng ý xóa

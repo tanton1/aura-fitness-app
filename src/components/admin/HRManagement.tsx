@@ -32,22 +32,19 @@ export default function HRManagement({ user }: Props) {
 
   useEffect(() => {
     if (user) {
-      setTimeout(() => {
-        console.log("Fetching global_schedule...");
-        const docRef = doc(db, 'schedules', 'global_schedule');
-        getDoc(docRef).then((docSnap) => {
-          console.log("docSnap.exists():", docSnap.exists());
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setTrainers(data.trainers || []);
-            setBranches(data.branches || []);
-            setStaff(data.staff || []);
-          }
-          setIsLoaded(true);
-        }).catch((error) => {
-          console.error("Firestore Error in HRManagement:", error);
-        });
-      }, 1000);
+      const docRef = doc(db, 'schedules', 'global_schedule');
+      const unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setTrainers(data.trainers || []);
+          setBranches(data.branches || []);
+          setStaff(data.staff || []);
+        }
+        setIsLoaded(true);
+      }, (error) => {
+        console.error("Firestore Error in HRManagement:", error);
+      });
+      return () => unsubscribe();
     }
   }, [user]);
 
@@ -198,36 +195,35 @@ export default function HRManagement({ user }: Props) {
 
         // Sync with trainers array
         let finalTrainers = [...currentTrainers];
-        if (role === 'trainer') {
-          const existingTrainerIndex = finalTrainers.findIndex(t => t.id === staffUid);
-          if (existingTrainerIndex >= 0) {
-            finalTrainers[existingTrainerIndex] = {
-              ...finalTrainers[existingTrainerIndex],
-              name: newMember.name,
-              email: newMember.email,
-              phone: newMember.phone,
-              branchId: newMember.branchId,
-              status: newMember.status,
-              // Preserve commission fields and employee code if they exist
-              commissionRate: (formData as any).commissionRate ?? finalTrainers[existingTrainerIndex].commissionRate ?? 5,
-              commissionPerSession: (formData as any).commissionPerSession ?? finalTrainers[existingTrainerIndex].commissionPerSession ?? 50000,
-              employeeCode: (formData as any).employeeCode ?? finalTrainers[existingTrainerIndex].employeeCode ?? ''
-            };
-          } else {
-            finalTrainers.push({
-              id: staffUid,
-              name: newMember.name,
-              email: newMember.email,
-              phone: newMember.phone,
-              branchId: newMember.branchId,
-              status: newMember.status,
-              commissionRate: (formData as any).commissionRate ?? 5,
-              commissionPerSession: (formData as any).commissionPerSession ?? 50000,
-              employeeCode: (formData as any).employeeCode ?? ''
-            });
-          }
-        } else {
-          finalTrainers = finalTrainers.filter(t => t.id !== staffUid);
+        const existingTrainerIndex = finalTrainers.findIndex(t => t.id === staffUid);
+        
+        if (existingTrainerIndex >= 0) {
+          // If they are already in the trainers list, update their info regardless of their new role
+          finalTrainers[existingTrainerIndex] = {
+            ...finalTrainers[existingTrainerIndex],
+            name: newMember.name,
+            email: newMember.email,
+            phone: newMember.phone,
+            branchId: newMember.branchId,
+            status: newMember.status,
+            // Preserve commission fields and employee code if they exist
+            commissionRate: (formData as any).commissionRate ?? finalTrainers[existingTrainerIndex].commissionRate ?? 5,
+            commissionPerSession: (formData as any).commissionPerSession ?? finalTrainers[existingTrainerIndex].commissionPerSession ?? 50000,
+            employeeCode: (formData as any).employeeCode ?? finalTrainers[existingTrainerIndex].employeeCode ?? ''
+          };
+        } else if (role === 'trainer') {
+          // If they are not in the trainers list, only add them if their role is 'trainer'
+          finalTrainers.push({
+            id: staffUid,
+            name: newMember.name,
+            email: newMember.email,
+            phone: newMember.phone,
+            branchId: newMember.branchId,
+            status: newMember.status,
+            commissionRate: (formData as any).commissionRate ?? 5,
+            commissionPerSession: (formData as any).commissionPerSession ?? 50000,
+            employeeCode: (formData as any).employeeCode ?? ''
+          });
         }
 
         try {
@@ -263,29 +259,24 @@ export default function HRManagement({ user }: Props) {
     const updatedBranches = branches.filter(b => b.id !== id);
 
     try {
-      if (activeSubTab === 'trainers') {
-        await setDoc(docRef, { trainers: updatedTrainers }, { merge: true });
-        setTrainers(updatedTrainers);
-      } else if (activeSubTab === 'branches') {
-        await setDoc(docRef, { branches: updatedBranches }, { merge: true });
-        setBranches(updatedBranches);
-      } else if (activeSubTab === 'staff') {
+      if (activeSubTab === 'trainers' || activeSubTab === 'staff') {
         await setDoc(docRef, { 
           staff: updatedStaff,
           trainers: updatedTrainers
         }, { merge: true });
         setStaff(updatedStaff);
         setTrainers(updatedTrainers);
-      }
-      
-      // Also try to delete from users collection if it's a staff/trainer
-      if (activeSubTab === 'staff' || activeSubTab === 'trainers') {
+        
         try {
           await deleteDoc(doc(db, 'users', id));
         } catch (e) {
           console.error("Error deleting user doc:", e);
         }
+      } else if (activeSubTab === 'branches') {
+        await setDoc(docRef, { branches: updatedBranches }, { merge: true });
+        setBranches(updatedBranches);
       }
+      
       setAlertMessage('Đã xóa thành công!');
     } catch (e) {
       console.error("Error deleting item:", e);
