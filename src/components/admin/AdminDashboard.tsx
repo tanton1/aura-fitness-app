@@ -50,7 +50,7 @@ export default function AdminDashboard({ user, profile, activeTab, onNavigate }:
       {/* Tab Content */}
       <div className="p-4 pt-6">
         <div className="mb-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+          {/* Removed Admin Dashboard title */}
           {!isMigrated && (
             <button
               onClick={migrateData}
