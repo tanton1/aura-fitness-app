@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StudentContract, TrainingPackage, Trainer, Branch } from '../../types';
+import { StudentContract, TrainingPackage, Trainer, Branch, Installment } from '../../types';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -14,10 +14,30 @@ interface Props {
 
 export default function EditContractModal({ contract, packages, trainers, branches, onClose, onSave }: Props) {
   const [formData, setFormData] = useState<StudentContract>({ ...contract });
+  const [installments, setInstallments] = useState<Installment[]>(contract.installments || []);
+
+  const debt = (formData.totalPrice - (formData.discount || 0)) - formData.paidAmount;
+  const totalInstallments = installments.reduce((sum, inst) => sum + inst.amount, 0);
 
   const handleSave = () => {
-    onSave(formData);
+    if (totalInstallments !== debt && debt > 0) {
+      alert(`Tổng số tiền trả góp (${totalInstallments.toLocaleString('vi-VN')}đ) phải bằng số tiền còn nợ (${debt.toLocaleString('vi-VN')}đ)!`);
+      return;
+    }
+    onSave({ ...formData, installments });
     onClose();
+  };
+
+  const handleInstallmentChange = (id: string, field: keyof Installment, value: any) => {
+    setInstallments(prev => prev.map(inst => inst.id === id ? { ...inst, [field]: value } : inst));
+  };
+
+  const addInstallment = () => {
+    setInstallments(prev => [...prev, { id: Date.now().toString(), amount: 0, date: new Date().toISOString().split('T')[0], status: 'pending' }]);
+  };
+
+  const removeInstallment = (id: string) => {
+    setInstallments(prev => prev.filter(inst => inst.id !== id));
   };
 
   return (
@@ -36,6 +56,7 @@ export default function EditContractModal({ contract, packages, trainers, branch
         </div>
 
         <div className="space-y-4">
+          {/* ... existing fields ... */}
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-1">Chi nhánh</label>
             <select 
@@ -123,6 +144,24 @@ export default function EditContractModal({ contract, packages, trainers, branch
               onChange={e => setFormData({ ...formData, paidAmount: Number(e.target.value) })}
               className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
             />
+          </div>
+
+          {/* Installment Editing Section */}
+          <div className="pt-4 border-t border-zinc-800">
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-zinc-400">Kế hoạch trả góp</label>
+              <button onClick={addInstallment} className="text-xs text-pink-500 hover:text-pink-400 font-medium">+ Thêm kỳ</button>
+            </div>
+            <div className="space-y-2">
+              {installments.map(inst => (
+                <div key={inst.id} className="flex gap-2 items-center">
+                  <input type="date" value={inst.date} onChange={e => handleInstallmentChange(inst.id, 'date', e.target.value)} className="flex-1 p-2 rounded-lg border border-zinc-800 bg-zinc-950 text-white text-sm" />
+                  <input type="number" value={inst.amount} onChange={e => handleInstallmentChange(inst.id, 'amount', Number(e.target.value))} className="flex-1 p-2 rounded-lg border border-zinc-800 bg-zinc-950 text-white text-sm" />
+                  <button onClick={() => removeInstallment(inst.id)} className="text-zinc-500 hover:text-red-500"><X className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+            <div className="text-xs text-zinc-500 mt-2">Còn nợ: {debt.toLocaleString('vi-VN')}đ | Đã chia: {totalInstallments.toLocaleString('vi-VN')}đ</div>
           </div>
 
           <button 

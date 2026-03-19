@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Student, StudentContract, TrainingPackage, Installment, Trainer, Branch, Session, DailyCheckin } from '../../types';
 import { ArrowLeft, CheckCircle, Plus, Activity, History, FileText, CreditCard, Calendar as CalendarIcon, AlertCircle, TrendingUp, Package, ClipboardCheck, Droplets, Moon, Smile, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ContractInvoice from './ContractInvoice';
 import EditContractModal from './EditContractModal';
 import StudentProgressAdmin from './StudentProgressAdmin';
+import ConfirmationModal from '../ConfirmationModal';
 import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface Props {
@@ -35,10 +36,19 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   const [editingContract, setEditingContract] = useState<StudentContract | null>(null);
   const [isManagingDebt, setIsManagingDebt] = useState(false);
   const [payingInstallmentId, setPayingInstallmentId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{title: string, message: string, onConfirm: () => void} | null>(null);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [referralCode, setReferralCode] = useState('');
   const [activeTab, setActiveTab] = useState<'info' | 'progress' | 'history' | 'checkin'>('info');
   const [dailyCheckins, setDailyCheckins] = useState<DailyCheckin[]>([]);
   const [loadingCheckins, setLoadingCheckins] = useState(false);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const activeContract = contracts.find(c => c.studentId === student.id && c.status === 'active');
   const historyContracts = contracts.filter(c => c.studentId === student.id && c.status !== 'active');
@@ -189,26 +199,31 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     const installmentToPay = contract.installments.find(i => i.id === installmentId);
     if (!installmentToPay) return;
 
-    if (!confirm(`Xác nhận thu tiền kỳ này: ${installmentToPay.amount.toLocaleString('vi-VN')}đ?`)) return;
+    setConfirmAction({
+      title: 'Xác nhận thu tiền',
+      message: `Xác nhận thu tiền kỳ này: ${installmentToPay.amount.toLocaleString('vi-VN')}đ?`,
+      onConfirm: () => {
+        const updatedInstallments = contract.installments!.map(inst => 
+          inst.id === installmentId ? { ...inst, status: 'paid' as const } : inst
+        );
 
-    const updatedInstallments = contract.installments.map(inst => 
-      inst.id === installmentId ? { ...inst, status: 'paid' as const } : inst
-    );
+        const newPaidAmount = contract.paidAmount + installmentToPay.amount;
+        
+        // Find next pending installment date
+        const nextPending = updatedInstallments.find(i => i.status === 'pending');
 
-    const newPaidAmount = contract.paidAmount + installmentToPay.amount;
-    
-    // Find next pending installment date
-    const nextPending = updatedInstallments.find(i => i.status === 'pending');
+        const updatedContract = {
+          ...contract,
+          installments: updatedInstallments,
+          paidAmount: newPaidAmount,
+          nextPaymentDate: nextPending ? nextPending.date : undefined
+        };
 
-    const updatedContract = {
-      ...contract,
-      installments: updatedInstallments,
-      paidAmount: newPaidAmount,
-      nextPaymentDate: nextPending ? nextPending.date : undefined
-    };
-
-    onUpdateContract(updatedContract);
-    setPayingInstallmentId(null);
+        onUpdateContract(updatedContract);
+        setConfirmAction(null);
+        setNotification({message: 'Đã thu tiền thành công!', type: 'success'});
+      }
+    });
   };
 
   const handleUndoInstallment = (contractId: string, installmentId: string) => {
@@ -218,25 +233,31 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     const installmentToUndo = contract.installments.find(i => i.id === installmentId);
     if (!installmentToUndo) return;
 
-    if (!confirm(`Xác nhận hoàn tác thu tiền kỳ này: ${installmentToUndo.amount.toLocaleString('vi-VN')}đ? Số tiền đã thu sẽ bị trừ đi và phiếu thu tương ứng sẽ bị xóa.`)) return;
+    setConfirmAction({
+      title: 'Xác nhận hoàn tác',
+      message: `Xác nhận hoàn tác thu tiền kỳ này: ${installmentToUndo.amount.toLocaleString('vi-VN')}đ? Số tiền đã thu sẽ bị trừ đi và phiếu thu tương ứng sẽ bị xóa.`,
+      onConfirm: () => {
+        const updatedInstallments = contract.installments!.map(inst => 
+          inst.id === installmentId ? { ...inst, status: 'pending' as const } : inst
+        );
 
-    const updatedInstallments = contract.installments.map(inst => 
-      inst.id === installmentId ? { ...inst, status: 'pending' as const } : inst
-    );
+        const newPaidAmount = Math.max(0, contract.paidAmount - installmentToUndo.amount);
+        
+        // Find next pending installment date
+        const nextPending = updatedInstallments.find(i => i.status === 'pending');
 
-    const newPaidAmount = Math.max(0, contract.paidAmount - installmentToUndo.amount);
-    
-    // Find next pending installment date
-    const nextPending = updatedInstallments.find(i => i.status === 'pending');
+        const updatedContract = {
+          ...contract,
+          installments: updatedInstallments,
+          paidAmount: newPaidAmount,
+          nextPaymentDate: nextPending ? nextPending.date : undefined
+        };
 
-    const updatedContract = {
-      ...contract,
-      installments: updatedInstallments,
-      paidAmount: newPaidAmount,
-      nextPaymentDate: nextPending ? nextPending.date : undefined
-    };
-
-    onUpdateContract(updatedContract);
+        onUpdateContract(updatedContract);
+        setConfirmAction(null);
+        setNotification({message: 'Đã hoàn tác thu tiền thành công!', type: 'success'});
+      }
+    });
   };
 
   return (
@@ -776,6 +797,33 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
           </div>
         )}
       </AnimatePresence>
+
+      {/* Notification */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={`fixed top-4 right-4 z-[80] p-4 rounded-xl shadow-lg border ${
+              notification.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-red-500/10 border-red-500/20 text-red-500'
+            }`}
+          >
+            {notification.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <ConfirmationModal
+          isOpen={!!confirmAction}
+          title={confirmAction.title}
+          message={confirmAction.message}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
 
       {/* Contract Invoice Modal */}
       <AnimatePresence>
