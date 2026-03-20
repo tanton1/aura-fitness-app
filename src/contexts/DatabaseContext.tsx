@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, runTransaction, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { Student, StudentContract, PaymentRecord, Session, Trainer, Branch, TrainingPackage, StaffMember, DailyCheckin, Schedule, Warning } from '../types';
+import { Student, StudentContract, PaymentRecord, Session, Trainer, Branch, TrainingPackage, StaffMember, DailyCheckin, Schedule, Warning, ScheduleEntry } from '../types';
 import { onAuthStateChanged } from 'firebase/auth';
 
 interface DatabaseContextType {
@@ -18,7 +18,7 @@ interface DatabaseContextType {
   warnings: Warning[];
   
   addStudent: (student: Student) => Promise<void>;
-  updateStudent: (student: Student) => Promise<void>;
+  updateStudent: (id: string, updates: Partial<Student>) => Promise<void>;
   deleteStudent: (id: string) => Promise<void>;
   
   addContract: (contract: StudentContract) => Promise<void>;
@@ -53,6 +53,8 @@ interface DatabaseContextType {
   deleteDailyCheckin: (id: string) => Promise<void>;
   
   updateScheduleData: (schedule: Schedule, warnings: Warning[]) => Promise<void>;
+  updateScheduleSlot: (slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => Promise<void>;
+  updateScheduleSlots: (updater: (currentSchedule: Schedule) => { [slotId: string]: ScheduleEntry[] }) => Promise<void>;
   updateUserProfile: (uid: string, data: any) => Promise<void>;
   
   migrateData: () => Promise<void>;
@@ -186,8 +188,8 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
   const addStudent = async (student: Student) => {
     await setDoc(doc(db, 'students', student.id), student);
   };
-  const updateStudent = async (student: Student) => {
-    await setDoc(doc(db, 'students', student.id), student, { merge: true });
+  const updateStudent = async (id: string, updates: Partial<Student>) => {
+    await updateDoc(doc(db, 'students', id), updates);
   };
   const deleteStudent = async (id: string) => {
     await deleteDoc(doc(db, 'students', id));
@@ -280,6 +282,42 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const updateScheduleSlot = async (slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => {
+    const docRef = doc(db, 'schedules', 'generated_schedule');
+    await runTransaction(db, async (transaction) => {
+      const docSnap = await transaction.get(docRef);
+      if (!docSnap.exists()) return;
+      
+      const currentSchedule = docSnap.data().schedule || {};
+      const currentEntries = currentSchedule[slotId] || [];
+      const newEntries = updater(currentEntries);
+      
+      transaction.update(docRef, {
+        [`schedule.${slotId}`]: newEntries
+      });
+    });
+  };
+
+  const updateScheduleSlots = async (updater: (currentSchedule: Schedule) => { [slotId: string]: ScheduleEntry[] }) => {
+    const docRef = doc(db, 'schedules', 'generated_schedule');
+    await runTransaction(db, async (transaction) => {
+      const docSnap = await transaction.get(docRef);
+      if (!docSnap.exists()) return;
+
+      const currentSchedule = docSnap.data().schedule || {};
+      const updatedSlots = updater(currentSchedule);
+
+      const updateData: any = {};
+      Object.keys(updatedSlots).forEach(slotId => {
+        updateData[`schedule.${slotId}`] = updatedSlots[slotId];
+      });
+      
+      if (Object.keys(updateData).length > 0) {
+        transaction.update(docRef, updateData);
+      }
+    });
+  };
+
   const updateUserProfile = async (uid: string, data: any) => {
     await setDoc(doc(db, 'users', uid), data, { merge: true });
   };
@@ -296,7 +334,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       addPackage, updatePackage, deletePackage,
       addStaff, updateStaff, deleteStaff,
       addDailyCheckin, updateDailyCheckin, deleteDailyCheckin,
-      updateScheduleData,
+      updateScheduleData, updateScheduleSlot, updateScheduleSlots,
       updateUserProfile,
       migrateData, isMigrating, isMigrated
     }}>

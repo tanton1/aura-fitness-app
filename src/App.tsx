@@ -202,7 +202,7 @@ export default function App() {
         </motion.div>
       </AnimatePresence>
       <Suspense fallback={null}>
-        <BottomNav currentScreen={currentScreen} onNavigate={setCurrentScreen} profile={profile} />
+        <BottomNav currentScreen={currentScreen} onNavigate={setCurrentScreen} profile={profile} isFullWidth={isFullWidth} />
       </Suspense>
     </div>
   );

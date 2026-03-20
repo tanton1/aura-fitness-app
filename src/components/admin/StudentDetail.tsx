@@ -21,7 +21,7 @@ interface Props {
 }
 
 export default function StudentDetail({ student, contracts, packages, trainers, branches, sessions, onBack, onSaveContract, onUpdateContract }: Props) {
-  const { dailyCheckins: allDailyCheckins } = useDatabase();
+  const { dailyCheckins: allDailyCheckins, payments, addPayment, deletePayment } = useDatabase();
   const [isAddingPackage, setIsAddingPackage] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [selectedTrainerId, setSelectedTrainerId] = useState('');
@@ -220,6 +220,20 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
         };
 
         onUpdateContract(updatedContract);
+        
+        // Create a payment record
+        addPayment({
+          id: Date.now().toString(),
+          studentId: student.id,
+          contractId: contract.id,
+          amount: installmentToPay.amount,
+          date: new Date().toISOString(),
+          method: 'transfer', // Default method
+          note: `Thanh toán trả góp hợp đồng ${contract.id}`,
+          previousInstallments: contract.installments,
+          installmentId: installmentId
+        });
+
         setConfirmAction(null);
         setNotification({message: 'Đã thu tiền thành công!', type: 'success'});
       }
@@ -254,6 +268,13 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
         };
 
         onUpdateContract(updatedContract);
+        
+        // Find and delete the associated payment record
+        const paymentToDelete = payments.find(p => p.contractId === contract.id && p.installmentId === installmentId);
+        if (paymentToDelete) {
+          deletePayment(paymentToDelete.id);
+        }
+
         setConfirmAction(null);
         setNotification({message: 'Đã hoàn tác thu tiền thành công!', type: 'success'});
       }

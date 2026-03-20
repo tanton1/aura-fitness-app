@@ -20,7 +20,7 @@ interface Props {
 export default function SchedulerWrapper({ user, profile }: Props) {
   const { 
     students, trainers, branches, contracts, sessions, schedule, warnings, 
-    updateStudent, updateScheduleData, addSession, updateContract, updateSession
+    addStudent, updateStudent, updateScheduleData, updateScheduleSlot, updateScheduleSlots, addSession, updateContract, updateSession
   } = useDatabase();
   
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -290,7 +290,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               {editingStudent && (
                 <StudentForm 
                   onSave={(s) => {
-                    updateStudent(s);
+                    updateStudent(s.id, s);
                     setEditingStudent(null);
                   }}
                   initialData={editingStudent}
@@ -327,30 +327,35 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                 onToggleConfirm={(id) => {
                   const student = students.find(s => s.id === id);
                   if (student) {
-                    updateStudent({ ...student, isScheduleConfirmed: !student.isScheduleConfirmed });
+                    updateStudent(id, { isScheduleConfirmed: !student.isScheduleConfirmed });
                   }
                 }}
                 onToggleLockSchedule={(id) => {
-                  const newSchedule = { ...schedule };
-                  let isCurrentlyLocked = false;
-                  
-                  // Check if currently locked
-                  Object.keys(newSchedule).forEach(slotId => {
-                    newSchedule[slotId].forEach(e => {
-                      if (e.studentId === id && e.isLocked) {
-                        isCurrentlyLocked = true;
+                  updateScheduleSlots((currentSchedule) => {
+                    let isCurrentlyLocked = false;
+                    
+                    // Check if currently locked
+                    Object.keys(currentSchedule).forEach(slotId => {
+                      currentSchedule[slotId].forEach(e => {
+                        if (e.studentId === id && e.isLocked) {
+                          isCurrentlyLocked = true;
+                        }
+                      });
+                    });
+
+                    // Toggle lock for all entries of this student
+                    const updatedSlots: { [slotId: string]: ScheduleEntry[] } = {};
+                    Object.keys(currentSchedule).forEach(slotId => {
+                      const hasStudent = currentSchedule[slotId].some(e => e.studentId === id);
+                      if (hasStudent) {
+                        updatedSlots[slotId] = currentSchedule[slotId].map(e => 
+                          e.studentId === id ? { ...e, isLocked: !isCurrentlyLocked } : e
+                        );
                       }
                     });
-                  });
 
-                  // Toggle lock for all entries of this student
-                  Object.keys(newSchedule).forEach(slotId => {
-                    newSchedule[slotId] = newSchedule[slotId].map(e => 
-                      e.studentId === id ? { ...e, isLocked: !isCurrentlyLocked } : e
-                    );
+                    return updatedSlots;
                   });
-
-                  updateScheduleData(newSchedule, warnings);
                 }}
               />
             </div>
@@ -362,8 +367,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               students={students} 
               trainers={trainers} 
               weekOffset={weekOffset} 
-              onUpdateSchedule={(newSchedule) => {
-                updateScheduleData(newSchedule, warnings);
+              onUpdateSlot={(slotId, updater) => {
+                updateScheduleSlot(slotId, updater);
               }}
             />
           )}
@@ -384,14 +389,21 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const handleUserSaveStudent = (s: Student) => {
     if (!user) return;
     
-    const studentId = currentUserStudent ? currentUserStudent.id : user.uid;
-    const newStudent = { ...s, id: studentId, name: profile?.name || s.name, isScheduleConfirmed: true };
-    updateStudent(newStudent);
+    if (!currentUserStudent) {
+      const newStudent = { ...s, id: user.uid, name: profile?.name || s.name, isScheduleConfirmed: true, status: 'active' as const };
+      addStudent(newStudent);
+    } else {
+      updateStudent(currentUserStudent.id, {
+        availableSlots: s.availableSlots,
+        sessionsPerWeek: s.sessionsPerWeek,
+        isScheduleConfirmed: true
+      });
+    }
   };
 
   const handleToggleConfirm = () => {
     if (!user || !currentUserStudent) return;
-    updateStudent({ ...currentUserStudent, isScheduleConfirmed: !currentUserStudent.isScheduleConfirmed });
+    updateStudent(currentUserStudent.id, { isScheduleConfirmed: !currentUserStudent.isScheduleConfirmed });
   };
 
   const handleConfirmAttendance = async (contractId: string, classId: string) => {

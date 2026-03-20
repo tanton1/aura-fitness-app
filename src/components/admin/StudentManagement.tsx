@@ -29,7 +29,7 @@ export default function StudentManagement({ user, profile }: Props) {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
-  const [contractFilter, setContractFilter] = useState<'active' | 'expiring_week' | 'expiring_month' | 'expired' | 'all'>('active');
+  const [contractFilter, setContractFilter] = useState<'active' | 'expiring_week' | 'expiring_month' | 'expired' | 'all'>('all');
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -67,8 +67,11 @@ export default function StudentManagement({ user, profile }: Props) {
     }
 
     if (dateRange) {
+      // If range is 'Tất cả' (start is 1970), don't filter out students without joinDate
+      const isAllTime = dateRange.start.getTime() === 0;
+      
       filtered = filtered.filter(s => {
-        if (!s.joinDate) return false;
+        if (!s.joinDate) return isAllTime;
         const joinDate = new Date(s.joinDate);
         return joinDate >= dateRange.start && joinDate <= dateRange.end;
       });
@@ -133,7 +136,7 @@ export default function StudentManagement({ user, profile }: Props) {
 
       const student = students.find(s => s.id === newContract.studentId);
       if (student && student.status !== 'active') {
-        await updateStudent({ ...student, status: 'active' });
+        await updateStudent(student.id, { status: 'active' });
       }
 
       await addContract(newContract);
@@ -222,7 +225,7 @@ export default function StudentManagement({ user, profile }: Props) {
 
     if (editingStudent) {
       const updatedStudent = sanitize({ ...editingStudent, ...formData }) as Student;
-      await updateStudent(updatedStudent);
+      await updateStudent(updatedStudent.id, updatedStudent);
       
       // Update User Profile in Firestore if it exists
       try {

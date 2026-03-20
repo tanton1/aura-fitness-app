@@ -11,10 +11,10 @@ interface Props {
   trainers: Trainer[];
   currentTrainerId?: string;
   weekOffset?: number;
-  onUpdateSchedule?: (newSchedule: Schedule) => void;
+  onUpdateSlot?: (slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => void;
 }
 
-export default function PTSchedule({ schedule, students, trainers, currentTrainerId, weekOffset = 0, onUpdateSchedule }: Props) {
+export default function PTSchedule({ schedule, students, trainers, currentTrainerId, weekOffset = 0, onUpdateSlot }: Props) {
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>(currentTrainerId || trainers[0]?.id || '');
   const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
   const [hoveredStudentId, setHoveredStudentId] = useState<string | null>(null);
@@ -124,13 +124,9 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
   };
 
   const handleSaveSlot = () => {
-    if (!editingSlot || !onUpdateSchedule) return;
+    if (!editingSlot || !onUpdateSlot) return;
     
-    const newSchedule = { ...schedule };
     const slotId = editingSlot.id;
-    
-    // Remove old entries for this trainer in this slot
-    const otherEntries = (newSchedule[slotId] || []).filter(e => e.trainerId !== selectedTrainerId);
     
     // Add new entries
     const newEntries: ScheduleEntry[] = slotStudents.map(s => ({
@@ -139,8 +135,12 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
       isLocked: s.isLocked
     }));
     
-    newSchedule[slotId] = [...otherEntries, ...newEntries];
-    onUpdateSchedule(newSchedule);
+    onUpdateSlot(slotId, (currentEntries) => {
+      // Remove old entries for this trainer in this slot
+      const otherEntries = currentEntries.filter(e => e.trainerId !== selectedTrainerId);
+      return [...otherEntries, ...newEntries];
+    });
+    
     setEditingSlot(null);
   };
 

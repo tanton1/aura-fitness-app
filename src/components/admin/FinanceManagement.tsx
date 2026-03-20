@@ -271,36 +271,53 @@ export default function FinanceManagement({ user, profile }: Props) {
     
     const remainingDebt = selectedContract.totalPrice - selectedContract.paidAmount - amount;
     
-    // Preserve existing paid installments
-    const existingPaidInstallments = (selectedContract.installments || []).filter(i => i.status === 'paid');
+    let finalInstallments: Installment[] = selectedContract.installments ? [...selectedContract.installments] : [];
     
-    // Create a new paid installment for the current payment
-    const newPaidInstallment: Installment = {
-      id: Date.now().toString() + '-paid',
-      amount: amount,
-      date: new Date().toISOString().split('T')[0],
-      status: 'paid'
-    };
+    // Check if the payment exactly matches a pending installment
+    const matchingInstallmentIndex = finalInstallments.findIndex(i => i.status === 'pending' && i.amount === amount);
+    let matchedInstallmentId: string | undefined;
+    
+    if (matchingInstallmentIndex !== -1) {
+      // Exact match found, just mark it as paid
+      matchedInstallmentId = finalInstallments[matchingInstallmentIndex].id;
+      finalInstallments[matchingInstallmentIndex] = {
+        ...finalInstallments[matchingInstallmentIndex],
+        status: 'paid'
+      };
+    } else {
+      // No exact match, recreate the installment plan
+      // Preserve existing paid installments
+      const existingPaidInstallments = finalInstallments.filter(i => i.status === 'paid');
+      
+      // Create a new paid installment for the current payment
+      const newPaidInstallment: Installment = {
+        id: Date.now().toString() + '-paid',
+        amount: amount,
+        date: new Date().toISOString().split('T')[0],
+        status: 'paid'
+      };
+      matchedInstallmentId = newPaidInstallment.id;
 
-    let finalInstallments: Installment[] = [...existingPaidInstallments, newPaidInstallment];
-    
-    if (remainingDebt > 0) {
-      const sum = installments.reduce((a, b) => a + b.amount, 0);
-      if (sum !== remainingDebt) {
-        setAlertMessage('Tổng số tiền các kỳ phải bằng số tiền còn nợ!');
-        return;
+      finalInstallments = [...existingPaidInstallments, newPaidInstallment];
+      
+      if (remainingDebt > 0) {
+        const sum = installments.reduce((a, b) => a + b.amount, 0);
+        if (sum !== remainingDebt) {
+          setAlertMessage('Tổng số tiền các kỳ phải bằng số tiền còn nợ!');
+          return;
+        }
+        if (installments.some(i => !i.date)) {
+          setAlertMessage('Vui lòng chọn ngày hẹn trả cho tất cả các kỳ!');
+          return;
+        }
+        const newPendingInstallments = installments.map((inst, idx) => ({
+          id: Date.now().toString() + '-' + idx,
+          amount: inst.amount,
+          date: inst.date,
+          status: 'pending' as const
+        }));
+        finalInstallments = [...finalInstallments, ...newPendingInstallments];
       }
-      if (installments.some(i => !i.date)) {
-        setAlertMessage('Vui lòng chọn ngày hẹn trả cho tất cả các kỳ!');
-        return;
-      }
-      const newPendingInstallments = installments.map((inst, idx) => ({
-        id: Date.now().toString() + '-' + idx,
-        amount: inst.amount,
-        date: inst.date,
-        status: 'pending' as const
-      }));
-      finalInstallments = [...finalInstallments, ...newPendingInstallments];
     }
 
     const newPayment: PaymentRecord = {
@@ -311,7 +328,8 @@ export default function FinanceManagement({ user, profile }: Props) {
       date: new Date().toISOString(),
       method: 'transfer',
       note: 'Thanh toán công nợ',
-      previousInstallments: selectedContract.installments || []
+      previousInstallments: selectedContract.installments || [],
+      installmentId: matchedInstallmentId
     };
 
     const updatedContract = {
@@ -616,6 +634,24 @@ export default function FinanceManagement({ user, profile }: Props) {
                   </div>
                 </div>
 
+                {selectedContract.installments && selectedContract.installments.filter(i => i.status === 'pending').length > 0 && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Chọn nhanh kỳ thanh toán</label>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedContract.installments.filter(i => i.status === 'pending').map((inst, idx) => (
+                        <button
+                          key={inst.id}
+                          onClick={() => setPayAmount(inst.amount.toString())}
+                          className="px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors text-sm flex items-center gap-2"
+                        >
+                          <span>Kỳ {selectedContract.installments!.findIndex(i => i.id === inst.id) + 1}</span>
+                          <span className="font-bold text-pink-400">{inst.amount.toLocaleString('vi-VN')}đ</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-1">Số tiền thanh toán đợt này (VNĐ)</label>
                   <input 
@@ -626,7 +662,8 @@ export default function FinanceManagement({ user, profile }: Props) {
                   />
                 </div>
 
-                {Number(payAmount) < (selectedContract.totalPrice - selectedContract.paidAmount) && (
+                {Number(payAmount) < (selectedContract.totalPrice - selectedContract.paidAmount) && 
+                 (!selectedContract.installments || !selectedContract.installments.some(i => i.status === 'pending' && i.amount === Number(payAmount))) && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}

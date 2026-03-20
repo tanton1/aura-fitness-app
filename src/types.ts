@@ -176,6 +176,7 @@ export interface PaymentRecord {
   method: 'cash' | 'transfer';
   note: string;
   previousInstallments?: Installment[];
+  installmentId?: string;
 }
 
 export interface Quote {

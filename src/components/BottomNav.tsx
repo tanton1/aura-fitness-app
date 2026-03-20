@@ -6,9 +6,10 @@ interface Props {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   profile: UserProfile | null;
+  isFullWidth?: boolean;
 }
 
-export default function BottomNav({ currentScreen, onNavigate, profile }: Props) {
+export default function BottomNav({ currentScreen, onNavigate, profile, isFullWidth = false }: Props) {
   const isStaff = ['admin', 'trainer', 'sales', 'manager'].includes(profile?.role || '');
   const isAdminOrManager = ['admin', 'manager'].includes(profile?.role || '');
   const isAdmin = profile?.role === 'admin';
@@ -46,7 +47,7 @@ export default function BottomNav({ currentScreen, onNavigate, profile }: Props)
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 px-4 py-4 flex justify-between items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+    <div className={`fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 px-4 py-4 flex justify-between items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] ${isFullWidth ? '' : 'max-w-md mx-auto'}`}>
       {navItems.map(item => {
         const Icon = item.icon;
         const isActive = currentScreen === item.id;

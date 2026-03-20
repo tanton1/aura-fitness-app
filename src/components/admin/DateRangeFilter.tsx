@@ -7,7 +7,7 @@ interface Props {
 
 export default function DateRangeFilter({ onFilter }: Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const [range, setRange] = useState('Tháng này');
+  const [range, setRange] = useState('Tất cả');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
 
@@ -24,6 +24,10 @@ export default function DateRangeFilter({ onFilter }: Props) {
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
     switch (r) {
+      case 'Tất cả':
+        s = new Date(0);
+        e = new Date(8640000000000000); // Max date
+        break;
       case 'Hôm nay':
         s = startOfToday;
         e = endOfToday;
@@ -68,7 +72,7 @@ export default function DateRangeFilter({ onFilter }: Props) {
       </button>
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 bg-zinc-900 border border-zinc-800 rounded-xl p-2 shadow-xl z-[60] w-64 sm:w-48">
-          {['Hôm nay', 'Ngày mai', 'Hôm qua', 'Tuần này', 'Tuần sau', 'Tháng này', 'Tháng trước'].map(r => (
+          {['Tất cả', 'Hôm nay', 'Ngày mai', 'Hôm qua', 'Tuần này', 'Tuần sau', 'Tháng này', 'Tháng trước'].map(r => (
             <button key={r} onClick={() => { setRange(r); applyFilter(r); setIsOpen(false); }} className="block w-full text-left px-4 py-2 text-zinc-300 hover:bg-zinc-800 rounded-lg text-sm">
               {r}
             </button>
