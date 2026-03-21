@@ -4,7 +4,7 @@ import { generateSchedule } from '../utils/scheduler';
 import StudentForm from './StudentForm';
 import StudentList from './StudentList';
 import PTSchedule from './PTSchedule';
-import { Calendar, Users, UserPlus, CheckCircle2, Package, User as UserIcon, Phone, Mail, MapPin, CheckCircle, ChevronRight, CreditCard, Clock, XCircle, RotateCcw } from 'lucide-react';
+import { Calendar, Users, UserPlus, CheckCircle2, Package, User as UserIcon, Phone, Mail, MapPin, CheckCircle, ChevronRight, CreditCard, Clock, XCircle, RotateCcw, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';
 import { doc, setDoc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
@@ -20,7 +20,7 @@ interface Props {
 export default function SchedulerWrapper({ user, profile }: Props) {
   const { 
     students, trainers, branches, contracts, sessions, schedules, 
-    addStudent, updateStudent, updateScheduleData, updateScheduleSlot, updateScheduleSlots, addSession, updateContract, updateSession
+    addStudent, updateStudent, updateScheduleData, updateScheduleSlot, updateScheduleSlots, addSession, updateContract, updateSession, deleteSession
   } = useDatabase();
   
   const [weekOffset, setWeekOffset] = useState(0);
@@ -30,6 +30,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const [selectedBranchId, setSelectedBranchId] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [studentSessionFilter, setStudentSessionFilter] = useState<'all' | 'this_week' | 'upcoming' | 'history'>('upcoming');
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [editFormData, setEditFormData] = useState({ date: '', hour: 0, trainerId: '' });
   const [isLoaded, setIsLoaded] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
@@ -157,7 +159,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           return d >= range.start && d <= range.end;
         }
         if (studentSessionFilter === 'upcoming') return isSameDayOrAfter(s.date, now) && s.status !== 'completed';
-        if (studentSessionFilter === 'history') return s.status === 'completed';
+        if (studentSessionFilter === 'history') return s.status === 'completed' || s.status === 'cancelled' || s.status === 'canceled_by_student';
         return true;
       })
       .map(s => {
@@ -175,7 +177,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           fullDate: s.date || '',
           classId: `${day}-${hour}-${s.date}`,
           sessionId: s.id,
-          status: s.status
+          status: s.status,
+          originalSession: s
         };
       })
       .sort((a, b) => (new Date(b.fullDate).getTime() || 0) - (new Date(a.fullDate).getTime() || 0));
@@ -444,6 +447,78 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     }
   };
 
+  const handleCancelSession = async (sessionId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn báo nghỉ buổi tập này?')) return;
+    const sessionToUpdate = sessions.find(s => s.id === sessionId);
+    if (!sessionToUpdate) return;
+    try {
+      await updateSession({ ...sessionToUpdate, status: 'canceled_by_student', verifiedByStudent: false });
+    } catch (e) {
+      alert('Lỗi khi báo nghỉ: ' + (e as Error).message);
+    }
+  };
+
+  const handleEditSession = (session: Session) => {
+    const hour = parseInt(session.id.split('-')[1]) || 6;
+    setEditFormData({
+      date: session.date,
+      hour: hour,
+      trainerId: session.trainerId
+    });
+    setEditingSession(session);
+  };
+
+  const saveEditedSession = async () => {
+    if (!user || !editingSession) return;
+    
+    const dateObj = new Date(editFormData.date);
+    const dayOfWeek = dateObj.getDay();
+    const dayCode = dayOfWeek === 0 ? 'CN' : `T${dayOfWeek + 1}`;
+    const newId = `${dayCode}-${editFormData.hour}-${editingSession.studentId}-${editFormData.date}`;
+
+    const updatedSession: Session = {
+      ...editingSession,
+      id: newId,
+      date: editFormData.date,
+      trainerId: editFormData.trainerId,
+      status: 'scheduled',
+      verifiedByStudent: false
+    };
+
+    try {
+      if (editingSession.id !== newId) {
+        await deleteSession(editingSession.id);
+        await addSession(updatedSession);
+      } else {
+        await updateSession(updatedSession);
+      }
+      setEditingSession(null);
+    } catch (e) {
+      alert('Lỗi khi lưu: ' + (e as Error).message);
+    }
+  };
+
+  const availableHours = useMemo(() => {
+    if (!editFormData.date || !editFormData.trainerId) return HOURS;
+    return HOURS.filter(h => {
+      const count = sessions.filter(s => 
+        s.trainerId === editFormData.trainerId && 
+        s.date === editFormData.date && 
+        parseInt(s.id.split('-')[1]) === h &&
+        s.status !== 'cancelled' &&
+        s.status !== 'canceled_by_student' &&
+        s.id !== editingSession?.id
+      ).length;
+      return count < 2;
+    });
+  }, [editFormData.date, editFormData.trainerId, sessions, editingSession]);
+
+  useEffect(() => {
+    if (editingSession && availableHours.length > 0 && !availableHours.includes(editFormData.hour)) {
+      setEditFormData(prev => ({ ...prev, hour: availableHours[0] }));
+    }
+  }, [availableHours, editingSession]);
+
   const myContracts = contracts.filter(c => c.studentId === currentUserStudent?.id);
 
   return (
@@ -657,20 +732,52 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                               <XCircle className="w-4 h-4" />
                               Đã hủy
                             </div>
+                          ) : cls.status === 'canceled_by_student' ? (
+                            <div className="w-full sm:w-auto bg-orange-500/10 text-orange-500 border border-orange-500/30 px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(249,115,22,0.1)]">
+                              <XCircle className="w-4 h-4" />
+                              Đã báo nghỉ
+                            </div>
                           ) : isAttended ? (
                             <div className="w-full sm:w-auto bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
                               <CheckCircle className="w-4 h-4" />
                               Đã xác nhận
                             </div>
+                          ) : cls.status === 'completed' ? (
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                              <button 
+                                onClick={() => cls.contractId && handleConfirmAttendance(cls.contractId, cls.classId)}
+                                disabled={!cls.contractId}
+                                className="w-full sm:w-auto bg-pink-500/10 text-pink-500 border border-pink-500/30 hover:bg-pink-500 hover:text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                Xác nhận đã tập
+                              </button>
+                            </div>
                           ) : (
-                            <button 
-                              onClick={() => cls.contractId && handleConfirmAttendance(cls.contractId, cls.classId)}
-                              disabled={!cls.contractId}
-                              className="w-full sm:w-auto bg-pink-500/10 text-pink-500 border border-pink-500/30 hover:bg-pink-500 hover:text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                              Xác nhận đã tập
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                              <button 
+                                onClick={() => handleEditSession(cls.originalSession)}
+                                className="w-full sm:w-auto bg-blue-500/10 text-blue-500 border border-blue-500/30 hover:bg-blue-500 hover:text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                                Đổi lịch
+                              </button>
+                              <button 
+                                onClick={() => handleCancelSession(cls.originalSession.id)}
+                                className="w-full sm:w-auto bg-orange-500/10 text-orange-500 border border-orange-500/30 hover:bg-orange-500 hover:text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+                              >
+                                <XCircle className="w-4 h-4" />
+                                Báo nghỉ
+                              </button>
+                              <button 
+                                onClick={() => cls.contractId && handleConfirmAttendance(cls.contractId, cls.classId)}
+                                disabled={!cls.contractId}
+                                className="w-full sm:w-auto bg-pink-500/10 text-pink-500 border border-pink-500/30 hover:bg-pink-500 hover:text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                Xác nhận đã tập
+                              </button>
+                            </div>
                           )}
                         </div>
                       )})}
@@ -788,6 +895,60 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+      )}
+
+      {/* Edit Session Modal */}
+      {editingSession && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 rounded-2xl p-6 w-full max-w-md border border-zinc-800 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-6">Đổi lịch tập</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-1">Ngày tập</label>
+                <input
+                  type="date"
+                  value={editFormData.date}
+                  onChange={e => setEditFormData({...editFormData, date: e.target.value})}
+                  className="w-full bg-zinc-950 border border-zinc-800 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-1">Giờ tập (Chỉ hiển thị giờ PT trống)</label>
+                <select
+                  value={editFormData.hour}
+                  onChange={e => setEditFormData({...editFormData, hour: parseInt(e.target.value)})}
+                  className="w-full bg-zinc-950 border border-zinc-800 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500"
+                >
+                  {availableHours.length > 0 ? (
+                    availableHours.map(h => (
+                      <option key={h} value={h}>{h}:00</option>
+                    ))
+                  ) : (
+                    <option value="" disabled>Không có giờ trống</option>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={() => setEditingSession(null)}
+                className="flex-1 px-4 py-2.5 bg-zinc-800 text-white rounded-xl hover:bg-zinc-700 transition-colors font-medium"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={saveEditedSession}
+                disabled={availableHours.length === 0}
+                className="flex-1 px-4 py-2.5 bg-pink-600 text-white rounded-xl hover:bg-pink-500 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Lưu thay đổi
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

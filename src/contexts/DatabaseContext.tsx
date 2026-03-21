@@ -135,6 +135,12 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       setSchedules(newSchedules);
     }));
 
+    unsubs.push(onSnapshot(doc(db, 'schedules', 'global_schedule'), (doc) => {
+      if (doc.exists()) {
+        setIsMigrated(!!doc.data().migrated);
+      }
+    }));
+
     return () => unsubs.forEach(unsub => unsub());
   }, [isAuthenticated]);
 

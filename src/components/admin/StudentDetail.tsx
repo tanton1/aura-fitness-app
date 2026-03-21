@@ -418,9 +418,10 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                   </div>
                   <span className={`text-xs font-medium px-2 py-1 rounded-md ${
                     s.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' :
-                    s.status === 'cancelled' ? 'bg-red-500/10 text-red-500' : 'bg-zinc-800 text-zinc-400'
+                    s.status === 'cancelled' ? 'bg-red-500/10 text-red-500' : 
+                    s.status === 'canceled_by_student' ? 'bg-orange-500/10 text-orange-500' : 'bg-zinc-800 text-zinc-400'
                   }`}>
-                    {s.status === 'completed' ? 'Đã hoàn thành' : s.status === 'cancelled' ? 'Đã hủy' : 'Đã lên lịch'}
+                    {s.status === 'completed' ? 'Đã hoàn thành' : s.status === 'cancelled' ? 'Đã hủy' : s.status === 'canceled_by_student' ? 'Đã báo nghỉ' : 'Đã lên lịch'}
                   </span>
                 </div>
               );

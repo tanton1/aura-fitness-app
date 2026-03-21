@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Trainer, Session, Payroll, Branch, StudentContract, UserProfile, Student, HOURS } from '../../types';
 import { CheckCircle, XCircle, DollarSign, Calendar, Trash2, RotateCcw, User as UserIcon, Clock, Filter, Edit2 } from 'lucide-react';
@@ -22,7 +22,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [editFormData, setEditFormData] = useState({ date: '', hour: 0, trainerId: '' });
 
-  const markSession = async (sessionId: string, status: 'completed' | 'cancelled' | 'scheduled') => {
+  const markSession = async (sessionId: string, status: 'completed' | 'cancelled' | 'scheduled' | 'canceled_by_student') => {
     if (!user) return;
     
     const session = sessions.find(s => s.id === sessionId);
@@ -46,7 +46,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
     const updatedSession: Session = { 
       ...session, 
       status, 
-      verifiedByStudent: status === 'scheduled' ? false : session.verifiedByStudent 
+      verifiedByStudent: status === 'scheduled' || status === 'canceled_by_student' ? false : session.verifiedByStudent 
     };
     
     try {
@@ -113,6 +113,8 @@ export default function TrainerPayroll({ user, profile }: Props) {
       id: newId,
       date: editFormData.date,
       trainerId: editFormData.trainerId,
+      status: 'scheduled', // Reset status if it was canceled_by_student
+      verifiedByStudent: false
     };
 
     try {
@@ -128,7 +130,112 @@ export default function TrainerPayroll({ user, profile }: Props) {
     }
   };
 
+  const availableHours = useMemo(() => {
+    if (!editFormData.date || !editFormData.trainerId) return HOURS.map(h => ({ hour: h, count: 0, sessions: [] as Session[] }));
+    return HOURS.map(h => {
+      const hourSessions = sessions.filter(s => 
+        s.trainerId === editFormData.trainerId && 
+        s.date === editFormData.date && 
+        parseInt(s.id.split('-')[1]) === h &&
+        s.status !== 'cancelled' &&
+        s.status !== 'canceled_by_student' &&
+        s.id !== editingSession?.id
+      );
+      return { hour: h, count: hourSessions.length, sessions: hourSessions };
+    });
+  }, [editFormData.date, editFormData.trainerId, sessions, editingSession]);
+
+  useEffect(() => {
+    if (editingSession && availableHours.length > 0) {
+      const currentHourObj = availableHours.find(h => h.hour === editFormData.hour);
+      if (!currentHourObj) {
+        setEditFormData(prev => ({ ...prev, hour: availableHours[0].hour }));
+      }
+    }
+  }, [availableHours, editingSession]);
+
+  const swapSuggestions = useMemo(() => {
+    if (!editingSession || !editFormData.date || !editFormData.trainerId) return [];
+    
+    const selectedHourObj = availableHours.find(h => h.hour === editFormData.hour);
+    if (!selectedHourObj || selectedHourObj.count < 2) return [];
+
+    const sourceDateObj = new Date(editingSession.date);
+    const sourceDayOfWeek = sourceDateObj.getDay();
+    const sourceDayCode = sourceDayOfWeek === 0 ? 'CN' : `T${sourceDayOfWeek + 1}`;
+    const sourceHour = parseInt(editingSession.id.split('-')[1]) || 6;
+    const sourceSlotString = `${sourceDayCode}-${sourceHour}`;
+
+    const suggestions: { sessionB: Session, studentB: Student }[] = [];
+
+    selectedHourObj.sessions.forEach(sessionB => {
+      if (sessionB.status !== 'scheduled') return;
+      const studentB = students.find(s => s.id === sessionB.studentId);
+      if (studentB && studentB.availableSlots.includes(sourceSlotString)) {
+        suggestions.push({ sessionB, studentB });
+      }
+    });
+
+    return suggestions;
+  }, [editingSession, editFormData, availableHours, students]);
+
+  const handleSwapSession = async (sessionB: Session) => {
+    if (!user || !editingSession) return;
+    
+    const sourceDate = editingSession.date;
+    const sourceHour = parseInt(editingSession.id.split('-')[1]) || 6;
+    const sourceTrainerId = editingSession.trainerId;
+    
+    const targetDate = editFormData.date;
+    const targetHour = editFormData.hour;
+    const targetTrainerId = editFormData.trainerId;
+
+    const getDayCode = (dateStr: string) => {
+      const d = new Date(dateStr).getDay();
+      return d === 0 ? 'CN' : `T${d + 1}`;
+    };
+
+    const sourceDayCode = getDayCode(sourceDate);
+    const targetDayCode = getDayCode(targetDate);
+
+    const newSessionAId = `${targetDayCode}-${targetHour}-${editingSession.studentId}-${targetDate}`;
+    const newSessionBId = `${sourceDayCode}-${sourceHour}-${sessionB.studentId}-${sourceDate}`;
+
+    const updatedSessionA: Session = {
+      ...editingSession,
+      id: newSessionAId,
+      date: targetDate,
+      trainerId: targetTrainerId,
+      status: 'scheduled',
+      verifiedByStudent: false
+    };
+
+    const updatedSessionB: Session = {
+      ...sessionB,
+      id: newSessionBId,
+      date: sourceDate,
+      trainerId: sourceTrainerId,
+      status: 'scheduled',
+      verifiedByStudent: false
+    };
+
+    try {
+      if (editingSession.id !== newSessionAId) await deleteSession(editingSession.id);
+      if (sessionB.id !== newSessionBId) await deleteSession(sessionB.id);
+      
+      await addSession(updatedSessionA);
+      await addSession(updatedSessionB);
+      
+      setEditingSession(null);
+      alert('Đổi chéo thành công!');
+    } catch (e) {
+      alert('Lỗi khi đổi chéo: ' + (e as Error).message);
+    }
+  };
+
   const filteredSessions = sessions.filter(s => {
+    // Exclude canceled_by_student from normal schedule
+    if (s.status === 'canceled_by_student') return false;
 
     // Filter by PT subtab
     if (selectedTrainerId !== 'all' && s.trainerId !== selectedTrainerId) return false;
@@ -180,6 +287,8 @@ export default function TrainerPayroll({ user, profile }: Props) {
       })
     }));
   }, [filteredSessions]);
+
+  const canceledSessions = sessions.filter(s => s.status === 'canceled_by_student');
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -263,6 +372,48 @@ export default function TrainerPayroll({ user, profile }: Props) {
         ))}
       </div>
       
+      {/* Các buổi cần học bù */}
+      {canceledSessions.length > 0 && (
+        <div className="bg-orange-950/30 border border-orange-500/30 p-6 rounded-2xl">
+          <h3 className="text-lg font-bold text-orange-500 mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Các buổi cần học bù ({canceledSessions.length})
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {canceledSessions.map(s => {
+              const student = students.find(st => st.id === s.studentId);
+              const trainer = trainers.find(t => t.id === s.trainerId);
+              const dateObj = new Date(s.date);
+              const isValidDate = s.date && !isNaN(dateObj.getTime());
+              
+              return (
+                <div key={s.id} className="p-4 bg-zinc-900 rounded-xl border border-orange-500/20 flex flex-col gap-3">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2 text-zinc-200 font-medium">
+                      <UserIcon className="w-4 h-4 text-orange-500" />
+                      {student?.name || 'Học viên ẩn'}
+                    </div>
+                    <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-1 rounded-md font-bold">
+                      Chờ xếp lịch
+                    </span>
+                  </div>
+                  <div className="text-sm text-zinc-400">
+                    <p>PT cũ: <span className="text-zinc-300">{trainer?.name}</span></p>
+                    <p>Lịch cũ: {isValidDate ? dateObj.toLocaleDateString('vi-VN') : 'N/A'} - {s.id.split('-')[1]}h</p>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-2">
+                    <button onClick={() => handleEditSession(s)} className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg transition-colors flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      Xếp lịch bù
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Lịch dạy */}
         <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
@@ -324,6 +475,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
                             {s.status === 'scheduled' ? (
                               <>
                                 <button onClick={() => markSession(s.id, 'completed')} className="p-2 text-green-400 hover:text-green-300 bg-green-500/10 rounded-lg transition-colors" title="Hoàn thành"><CheckCircle className="w-4 h-4" /></button>
+                                <button onClick={() => markSession(s.id, 'canceled_by_student')} className="p-2 text-orange-400 hover:text-orange-300 bg-orange-500/10 rounded-lg transition-colors" title="HV Báo nghỉ (Học bù)"><XCircle className="w-4 h-4" /></button>
                                 <button onClick={() => markSession(s.id, 'cancelled')} className="p-2 text-red-400 hover:text-red-300 bg-red-500/10 rounded-lg transition-colors" title="Hủy buổi (Bảo lưu)"><XCircle className="w-4 h-4" /></button>
                                 <button onClick={() => handleEditSession(s)} className="p-2 text-blue-400 hover:text-blue-300 bg-blue-500/10 rounded-lg transition-colors" title="Đổi lịch/Đổi PT"><Edit2 className="w-4 h-4" /></button>
                               </>
@@ -427,9 +579,15 @@ export default function TrainerPayroll({ user, profile }: Props) {
                   onChange={e => setEditFormData({...editFormData, hour: parseInt(e.target.value)})}
                   className="w-full bg-zinc-950 border border-zinc-800 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500"
                 >
-                  {HOURS.map(h => (
-                    <option key={h} value={h}>{h}:00</option>
-                  ))}
+                  {availableHours.length > 0 ? (
+                    availableHours.map(h => (
+                      <option key={h.hour} value={h.hour}>
+                        {h.hour}:00 {h.count >= 2 ? '(Đã đầy)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>Không có giờ trống</option>
+                  )}
                 </select>
               </div>
 
@@ -447,6 +605,34 @@ export default function TrainerPayroll({ user, profile }: Props) {
               </div>
             </div>
 
+            {availableHours.find(h => h.hour === editFormData.hour)?.count! >= 2 && (
+              <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                <h4 className="text-blue-400 font-medium mb-3 flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4" />
+                  Đề xuất đổi chéo
+                </h4>
+                {swapSuggestions.length > 0 ? (
+                  <div className="space-y-3">
+                    {swapSuggestions.map((suggestion, idx) => (
+                      <div key={idx} className="bg-zinc-950/50 p-3 rounded-lg border border-zinc-800/50">
+                        <p className="text-sm text-zinc-300 mb-3">
+                          Có thể đổi chéo: Chuyển <span className="font-bold text-white">{suggestion.studentB.name}</span> sang {parseInt(editingSession.id.split('-')[1]) || 6}h ngày {editingSession.date} (PT: {trainers.find(t => t.id === editingSession.trainerId)?.name}) và đưa <span className="font-bold text-white">{students.find(s => s.id === editingSession.studentId)?.name}</span> vào {editFormData.hour}h ngày {editFormData.date} (PT: {trainers.find(t => t.id === editFormData.trainerId)?.name}).
+                        </p>
+                        <button
+                          onClick={() => handleSwapSession(suggestion.sessionB)}
+                          className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          Đổi chéo với {suggestion.studentB.name}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-400">Ca này đã đầy và không có học viên nào rảnh vào giờ hiện tại của học viên này để đổi chéo.</p>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-3 mt-8">
               <button
                 onClick={() => setEditingSession(null)}
@@ -456,7 +642,8 @@ export default function TrainerPayroll({ user, profile }: Props) {
               </button>
               <button
                 onClick={saveEditedSession}
-                className="flex-1 px-4 py-2.5 bg-pink-600 text-white rounded-xl hover:bg-pink-500 transition-colors font-medium"
+                disabled={availableHours.find(h => h.hour === editFormData.hour)?.count! >= 2}
+                className="flex-1 px-4 py-2.5 bg-pink-600 text-white rounded-xl hover:bg-pink-500 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Lưu thay đổi
               </button>

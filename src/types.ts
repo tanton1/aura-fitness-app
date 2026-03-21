@@ -224,7 +224,7 @@ export interface Session {
   trainerId: string;
   studentId: string;
   date: string; // ISO date
-  status: 'scheduled' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'completed' | 'cancelled' | 'canceled_by_student';
   branchId?: string;
   verifiedByStudent?: boolean; // Add this
   scheduleEntryId?: string; // Thêm trường này để liên kết

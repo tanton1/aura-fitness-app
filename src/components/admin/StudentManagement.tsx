@@ -197,11 +197,14 @@ export default function StudentManagement({ user, profile }: Props) {
     if (!formData.name) return;
     setError(null);
 
+    const sanitizePhone = (phone: string) => phone.replace(/\D/g, '');
+    const sanitizedFormDataPhone = formData.phone ? sanitizePhone(formData.phone) : '';
+
     const isDuplicatePhone = students.some(s => 
-      s.phone && formData.phone && s.phone === formData.phone && s.id !== editingStudent?.id
+      s.phone && formData.phone && sanitizePhone(s.phone) === sanitizedFormDataPhone && s.id !== editingStudent?.id
     );
     const isDuplicateEmail = students.some(s => 
-      s.email && formData.email && s.email === formData.email && s.id !== editingStudent?.id
+      s.email && formData.email && s.email.toLowerCase() === formData.email.toLowerCase() && s.id !== editingStudent?.id
     );
 
     if (isDuplicatePhone) {

@@ -56,7 +56,7 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
   }, [mySessions, sessionFilter]);
 
   const upcomingSessions = filteredSessions.filter(s => s.status === 'scheduled');
-  const historySessions = filteredSessions.filter(s => s.status === 'completed' || s.status === 'cancelled');
+  const historySessions = filteredSessions.filter(s => s.status === 'completed' || s.status === 'cancelled' || s.status === 'canceled_by_student');
 
   const currentMacros = profile.target_macros?.[profile.current_mode || 'standard'] || { kcal: 0, protein: 0, carb: 0, fat: 0 };
   const todayDateStr = new Date().toISOString().split('T')[0];
@@ -556,9 +556,10 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
                   </div>
                   <span className={`text-xs font-medium px-2 py-1 rounded-md ${
                     s.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' :
-                    s.status === 'cancelled' ? 'bg-red-500/10 text-red-500' : 'bg-zinc-800 text-zinc-400'
+                    s.status === 'cancelled' ? 'bg-red-500/10 text-red-500' : 
+                    s.status === 'canceled_by_student' ? 'bg-orange-500/10 text-orange-500' : 'bg-zinc-800 text-zinc-400'
                   }`}>
-                    {s.status === 'completed' ? 'Đã hoàn thành' : s.status === 'cancelled' ? 'Đã hủy' : 'Đã lên lịch'}
+                    {s.status === 'completed' ? 'Đã hoàn thành' : s.status === 'cancelled' ? 'Đã hủy' : s.status === 'canceled_by_student' ? 'Đã báo nghỉ' : 'Đã lên lịch'}
                   </span>
                 </div>
               ))

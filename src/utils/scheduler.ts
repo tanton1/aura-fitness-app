@@ -169,8 +169,6 @@ function scheduleStudentWithTrainer(
   const availableDays = Object.keys(slotsByDay).sort((a, b) => getDayIndex(a) - getDayIndex(b));
   if (availableDays.length === 0) return;
 
-  let bestDaysCombination: string[] | null = null;
-  
   const findDayCombinations = (days: string[], k: number): string[][] => {
     const result: string[][] = [];
     const f = (start: number, current: string[]) => {
@@ -186,83 +184,106 @@ function scheduleStudentWithTrainer(
     return result;
   };
 
-  // Try to find the best combination of days to fulfill the remaining needed sessions
-  for (let k = Math.min(needed, availableDays.length); k > 0; k--) {
-    const combos = findDayCombinations(availableDays, k);
-    
-    // Sort combos by least gap violations (prefer days that are at least 1 day apart)
-    combos.sort((a, b) => {
-      const getViolations = (combo: string[]) => {
-        const allDays = [...Array.from(scheduledDays), ...combo].sort((d1, d2) => getDayIndex(d1) - getDayIndex(d2));
-        let v = 0;
-        for (let i = 1; i < allDays.length; i++) {
-          if (getDayIndex(allDays[i]) - getDayIndex(allDays[i - 1]) < 2) v++;
-        }
-        return v;
-      };
-      return getViolations(a) - getViolations(b);
-    });
-
-    // Prefer combos with 0 violations
-    const goodCombos = combos.filter(combo => {
-      const allDays = [...Array.from(scheduledDays), ...combo].sort((d1, d2) => getDayIndex(d1) - getDayIndex(d2));
-      for (let i = 1; i < allDays.length; i++) {
-        if (getDayIndex(allDays[i]) - getDayIndex(allDays[i - 1]) < 2) return false;
+  // Generate all possible slot combinations for a given day combination
+  const getSlotCombinations = (dayCombo: string[]): string[][] => {
+    if (dayCombo.length === 0) return [[]];
+    const firstDay = dayCombo[0];
+    const restDays = dayCombo.slice(1);
+    const restCombos = getSlotCombinations(restDays);
+    const result: string[][] = [];
+    for (const slot of slotsByDay[firstDay]) {
+      for (const restCombo of restCombos) {
+        result.push([slot, ...restCombo]);
       }
-      return true;
-    });
+    }
+    return result;
+  };
 
-    if (goodCombos.length > 0) {
-      bestDaysCombination = goodCombos[0];
-      break;
-    } else if (combos.length > 0) {
-      bestDaysCombination = combos[0];
+  let bestSlotCombination: string[] | null = null;
+  let bestCombinationScore = -999999;
+
+  // Try to find the best combination of slots to fulfill the remaining needed sessions
+  for (let k = Math.min(needed, availableDays.length); k > 0; k--) {
+    const dayCombos = findDayCombinations(availableDays, k);
+    
+    for (const dayCombo of dayCombos) {
+      // Calculate day gap violations
+      const allDays = [...Array.from(scheduledDays), ...dayCombo].sort((d1, d2) => getDayIndex(d1) - getDayIndex(d2));
+      
+      let consecutiveCount = 1;
+      let maxConsecutive = 1;
+      let twoConsecutiveCount = 0;
+
+      for (let i = 1; i < allDays.length; i++) {
+        const diff = getDayIndex(allDays[i]) - getDayIndex(allDays[i - 1]);
+        if (diff === 1) {
+          consecutiveCount++;
+          if (consecutiveCount === 2) twoConsecutiveCount++;
+        } else if (diff > 1) {
+          consecutiveCount = 1;
+        }
+        if (consecutiveCount > maxConsecutive) {
+          maxConsecutive = consecutiveCount;
+        }
+      }
+
+      const slotCombos = getSlotCombinations(dayCombo);
+
+      for (const slotCombo of slotCombos) {
+        let comboScore = 0;
+
+        // Penalize 3 consecutive days heavily
+        if (maxConsecutive >= 3) {
+          comboScore -= 5000;
+        }
+        // Slight penalty for 2 consecutive days (so spaced is preferred, but easily overridden by trainer convenience)
+        comboScore -= twoConsecutiveCount * 150;
+
+        for (const slot of slotCombo) {
+          const [day, hourStr] = slot.split('-');
+          const hour = parseInt(hourStr, 10);
+          const hourIndex = HOURS.indexOf(hour);
+          
+          const count = schedule[slot].filter(e => e.trainerId === trainer.id).length;
+          if (count === 1) comboScore += 200; // Prioritize pairing students (filling a slot to 2/2)
+
+          // Contiguous shift logic for the trainer
+          let hasClassesToday = false;
+          for (let i = 0; i < HOURS.length; i++) {
+            if (i === hourIndex) continue;
+            const h = HOURS[i];
+            const isTeaching = schedule[`${day}-${h}`]?.some(e => e.trainerId === trainer.id);
+            if (isTeaching) {
+              hasClassesToday = true;
+              const diff = Math.abs(i - hourIndex);
+              if (diff === 1) comboScore += 100; // Contiguous shift (liền mạch)
+              else if (diff === 2) comboScore -= 50; // 1 shift gap (nghỉ 1 ca)
+              else if (diff === 3) comboScore -= 20; // 2 shift gap (nghỉ 2 ca)
+              else comboScore -= 5;
+            }
+          }
+          if (!hasClassesToday) comboScore += 10; // First class of the day is better than creating a gap
+        }
+
+        if (comboScore > bestCombinationScore) {
+          bestCombinationScore = comboScore;
+          bestSlotCombination = slotCombo;
+        }
+      }
+    }
+    
+    // If we found a valid combination for this 'k' (number of days), we stop searching smaller 'k's
+    if (bestSlotCombination) {
       break;
     }
   }
 
-  if (bestDaysCombination) {
-    for (const day of bestDaysCombination) {
-      const slotsInDay = slotsByDay[day];
-      let bestSlot = slotsInDay[0];
-      let bestSlotScore = -99999;
-
-      // Score each slot in the day to find the most optimal one for the trainer
-      for (const slot of slotsInDay) {
-        const hour = parseInt(slot.split('-')[1], 10);
-        const hourIndex = HOURS.indexOf(hour);
-        let slotScore = 0;
-        
-        const count = schedule[slot].filter(e => e.trainerId === trainer.id).length;
-        if (count === 1) slotScore += 200; // Prioritize pairing students (filling a slot to 2/2)
-
-        // Contiguous shift logic for the trainer
-        let hasClassesToday = false;
-        for (let i = 0; i < HOURS.length; i++) {
-          if (i === hourIndex) continue;
-          const h = HOURS[i];
-          const isTeaching = schedule[`${day}-${h}`]?.some(e => e.trainerId === trainer.id);
-          if (isTeaching) {
-            hasClassesToday = true;
-            const diff = Math.abs(i - hourIndex);
-            if (diff === 1) slotScore += 100; // Contiguous shift (liền mạch)
-            else if (diff === 2) slotScore -= 50; // 1 shift gap (nghỉ 1 ca)
-            else if (diff === 3) slotScore -= 20; // 2 shift gap (nghỉ 2 ca)
-            else slotScore -= 5;
-          }
-        }
-        if (!hasClassesToday) slotScore += 10; // First class of the day is better than creating a gap
-
-        if (slotScore > bestSlotScore) {
-          bestSlotScore = slotScore;
-          bestSlot = slot;
-        }
-      }
-
-      // Assign the best slot
-      schedule[bestSlot].push({ studentId: student.id, trainerId: trainer.id });
+  if (bestSlotCombination) {
+    for (const slot of bestSlotCombination) {
+      const day = slot.split('-')[0];
+      schedule[slot].push({ studentId: student.id, trainerId: trainer.id });
       scheduledDays.add(day);
-      scheduledSlots.push(bestSlot);
+      scheduledSlots.push(slot);
       needed--;
     }
     studentNeeds[student.id] = needed;
