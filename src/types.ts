@@ -155,12 +155,13 @@ export interface StudentContract {
   packageName: string;
   startDate: string;
   endDate: string;
+  frozenAt?: string; // ISO date string when frozen
   totalSessions: number;
   usedSessions: number;
   totalPrice: number;
   paidAmount: number;
   discount?: number;
-  status: 'active' | 'expired' | 'cancelled';
+  status: 'active' | 'expired' | 'cancelled' | 'frozen';
   nextPaymentDate?: string;
   installments?: Installment[];
   attendedClasses?: string[]; // Array of "slotId-date" like "T2-6-2026-03-16"

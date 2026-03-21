@@ -50,8 +50,8 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     }
   }, [notification]);
 
-  const activeContract = contracts.find(c => c.studentId === student.id && c.status === 'active');
-  const historyContracts = contracts.filter(c => c.studentId === student.id && c.status !== 'active');
+  const activeContract = contracts.find(c => c.studentId === student.id && (c.status === 'active' || c.status === 'frozen'));
+  const historyContracts = contracts.filter(c => c.studentId === student.id && c.status !== 'active' && c.status !== 'frozen');
   const studentSessions = sessions.filter(s => s.studentId === student.id);
 
   useEffect(() => {
@@ -101,6 +101,10 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
 
   const handleCheckIn = () => {
     if (!activeContract) return;
+    if (activeContract.status === 'frozen') {
+      alert('Hợp đồng đang bảo lưu, không thể điểm danh!');
+      return;
+    }
     if (activeContract.usedSessions >= activeContract.totalSessions) {
       alert('Gói tập đã hết buổi!');
       return;
@@ -287,6 +291,22 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
         <ArrowLeft className="w-5 h-5" /> Quay lại danh sách
       </button>
       
+      {confirmAction && (
+        <ConfirmationModal
+          isOpen={!!confirmAction}
+          title={confirmAction.title}
+          message={confirmAction.message}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
+      
+      {notification && (
+        <div className={`fixed bottom-4 right-4 p-4 rounded-xl shadow-lg z-[100] ${notification.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+          {notification.message}
+        </div>
+      )}
+
       {/* Student Info */}
       <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 shadow-sm">
         <h2 className="text-2xl font-bold text-white mb-1">{student.name}</h2>
@@ -457,6 +477,44 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                 className="text-xs font-medium text-amber-500 hover:text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-lg"
               >
                 Chỉnh sửa
+              </button>
+            )}
+            {activeContract && (
+              <button 
+                onClick={() => {
+                  const isFrozen = activeContract.status === 'frozen';
+                  setConfirmAction({
+                    title: isFrozen ? 'Xác nhận hủy bảo lưu' : 'Xác nhận bảo lưu',
+                    message: isFrozen ? 'Học viên sẽ quay lại tập luyện?' : 'Học viên sẽ được bảo lưu gói tập?',
+                    onConfirm: () => {
+                      if (isFrozen) {
+                        const frozenDuration = new Date().getTime() - new Date(activeContract.frozenAt || activeContract.startDate).getTime();
+                        const { frozenAt, ...contractWithoutFrozenAt } = activeContract;
+                        const newEndDate = new Date(new Date(activeContract.endDate).getTime() + frozenDuration).toISOString().split('T')[0];
+                        onUpdateContract({
+                          ...contractWithoutFrozenAt,
+                          status: 'active',
+                          endDate: newEndDate
+                        });
+                      } else {
+                        onUpdateContract({
+                          ...activeContract,
+                          status: 'frozen',
+                          frozenAt: new Date().toISOString()
+                        });
+                      }
+                      setConfirmAction(null);
+                      setNotification({message: isFrozen ? 'Đã hủy bảo lưu!' : 'Đã bảo lưu thành công!', type: 'success'});
+                    }
+                  });
+                }}
+                className={`text-xs font-medium flex items-center gap-1 px-2 py-1 rounded-lg ${
+                  activeContract.status === 'frozen' 
+                    ? 'text-emerald-500 bg-emerald-500/10 hover:text-emerald-400' 
+                    : 'text-blue-500 bg-blue-500/10 hover:text-blue-400'
+                }`}
+              >
+                {activeContract.status === 'frozen' ? 'Hủy bảo lưu' : 'Bảo lưu'}
               </button>
             )}
           </div>
