@@ -4,17 +4,18 @@ import { Trash2, Plus, UserCircle } from 'lucide-react';
 
 interface Props {
   trainers: Trainer[];
-  onAdd: (name: string) => void;
+  onAdd: (name: string, priority: number) => void;
   onDelete: (id: string) => void;
 }
 
 export default function TrainerList({ trainers, onAdd, onDelete }: Props) {
   const [name, setName] = useState('');
+  const [priority, setPriority] = useState<number>(1);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onAdd(name.trim());
+    onAdd(name.trim(), priority);
     setName('');
   };
 
@@ -37,6 +38,14 @@ export default function TrainerList({ trainers, onAdd, onDelete }: Props) {
           placeholder="Tên PT mới..."
           required
         />
+        <input
+          type="number"
+          value={priority}
+          onChange={(e) => setPriority(parseInt(e.target.value))}
+          className="w-20 px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none text-white placeholder-zinc-600 transition-all"
+          placeholder="Ưu tiên"
+          min="1"
+        />
         <button
           type="submit"
           className="flex items-center justify-center gap-2 bg-pink-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-pink-500 hover:shadow-[0_0_20px_rgba(236,72,153,0.4)] transition-all active:scale-95 uppercase tracking-wider shrink-0"
@@ -52,6 +61,7 @@ export default function TrainerList({ trainers, onAdd, onDelete }: Props) {
             <div className="flex items-center gap-3">
               <UserCircle size={24} className="text-pink-500" />
               <span className="font-bold text-zinc-200">{trainer.name}</span>
+              <span className="text-xs text-zinc-500 bg-zinc-900 px-2 py-1 rounded">Ưu tiên: {trainer.priority || 999}</span>
             </div>
             <button
               onClick={() => onDelete(trainer.id)}

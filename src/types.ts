@@ -107,6 +107,7 @@ export interface Trainer {
   commissionRate: number; // Percentage for referral
   commissionPerSession?: number; // Fixed amount per session
   status: 'active' | 'inactive';
+  priority?: number; // Add this
 }
 
 export interface Branch {

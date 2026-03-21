@@ -79,7 +79,7 @@ export function generateSchedule(
     const branchTrainers = trainers.filter(t => {
       const tBranchId = t.branchId || "";
       return tBranchId === branchId || tBranchId === "";
-    });
+    }).sort((a, b) => (a.priority || 999) - (b.priority || 999));
     
     if (branchTrainers.length === 0) continue;
 

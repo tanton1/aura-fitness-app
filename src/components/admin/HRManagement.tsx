@@ -476,6 +476,9 @@ export default function HRManagement({ user }: Props) {
                   <label className="block text-sm font-medium text-zinc-400 mb-1">Mã nhân viên (Dùng để tính hoa hồng giới thiệu)</label>
                   <input type="text" placeholder="VD: PT001" value={formData.employeeCode || ''} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, employeeCode: e.target.value})} />
 
+                  <label className="block text-sm font-medium text-zinc-400 mb-1 mt-3">Độ ưu tiên (PT1, PT2...)</label>
+                  <input type="number" placeholder="Độ ưu tiên" value={formData.priority || ''} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, priority: Number(e.target.value)})} min="1" />
+
                   <label className="block text-sm font-medium text-zinc-400 mb-1 mt-3">Hoa hồng giới thiệu (%)</label>
                   <input type="number" placeholder="Hoa hồng giới thiệu (%)" value={formData.commissionRate || ''} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, commissionRate: Number(e.target.value)})} />
                   
