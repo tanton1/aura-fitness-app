@@ -194,6 +194,10 @@ export default function StudentManagement({ user, profile }: Props) {
   };
 
   const handleSave = async () => {
+    if (profile?.role !== 'admin') {
+      setAlertMessage("Bạn không có quyền thực hiện thao tác này.");
+      return;
+    }
     if (!formData.name) return;
     setError(null);
 
@@ -288,6 +292,11 @@ export default function StudentManagement({ user, profile }: Props) {
   };
 
   const executeDelete = async () => {
+    if (profile?.role !== 'admin') {
+      setAlertMessage("Bạn không có quyền thực hiện thao tác này.");
+      setShowDeleteConfirm(false);
+      return;
+    }
     if (!studentToDelete) return;
     
     const id = studentToDelete;
@@ -394,12 +403,16 @@ export default function StudentManagement({ user, profile }: Props) {
           </select>
           <button
             onClick={() => {
+              if (profile?.role !== 'admin') {
+                setAlertMessage("Bạn không có quyền thực hiện thao tác này.");
+                return;
+              }
               setEditingStudent(null);
               setFormData({ name: '', phone: '', email: '', dob: '', sessionsPerWeek: 3, availableSlots: [], status: 'active', branchId: '' });
               setError(null);
               setIsAdding(true);
             }}
-            className="bg-pink-500 text-white px-4 py-3 rounded-xl hover:bg-pink-600 transition-colors flex items-center justify-center shadow-[0_0_15px_rgba(255,0,127,0.4)]"
+            className={`bg-pink-500 text-white px-4 py-3 rounded-xl transition-colors flex items-center justify-center shadow-[0_0_15px_rgba(255,0,127,0.4)] ${profile?.role !== 'admin' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-pink-600'}`}
           >
             <Plus className="w-5 h-5" />
             <span className="hidden sm:inline ml-2 font-medium">Thêm mới</span>
@@ -500,18 +513,28 @@ export default function StudentManagement({ user, profile }: Props) {
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
+                        if (profile?.role !== 'admin') {
+                          setAlertMessage("Bạn không có quyền thực hiện thao tác này.");
+                          return;
+                        }
                         setEditingStudent(student);
                         setFormData(student);
                         setError(null);
                         setIsAdding(true);
                       }}
-                      className="p-2 text-zinc-400 hover:text-white bg-zinc-800 rounded-lg transition-colors"
+                      className={`p-2 rounded-lg transition-colors ${profile?.role !== 'admin' ? 'text-zinc-600 bg-zinc-800/50 cursor-not-allowed' : 'text-zinc-400 hover:text-white bg-zinc-800'}`}
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(student.id)}
-                      className="p-2 text-red-400 hover:text-red-300 bg-red-500/10 rounded-lg transition-colors"
+                      onClick={() => {
+                        if (profile?.role !== 'admin') {
+                          setAlertMessage("Bạn không có quyền thực hiện thao tác này.");
+                          return;
+                        }
+                        handleDelete(student.id);
+                      }}
+                      className={`p-2 rounded-lg transition-colors ${profile?.role !== 'admin' ? 'text-red-900 bg-red-900/10 cursor-not-allowed' : 'text-red-400 hover:text-red-300 bg-red-500/10'}`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

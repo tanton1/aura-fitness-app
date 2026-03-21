@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Student, Trainer, Schedule, DAYS, HOURS, ScheduleEntry } from '../types';
+import { Student, Trainer, Schedule, DAYS, HOURS, ScheduleEntry, StudentContract } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar, User, Clock, Info, Download, X, Lock, Unlock, Plus, Trash2, Search } from 'lucide-react';
 import { getDatesForCurrentWeek, getDatesForWeek } from '../utils/dateUtils';
@@ -9,17 +9,25 @@ interface Props {
   schedule: Schedule;
   students: Student[];
   trainers: Trainer[];
+  contracts: StudentContract[];
   currentTrainerId?: string;
   weekOffset?: number;
   onUpdateSlot?: (slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => void;
   selectedBranchId: string;
 }
 
-export default function PTSchedule({ schedule, students, trainers, currentTrainerId, weekOffset = 0, onUpdateSlot, selectedBranchId }: Props) {
+export default function PTSchedule({ schedule, students, trainers, contracts, currentTrainerId, weekOffset = 0, onUpdateSlot, selectedBranchId }: Props) {
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>(currentTrainerId || trainers[0]?.id || '');
   const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
   const [hoveredStudentId, setHoveredStudentId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>(DAYS[0]);
+  
+  const activeStudents = useMemo(() => {
+    return students.filter(s => {
+      const contract = contracts.find(c => c.studentId === s.id && c.status === 'active');
+      return !!contract;
+    });
+  }, [students, contracts]);
   
   // Manual Scheduling State
   const [editingSlot, setEditingSlot] = useState<{ id: string, day: string, hour: number } | null>(null);
@@ -512,7 +520,7 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                     </div>
                     
                     <div className="bg-zinc-950 border border-zinc-800 rounded-xl max-h-48 overflow-y-auto custom-scrollbar">
-                      {students
+                      {activeStudents
                         .filter(s => !slotStudents.some(ss => ss.id === s.id))
                         .filter(s => 
                           !studentSearchTerm || 
@@ -542,7 +550,7 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                           </div>
                         ))
                       }
-                      {students.filter(s => !slotStudents.some(ss => ss.id === s.id)).filter(s => !studentSearchTerm || s.name.toLowerCase().includes(studentSearchTerm.toLowerCase()) || (s.phone && s.phone.includes(studentSearchTerm))).length === 0 && (
+                      {activeStudents.filter(s => !slotStudents.some(ss => ss.id === s.id)).filter(s => !studentSearchTerm || s.name.toLowerCase().includes(studentSearchTerm.toLowerCase()) || (s.phone && s.phone.includes(studentSearchTerm))).length === 0 && (
                         <div className="p-4 text-center text-zinc-500 text-sm">
                           Không tìm thấy học viên
                         </div>

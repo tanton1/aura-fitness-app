@@ -51,9 +51,20 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const schedule = schedules[weekId]?.schedule || {};
   const warnings = schedules[weekId]?.warnings || [];
 
+  const studentContracts = useMemo(() => {
+    const map = new Map<string, StudentContract>();
+    contracts.forEach(c => {
+      if (c.status === 'active') {
+        map.set(c.studentId, c);
+      }
+    });
+    return map;
+  }, [contracts]);
+
   const filteredStudents = students.filter(s => 
     (selectedBranchId === 'all' || (selectedBranchId === 'none' ? !s.branchId : s.branchId === selectedBranchId)) &&
-    (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone?.includes(searchTerm))
+    (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone?.includes(searchTerm)) &&
+    studentContracts.has(s.id)
   );
 
   const filteredWarnings = warnings.filter(w => 
@@ -379,6 +390,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               schedule={schedule} 
               students={students} 
               trainers={trainers} 
+              contracts={contracts}
               weekOffset={weekOffset} 
               selectedBranchId={selectedBranchId}
               onUpdateSlot={(slotId, updater) => {
@@ -398,6 +410,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           schedule={schedule} 
           students={students} 
           trainers={trainers} 
+          contracts={contracts}
           currentTrainerId={user?.uid} 
           selectedBranchId={profile?.branchId || 'all'}
           weekOffset={weekOffset}
