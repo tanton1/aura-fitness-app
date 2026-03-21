@@ -64,8 +64,11 @@ export function generateSchedule(
     }
   });
 
+  // Only schedule students with active contracts
+  const activeStudents = students.filter(s => studentContracts.has(s.id));
+
   // Sort students by least available slots first
-  const sortedStudents = [...students].sort(
+  const sortedStudents = [...activeStudents].sort(
     (a, b) => (a.availableSlots?.length || 0) - (b.availableSlots?.length || 0)
   );
 
