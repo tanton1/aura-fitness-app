@@ -14,8 +14,6 @@ interface DatabaseContextType {
   packages: TrainingPackage[];
   staff: StaffMember[];
   dailyCheckins: DailyCheckin[];
-  schedule: Schedule;
-  warnings: Warning[];
   
   addStudent: (student: Student) => Promise<void>;
   updateStudent: (id: string, updates: Partial<Student>) => Promise<void>;
@@ -52,9 +50,9 @@ interface DatabaseContextType {
   updateDailyCheckin: (checkin: DailyCheckin) => Promise<void>;
   deleteDailyCheckin: (id: string) => Promise<void>;
   
-  updateScheduleData: (schedule: Schedule, warnings: Warning[]) => Promise<void>;
-  updateScheduleSlot: (slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => Promise<void>;
-  updateScheduleSlots: (updater: (currentSchedule: Schedule) => { [slotId: string]: ScheduleEntry[] }) => Promise<void>;
+  updateScheduleData: (weekId: string, schedule: Schedule, warnings: Warning[]) => Promise<void>;
+  updateScheduleSlot: (weekId: string, slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => Promise<void>;
+  updateScheduleSlots: (weekId: string, updater: (currentSchedule: Schedule) => { [slotId: string]: ScheduleEntry[] }) => Promise<void>;
   updateUserProfile: (uid: string, data: any) => Promise<void>;
   
   migrateData: () => Promise<void>;
@@ -80,8 +78,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
   const [packages, setPackages] = useState<TrainingPackage[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [dailyCheckins, setDailyCheckins] = useState<DailyCheckin[]>([]);
-  const [schedule, setSchedule] = useState<Schedule>({});
-  const [warnings, setWarnings] = useState<Warning[]>([]);
+  const [schedules, setSchedules] = useState<{ [weekId: string]: { schedule: Schedule, warnings: Warning[] } }>({});
   const [isMigrating, setIsMigrating] = useState(false);
   const [isMigrated, setIsMigrated] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -126,18 +123,16 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       setDailyCheckins(snapshot.docs.map(doc => doc.data() as DailyCheckin));
     }));
     
-    // Thêm check migrated
-    unsubs.push(onSnapshot(doc(db, 'schedules', 'global_schedule'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setSchedule(data.schedule || {});
-        setWarnings(data.warnings || []);
-        setIsMigrated(!!data.migrated);
-      } else {
-        setSchedule({});
-        setWarnings([]);
-        setIsMigrated(false);
-      }
+    unsubs.push(onSnapshot(collection(db, 'schedules'), (snapshot) => {
+      const newSchedules: { [weekId: string]: { schedule: Schedule, warnings: Warning[] } } = {};
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        newSchedules[doc.id] = {
+          schedule: data.schedule || {},
+          warnings: data.warnings || []
+        };
+      });
+      setSchedules(newSchedules);
     }));
 
     return () => unsubs.forEach(unsub => unsub());
@@ -272,9 +267,9 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     await deleteDoc(doc(db, 'dailyCheckins', id));
   };
 
-  const updateScheduleData = async (newSchedule: Schedule, newWarnings: Warning[]) => {
+  const updateScheduleData = async (weekId: string, newSchedule: Schedule, newWarnings: Warning[]) => {
     await runTransaction(db, async (transaction) => {
-      const docRef = doc(db, 'schedules', 'generated_schedule');
+      const docRef = doc(db, 'schedules', weekId);
       transaction.set(docRef, {
         schedule: newSchedule,
         warnings: newWarnings
@@ -282,8 +277,8 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const updateScheduleSlot = async (slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => {
-    const docRef = doc(db, 'schedules', 'generated_schedule');
+  const updateScheduleSlot = async (weekId: string, slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => {
+    const docRef = doc(db, 'schedules', weekId);
     await runTransaction(db, async (transaction) => {
       const docSnap = await transaction.get(docRef);
       if (!docSnap.exists()) return;
@@ -298,8 +293,8 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const updateScheduleSlots = async (updater: (currentSchedule: Schedule) => { [slotId: string]: ScheduleEntry[] }) => {
-    const docRef = doc(db, 'schedules', 'generated_schedule');
+  const updateScheduleSlots = async (weekId: string, updater: (currentSchedule: Schedule) => { [slotId: string]: ScheduleEntry[] }) => {
+    const docRef = doc(db, 'schedules', weekId);
     await runTransaction(db, async (transaction) => {
       const docSnap = await transaction.get(docRef);
       if (!docSnap.exists()) return;
@@ -324,7 +319,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <DatabaseContext.Provider value={{
-      students, contracts, payments, sessions, trainers, branches, packages, staff, dailyCheckins, schedule, warnings,
+      students, contracts, payments, sessions, trainers, branches, packages, staff, dailyCheckins,
       addStudent, updateStudent, deleteStudent,
       addContract, updateContract, deleteContract,
       addPayment, deletePayment,
@@ -334,6 +329,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       addPackage, updatePackage, deletePackage,
       addStaff, updateStaff, deleteStaff,
       addDailyCheckin, updateDailyCheckin, deleteDailyCheckin,
+      schedules,
       updateScheduleData, updateScheduleSlot, updateScheduleSlots,
       updateUserProfile,
       migrateData, isMigrating, isMigrated

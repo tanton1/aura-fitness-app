@@ -199,6 +199,8 @@ export interface ScheduleEntry {
   studentId: string;
   trainerId: string;
   isLocked?: boolean;
+  branchId?: string;
+  type?: 'training' | 'off';
 }
 
 export interface Schedule {
@@ -225,6 +227,7 @@ export interface Session {
   status: 'scheduled' | 'completed' | 'cancelled';
   branchId?: string;
   verifiedByStudent?: boolean; // Add this
+  scheduleEntryId?: string; // Thêm trường này để liên kết
 }
 
 export interface Payroll {

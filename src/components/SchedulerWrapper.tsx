@@ -19,60 +19,44 @@ interface Props {
 
 export default function SchedulerWrapper({ user, profile }: Props) {
   const { 
-    students, trainers, branches, contracts, sessions, schedule, warnings, 
+    students, trainers, branches, contracts, sessions, schedules, 
     addStudent, updateStudent, updateScheduleData, updateScheduleSlot, updateScheduleSlots, addSession, updateContract, updateSession
   } = useDatabase();
   
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  const [isLoaded, setIsLoaded] = useState(true);
-  const [activeSubTab, setActiveSubTab] = useState<'schedule' | 'students' | 'trainers'>('schedule');
-  const [studentTab, setStudentTab] = useState<'overview' | 'schedule' | 'profile'>('overview');
   const [weekOffset, setWeekOffset] = useState(0);
-  const [studentSessionFilter, setStudentSessionFilter] = useState<'upcoming' | 'history' | 'this_week'>('upcoming');
-  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+  const [activeSubTab, setActiveSubTab] = useState<'schedule' | 'students'>('schedule');
+  const [studentTab, setStudentTab] = useState<'overview' | 'schedule' | 'profile'>('overview');
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [studentSessionFilter, setStudentSessionFilter] = useState<'all' | 'this_week' | 'upcoming' | 'history'>('upcoming');
+  const [isLoaded, setIsLoaded] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
   const isTrainer = profile?.role === 'trainer';
 
-  const filteredStudents = useMemo(() => {
-    let filtered = students;
-    
-    // Filter by branch
-    if (selectedBranchId !== 'all') {
-      if (selectedBranchId === 'none') {
-        filtered = filtered.filter(s => !s.branchId || s.branchId === '');
-      } else {
-        filtered = filtered.filter(s => s.branchId === selectedBranchId);
-      }
+  useEffect(() => {
+    if (students && trainers && contracts && sessions && schedules) {
+      setIsLoaded(true);
     }
-    
-    // Filter by search term
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(s => 
-        s.name.toLowerCase().includes(term) || 
-        (s.phone && s.phone.includes(term))
-      );
-    }
-    
-    return filtered;
-  }, [students, selectedBranchId, searchTerm]);
+  }, [students, trainers, contracts, sessions, schedules]);
 
-  const filteredWarnings = useMemo(() => {
-    return warnings.filter(w => {
-      const student = students.find(s => s.id === w.studentId);
-      if (!student) return false;
-      if (selectedBranchId !== 'all') {
-        if (selectedBranchId === 'none') {
-          return !student.branchId || student.branchId === '';
-        } else {
-          return student.branchId === selectedBranchId;
-        }
-      }
-      return true;
-    });
-  }, [warnings, students, selectedBranchId]);
+  const weekId = useMemo(() => {
+    const dates = getDatesForWeek(weekOffset);
+    return `schedule_${dates['T2'].full}`;
+  }, [weekOffset]);
+
+  const schedule = schedules[weekId]?.schedule || {};
+  const warnings = schedules[weekId]?.warnings || [];
+
+  const filteredStudents = students.filter(s => 
+    (selectedBranchId === 'all' || (selectedBranchId === 'none' ? !s.branchId : s.branchId === selectedBranchId)) &&
+    (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone?.includes(searchTerm))
+  );
+
+  const filteredWarnings = warnings.filter(w => 
+    filteredStudents.some(s => s.id === w.studentId)
+  );
 
   const handleResetSchedule = () => {
     if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch đã xếp không? Các ca đã khóa thủ công cũng sẽ bị xóa.')) {
@@ -84,7 +68,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         emptySchedule[`${day}-${hour}`] = [];
       }
     }
-    updateScheduleData(emptySchedule, []);
+    updateScheduleData(weekId, emptySchedule, []);
   };
 
   const handleGenerate = () => {
@@ -95,10 +79,14 @@ export default function SchedulerWrapper({ user, profile }: Props) {
       }
     }
     const result = generateSchedule(students, trainers, contracts, schedule);
-    updateScheduleData(result.schedule, result.warnings);
+    updateScheduleData(weekId, result.schedule, result.warnings);
   };
 
   const handleDeploySchedule = async () => {
+    if (!schedule) {
+      alert("Lịch tập chưa được tải. Vui lòng thử lại.");
+      return;
+    }
     const targetWeekDates = getDatesForWeek(weekOffset);
     const weekLabel = weekOffset === 0 ? 'tuần này' : weekOffset === 1 ? 'tuần sau' : `tuần +${weekOffset}`;
     
@@ -122,7 +110,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           date: dateStr,
           status: 'scheduled',
           branchId: contract?.branchId || trainers.find(t => t.id === entry.trainerId)?.branchId || null,
-          verifiedByStudent: false
+          verifiedByStudent: false,
+          scheduleEntryId: `${weekId}-${slotId}-${entry.studentId}`
         });
       });
     });
@@ -190,7 +179,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         };
       })
       .sort((a, b) => (new Date(b.fullDate).getTime() || 0) - (new Date(a.fullDate).getTime() || 0));
-  }, [currentUserStudent, studentSessionFilter, schedule, trainers, contracts, sessions]);
+  }, [currentUserStudent, studentSessionFilter, trainers, contracts, sessions]);
 
   if (!isLoaded) {
     return <div className="p-6 text-white">Đang tải dữ liệu...</div>;
@@ -367,8 +356,9 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               students={students} 
               trainers={trainers} 
               weekOffset={weekOffset} 
+              selectedBranchId={selectedBranchId}
               onUpdateSlot={(slotId, updater) => {
-                updateScheduleSlot(slotId, updater);
+                updateScheduleSlot(weekId, slotId, updater);
               }}
             />
           )}
@@ -380,7 +370,17 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   if (isTrainer) {
     return (
       <div className="p-6 space-y-8 pb-24">
-        <PTSchedule schedule={schedule} students={students} trainers={trainers} currentTrainerId={user?.uid} />
+        <PTSchedule 
+          schedule={schedule} 
+          students={students} 
+          trainers={trainers} 
+          currentTrainerId={user?.uid} 
+          selectedBranchId={profile?.branchId || 'all'}
+          weekOffset={weekOffset}
+          onUpdateSlot={(slotId, updater) => {
+            updateScheduleSlot(weekId, slotId, updater);
+          }}
+        />
       </div>
     );
   }

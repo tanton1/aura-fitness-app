@@ -12,9 +12,10 @@ interface Props {
   currentTrainerId?: string;
   weekOffset?: number;
   onUpdateSlot?: (slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => void;
+  selectedBranchId: string;
 }
 
-export default function PTSchedule({ schedule, students, trainers, currentTrainerId, weekOffset = 0, onUpdateSlot }: Props) {
+export default function PTSchedule({ schedule, students, trainers, currentTrainerId, weekOffset = 0, onUpdateSlot, selectedBranchId }: Props) {
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>(currentTrainerId || trainers[0]?.id || '');
   const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
   const [hoveredStudentId, setHoveredStudentId] = useState<string | null>(null);
@@ -117,10 +118,32 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
     const slotEntries = schedule[slotId] || [];
     const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
     
-    setSlotStudents(trainerEntries.map(e => ({ id: e.studentId, isLocked: !!e.isLocked })));
+    setSlotStudents(trainerEntries.filter(e => e.type !== 'off').map(e => ({ id: e.studentId, isLocked: !!e.isLocked })));
     setEditingSlot({ id: slotId, day, hour });
     setNewStudentId('');
     setStudentSearchTerm('');
+  };
+
+  const handleToggleOff = () => {
+    if (!editingSlot || !onUpdateSlot) return;
+    
+    const slotId = editingSlot.id;
+    
+    onUpdateSlot(slotId, (currentEntries) => {
+      const isOff = currentEntries.some(e => e.trainerId === selectedTrainerId && e.type === 'off');
+      if (isOff) {
+        // Remove OFF entry
+        return currentEntries.filter(e => !(e.trainerId === selectedTrainerId && e.type === 'off'));
+      } else {
+        // Add OFF entry
+        return [
+          ...currentEntries.filter(e => e.trainerId !== selectedTrainerId),
+          { studentId: 'OFF', trainerId: selectedTrainerId, type: 'off', branchId: selectedBranchId }
+        ];
+      }
+    });
+    
+    setEditingSlot(null);
   };
 
   const handleSaveSlot = () => {
@@ -132,12 +155,14 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
     const newEntries: ScheduleEntry[] = slotStudents.map(s => ({
       studentId: s.id,
       trainerId: selectedTrainerId,
-      isLocked: s.isLocked
+      isLocked: s.isLocked,
+      branchId: selectedBranchId,
+      type: 'training'
     }));
     
     onUpdateSlot(slotId, (currentEntries) => {
-      // Remove old entries for this trainer in this slot
-      const otherEntries = currentEntries.filter(e => e.trainerId !== selectedTrainerId);
+      // Remove old 'training' entries for this trainer in this slot, but keep 'off' entries
+      const otherEntries = currentEntries.filter(e => e.trainerId !== selectedTrainerId || e.type === 'off');
       return [...otherEntries, ...newEntries];
     });
     
@@ -300,7 +325,9 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                       const slotId = `${day}-${hour}`;
                       const slotEntries = schedule[slotId] || [];
                       const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
-                      const studentIds = trainerEntries.map(e => e.studentId);
+                      const isOff = trainerEntries.some(e => e.type === 'off');
+                      
+                      const studentIds = trainerEntries.filter(e => e.type !== 'off').map(e => e.studentId);
                       
                       const isHighlighted = highlightedStudentId && studentIds.includes(highlightedStudentId);
                       const isDimmed = highlightedStudentId && !studentIds.includes(highlightedStudentId);
@@ -313,16 +340,20 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                           className={`border-b border-r border-zinc-800/50 p-1 md:p-1.5 text-center transition-all duration-300 align-top relative ${!currentTrainerId ? 'cursor-pointer' : ''} ${
                             selectedDay !== day ? 'hidden md:table-cell' : ''
                           } ${
-                            isHighlighted
-                              ? 'bg-pink-500/10 shadow-[inset_0_0_20px_rgba(236,72,153,0.1)] border-pink-500/30'
-                              : isHoveredStudentAvailable
-                                ? 'bg-emerald-500/20 shadow-[inset_0_0_15px_rgba(16,185,129,0.1)] border-emerald-500/30'
-                                : studentIds.length > 0 
-                                  ? isDimmed ? 'bg-zinc-950 opacity-30' : 'bg-zinc-900/30 hover:bg-zinc-800/50' 
-                                  : 'bg-transparent text-zinc-800 hover:bg-zinc-900/30'
+                            isOff
+                              ? 'bg-zinc-950 text-zinc-600'
+                              : isHighlighted
+                                ? 'bg-pink-500/10 shadow-[inset_0_0_20px_rgba(236,72,153,0.1)] border-pink-500/30'
+                                : isHoveredStudentAvailable
+                                  ? 'bg-emerald-500/20 shadow-[inset_0_0_15px_rgba(16,185,129,0.1)] border-emerald-500/30'
+                                  : studentIds.length > 0 
+                                    ? isDimmed ? 'bg-zinc-950 opacity-30' : 'bg-zinc-900/30 hover:bg-zinc-800/50' 
+                                    : 'bg-transparent text-zinc-800 hover:bg-zinc-900/30'
                           }`}
                         >
-                          {studentIds.length > 0 ? (
+                          {isOff ? (
+                            <div className="h-full w-full flex items-center justify-center font-bold text-xs">NGHỈ</div>
+                          ) : studentIds.length > 0 ? (
                             <div className="flex flex-col gap-1 h-full justify-start">
                               {studentIds.map(id => {
                                 const isLocked = trainerEntries.find(e => e.studentId === id)?.isLocked;
@@ -452,6 +483,18 @@ export default function PTSchedule({ schedule, students, trainers, currentTraine
                       ))}
                     </div>
                   )}
+
+                  <button 
+                    onClick={handleToggleOff}
+                    className={`w-full py-2 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
+                      schedule[editingSlot.id]?.some(e => e.trainerId === selectedTrainerId && e.type === 'off')
+                        ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                        : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                    }`}
+                  >
+                    <Lock className="w-4 h-4" />
+                    {schedule[editingSlot.id]?.some(e => e.trainerId === selectedTrainerId && e.type === 'off') ? 'Mở ca' : 'Khóa ca (Nghỉ)'}
+                  </button>
                 </div>
 
                 {slotStudents.length < 2 && (
