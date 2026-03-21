@@ -184,6 +184,27 @@ export default function SchedulerWrapper({ user, profile }: Props) {
       .sort((a, b) => (new Date(b.fullDate).getTime() || 0) - (new Date(a.fullDate).getTime() || 0));
   }, [currentUserStudent, studentSessionFilter, trainers, contracts, sessions]);
 
+  const availableHours = useMemo(() => {
+    if (!editFormData.date || !editFormData.trainerId) return HOURS;
+    return HOURS.filter(h => {
+      const count = sessions.filter(s => 
+        s.trainerId === editFormData.trainerId && 
+        s.date === editFormData.date && 
+        parseInt(s.id.split('-')[1]) === h &&
+        s.status !== 'cancelled' &&
+        s.status !== 'canceled_by_student' &&
+        s.id !== editingSession?.id
+      ).length;
+      return count < 2;
+    });
+  }, [editFormData.date, editFormData.trainerId, sessions, editingSession]);
+
+  useEffect(() => {
+    if (editingSession && availableHours.length > 0 && !availableHours.includes(editFormData.hour)) {
+      setEditFormData(prev => ({ ...prev, hour: availableHours[0] }));
+    }
+  }, [availableHours, editingSession]);
+
   if (!isLoaded) {
     return <div className="p-6 text-white">Đang tải dữ liệu...</div>;
   }
@@ -497,27 +518,6 @@ export default function SchedulerWrapper({ user, profile }: Props) {
       alert('Lỗi khi lưu: ' + (e as Error).message);
     }
   };
-
-  const availableHours = useMemo(() => {
-    if (!editFormData.date || !editFormData.trainerId) return HOURS;
-    return HOURS.filter(h => {
-      const count = sessions.filter(s => 
-        s.trainerId === editFormData.trainerId && 
-        s.date === editFormData.date && 
-        parseInt(s.id.split('-')[1]) === h &&
-        s.status !== 'cancelled' &&
-        s.status !== 'canceled_by_student' &&
-        s.id !== editingSession?.id
-      ).length;
-      return count < 2;
-    });
-  }, [editFormData.date, editFormData.trainerId, sessions, editingSession]);
-
-  useEffect(() => {
-    if (editingSession && availableHours.length > 0 && !availableHours.includes(editFormData.hour)) {
-      setEditFormData(prev => ({ ...prev, hour: availableHours[0] }));
-    }
-  }, [availableHours, editingSession]);
 
   const myContracts = contracts.filter(c => c.studentId === currentUserStudent?.id);
 
