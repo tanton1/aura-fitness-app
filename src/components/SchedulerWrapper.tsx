@@ -67,13 +67,13 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     return calculateWarnings(activeStudents, trainers, schedule);
   }, [isLoaded, students, trainers, schedule, studentContracts]);
 
-  const filteredStudents = students.filter(s => 
+  const filteredStudents = (students || []).filter(s => 
     (selectedBranchId === 'all' || (selectedBranchId === 'none' ? !s.branchId : s.branchId === selectedBranchId)) &&
     (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone?.includes(searchTerm)) &&
     studentContracts.has(s.id)
   );
 
-  const filteredWarnings = warnings.filter(w => 
+  const filteredWarnings = (warnings || []).filter(w => 
     filteredStudents.some(s => s.id === w.studentId)
   );
 
@@ -412,6 +412,13 @@ export default function SchedulerWrapper({ user, profile }: Props) {
 
   if (isTrainer) {
     const targetWeekDates = getDatesForWeek(weekOffset);
+    const trainerStudents = (students || []).filter(s => 
+      (contracts || []).some(c => c.studentId === s.id && c.trainerId === user?.uid && c.status === 'active')
+    );
+    const trainerWarnings = (warnings || []).filter(w => 
+      trainerStudents.some(s => s.id === w.studentId)
+    );
+
     return (
       <div className="p-6 space-y-8 pb-24">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -465,18 +472,54 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           </div>
         </div>
 
-        <PTSchedule 
-          schedule={schedule} 
-          students={students} 
-          trainers={trainers} 
-          contracts={contracts}
-          currentTrainerId={user?.uid} 
-          selectedBranchId={profile?.branchId || 'all'}
-          weekOffset={weekOffset}
-          onUpdateSlot={(slotId, updater) => {
-            updateScheduleSlot(weekId, slotId, updater);
-          }}
-        />
+        {/* Sub-tabs */}
+        <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 mb-6">
+          {[
+            { id: 'schedule', label: 'Lịch PT', icon: Calendar },
+            { id: 'students', label: 'Học viên', icon: Users }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id as any)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                activeSubTab === tab.id 
+                  ? 'bg-zinc-800 text-white shadow-sm' 
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeSubTab === 'students' && (
+          <div className="space-y-8">
+            <StudentList 
+              students={trainerStudents} 
+              schedule={schedule} 
+              warnings={trainerWarnings}
+              branches={branches}
+              contracts={contracts}
+              onEdit={() => {}}
+            />
+          </div>
+        )}
+
+        {activeSubTab === 'schedule' && (
+          <PTSchedule 
+            schedule={schedule} 
+            students={students} 
+            trainers={trainers} 
+            contracts={contracts}
+            currentTrainerId={user?.uid} 
+            selectedBranchId={profile?.branchId || 'all'}
+            weekOffset={weekOffset}
+            onUpdateSlot={(slotId, updater) => {
+              updateScheduleSlot(weekId, slotId, updater);
+            }}
+          />
+        )}
       </div>
     );
   }

@@ -49,8 +49,8 @@ export default function StudentList({ students, schedule, warnings, branches, co
 
   const warningsByBranch = React.useMemo(() => {
     const grouped: Record<string, Warning[]> = {};
-    warnings.forEach(w => {
-      const student = students.find(s => s.id === w.studentId);
+    (warnings || []).forEach(w => {
+      const student = (students || []).find(s => s.id === w.studentId);
       const branchId = student?.branchId || 'none';
       if (!grouped[branchId]) {
         grouped[branchId] = [];
@@ -123,12 +123,12 @@ export default function StudentList({ students, schedule, warnings, branches, co
           </h2>
         </div>
         <div className="divide-y divide-zinc-800/50">
-          {students.length === 0 ? (
+          {(students || []).length === 0 ? (
             <div className="p-8 text-center text-zinc-500 font-medium">
               Chưa có học viên nào. Hãy thêm học viên ở tab Đăng ký.
             </div>
           ) : (
-            students.map(student => {
+            (students || []).map(student => {
               const studentSchedule = getStudentSchedule(student.id);
               const message = `Chào ${student.name}, lịch tập tuần này của bạn là: ${studentSchedule.map(formatSlot).join(', ')}.`;
               

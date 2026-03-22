@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Student, Trainer, Schedule, DAYS, HOURS, ScheduleEntry, StudentContract } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar, User, Clock, Info, Download, X, Lock, Unlock, Plus, Trash2, Search } from 'lucide-react';
 import { getDatesForCurrentWeek, getDatesForWeek } from '../utils/dateUtils';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface Props {
   schedule: Schedule;
@@ -21,10 +23,11 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
   const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
   const [hoveredStudentId, setHoveredStudentId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>(DAYS[0]);
+  const scheduleRef = useRef<HTMLDivElement>(null);
   
   const activeStudents = useMemo(() => {
-    return students.filter(s => {
-      const contract = contracts.find(c => c.studentId === s.id && c.status === 'active');
+    return (students || []).filter(s => {
+      const contract = (contracts || []).find(c => c.studentId === s.id && c.status === 'active');
       return !!contract;
     });
   }, [students, contracts]);
@@ -63,61 +66,18 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
     XLSX.writeFile(wb, `Lich_Tap_PT_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.xlsx`);
   };
 
-  const handleExportPDF = () => {
-    let html = `
-      <html>
-      <head>
-        <title>Lịch Tập PT</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { text-align: center; color: #333; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-          th { background-color: #f2f2f2; font-weight: bold; }
-          .trainer-name { margin-bottom: 20px; font-size: 16px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <h1>Lịch Tập PT</h1>
-        <div class="trainer-name">Huấn luyện viên: ${trainers.find(t => t.id === selectedTrainerId)?.name || 'Tất cả'}</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Giờ</th>
-              ${DAYS.map(day => `<th>${day}</th>`).join('')}
-            </tr>
-          </thead>
-          <tbody>
-            ${HOURS.map(hour => `
-              <tr>
-                <td><strong>${hour}:00</strong></td>
-                ${DAYS.map(day => {
-                  const slotId = `${day}-${hour}`;
-                  const slotEntries = schedule[slotId] || [];
-                  const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
-                  const studentNames = trainerEntries.map(e => getStudentName(e.studentId)).join('<br/>');
-                  return `<td>${studentNames}</td>`;
-                }).join('')}
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
+  const handleExportPDF = async () => {
+    if (!scheduleRef.current) return;
 
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 250);
-    } else {
-      alert('Vui lòng cho phép mở popup để in PDF.');
-    }
+    const canvas = await html2canvas(scheduleRef.current, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('l', 'mm', 'a4');
+    const imgProps = pdf.getImageProperties(imgData);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`Lich_Tap_PT_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.pdf`);
   };
 
   const openSlotEditor = (day: string, hour: number) => {
@@ -303,7 +263,7 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
       </div>
       
       {/* Schedule Table */}
-      <div className="flex-1 overflow-hidden flex flex-col bg-zinc-950 border-y md:border md:rounded-xl border-zinc-800 shadow-inner -mx-px md:mx-0">
+      <div className="flex-1 overflow-hidden flex flex-col bg-zinc-950 border-y md:border md:rounded-xl border-zinc-800 shadow-inner -mx-px md:mx-0" ref={scheduleRef}>
         <div className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1">
           <div className="min-w-[300px] md:min-w-[800px] w-full">
             <table className="w-full text-sm text-left border-collapse table-fixed">
