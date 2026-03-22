@@ -4,7 +4,7 @@ import { generateSchedule, calculateWarnings } from '../utils/scheduler';
 import StudentForm from './StudentForm';
 import StudentList from './StudentList';
 import PTSchedule from './PTSchedule';
-import { Calendar, Users, UserPlus, CheckCircle2, Package, User as UserIcon, Phone, Mail, MapPin, CheckCircle, ChevronRight, CreditCard, Clock, XCircle, RotateCcw, Edit2 } from 'lucide-react';
+import { Calendar, Users, UserPlus, CheckCircle2, Package, User as UserIcon, Phone, Mail, MapPin, CheckCircle, ChevronRight, CreditCard, Clock, XCircle, RotateCcw, Edit2, Search, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';
 import { doc, setDoc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
@@ -414,23 +414,43 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     const targetWeekDates = getDatesForWeek(weekOffset);
     const currentTrainer = trainers.find(t => 
       t.id === user?.uid || 
-      (user?.email && t.email === user.email) || 
+      (user?.email && t.email?.toLowerCase() === user.email.toLowerCase()) || 
       (user?.phoneNumber && t.phone === user.phoneNumber)
     );
     const actualTrainerId = currentTrainer?.id || user?.uid;
 
-    const trainerStudents = (students || []).filter(s => 
-      (contracts || []).some(c => c.studentId === s.id && c.trainerId === actualTrainerId && c.status === 'active')
+    const trainerStudents = (students || []).filter(s => {
+      const hasActiveContract = (contracts || []).some(c => c.studentId === s.id && c.status === 'active');
+      return hasActiveContract;
+    });
+    
+    const filteredTrainerStudents = trainerStudents.filter(s => 
+      (selectedBranchId === 'all' || (selectedBranchId === 'none' ? !s.branchId : s.branchId === selectedBranchId)) &&
+      (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone?.includes(searchTerm))
     );
+    
     const trainerWarnings = (warnings || []).filter(w => 
-      trainerStudents.some(s => s.id === w.studentId)
+      filteredTrainerStudents.some(s => s.id === w.studentId)
     );
 
     return (
       <div className="p-6 space-y-8 pb-24">
+        {!currentTrainer && (
+          <div className="bg-yellow-500/10 border border-yellow-500/50 text-yellow-500 p-4 rounded-xl flex items-start gap-3">
+            <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">Chưa liên kết hồ sơ PT</p>
+              <p className="text-sm mt-1">Tài khoản của bạn ({user?.email || user?.phoneNumber}) chưa được liên kết với hồ sơ PT nào trong hệ thống. Vui lòng liên hệ Admin để cập nhật email/SĐT của bạn vào danh sách nhân sự PT.</p>
+            </div>
+          </div>
+        )}
+        
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-black text-white uppercase tracking-wider">Lịch Của Tôi</h1>
+            {currentTrainer && (
+              <p className="text-zinc-400 mt-1">HLV: <span className="text-pink-500 font-medium">{currentTrainer.name}</span></p>
+            )}
             <div className="flex items-center gap-2 mt-2">
               <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
                 <button
@@ -501,14 +521,71 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         </div>
 
         {activeSubTab === 'students' && (
-          <div className="space-y-8">
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên hoặc SĐT..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-zinc-500 focus:outline-none focus:border-pink-500 transition-colors"
+                />
+              </div>
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-pink-500 transition-colors"
+              >
+                <option value="all">Tất cả chi nhánh</option>
+                <option value="none">Chưa xếp chi nhánh</option>
+                {branches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
             <StudentList 
-              students={trainerStudents} 
+              students={filteredTrainerStudents} 
               schedule={schedule} 
               warnings={trainerWarnings}
               branches={branches}
               contracts={contracts}
-              onEdit={() => {}}
+              onEdit={setEditingStudent}
+              onToggleConfirm={(id) => {
+                const student = students.find(s => s.id === id);
+                if (student) {
+                  updateStudent(id, { isScheduleConfirmed: !student.isScheduleConfirmed });
+                }
+              }}
+              onToggleLockSchedule={(id) => {
+                updateScheduleSlots((currentSchedule) => {
+                  let isCurrentlyLocked = false;
+                  
+                  // Check if currently locked
+                  Object.keys(currentSchedule).forEach(slotId => {
+                    currentSchedule[slotId].forEach(e => {
+                      if (e.studentId === id && e.isLocked) {
+                        isCurrentlyLocked = true;
+                      }
+                    });
+                  });
+
+                  const newLockedState = !isCurrentlyLocked;
+                  const updates: Record<string, ScheduleEntry[]> = {};
+
+                  Object.keys(currentSchedule).forEach(slotId => {
+                    const entries = currentSchedule[slotId];
+                    if (entries.some(e => e.studentId === id)) {
+                      updates[slotId] = entries.map(e => 
+                        e.studentId === id ? { ...e, isLocked: newLockedState } : e
+                      );
+                    }
+                  });
+
+                  return updates;
+                });
+              }}
             />
           </div>
         )}

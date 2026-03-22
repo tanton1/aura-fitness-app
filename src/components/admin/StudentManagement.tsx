@@ -62,8 +62,8 @@ export default function StudentManagement({ user, profile }: Props) {
       } else {
         filtered = filtered.filter(s => s.branchId === selectedBranchId);
       }
-    } else if (profile?.branchId && profile.role !== 'admin') {
-      filtered = filtered.filter(s => s.branchId === profile.branchId);
+    } else if (profile?.branchId && profile.role !== 'admin' && profile.role !== 'trainer') {
+      filtered = filtered.filter(s => s.branchId === profile.branchId || !s.branchId);
     }
 
     if (dateRange) {
