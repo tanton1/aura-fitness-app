@@ -5,7 +5,7 @@ import { Calendar, User, Clock, Info, Download, X, Lock, Unlock, Plus, Trash2, S
 import { getDatesForCurrentWeek, getDatesForWeek } from '../utils/dateUtils';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import autoTable from 'jspdf-autotable';
 
 interface Props {
   schedule: Schedule;
@@ -67,17 +67,86 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
   };
 
   const handleExportPDF = async () => {
-    if (!scheduleRef.current) return;
+    try {
+      const doc = new jsPDF('l', 'mm', 'a4');
+      
+      // Fetch Roboto fonts for Vietnamese support
+      const [regularRes, boldRes] = await Promise.all([
+        fetch('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf'),
+        fetch('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf')
+      ]);
+      
+      const regularBlob = await regularRes.blob();
+      const boldBlob = await boldRes.blob();
+      
+      const blobToBase64 = (blob: Blob): Promise<string> => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+          reader.readAsDataURL(blob);
+        });
+      };
 
-    const canvas = await html2canvas(scheduleRef.current, { scale: 2 });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('l', 'mm', 'a4');
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const [regularBase64, boldBase64] = await Promise.all([
+        blobToBase64(regularBlob),
+        blobToBase64(boldBlob)
+      ]);
 
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`Lich_Tap_PT_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.pdf`);
+      doc.addFileToVFS('Roboto-Regular.ttf', regularBase64);
+      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+      
+      doc.addFileToVFS('Roboto-Medium.ttf', boldBase64);
+      doc.addFont('Roboto-Medium.ttf', 'Roboto', 'bold');
+      
+      doc.setFont('Roboto', 'normal');
+      
+      doc.setFontSize(16);
+      doc.text('Lịch Tập PT', 14, 15);
+      
+      const trainerName = trainers.find(t => t.id === selectedTrainerId)?.name || 'Tất cả';
+      doc.setFontSize(12);
+      doc.text(`Huấn luyện viên: ${trainerName}`, 14, 25);
+
+      const tableData = HOURS.map(hour => {
+        return [
+          `${hour}:00`,
+          ...DAYS.map(day => {
+            const slotId = `${day}-${hour}`;
+            const slotEntries = schedule[slotId] || [];
+            const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
+            return trainerEntries.map(e => getStudentName(e.studentId)).join('\n');
+          })
+        ];
+      });
+
+      autoTable(doc, {
+        head: [['Giờ', ...DAYS]],
+        body: tableData,
+        startY: 30,
+        styles: {
+          font: 'Roboto',
+          fontSize: 9,
+          cellPadding: 3,
+          overflow: 'linebreak',
+          halign: 'center',
+          valign: 'middle',
+        },
+        headStyles: {
+          fillColor: [236, 72, 153], // pink-500
+          textColor: 255,
+          fontStyle: 'bold',
+        },
+        columnStyles: {
+          0: { fontStyle: 'bold', fillColor: [244, 244, 245], textColor: [24, 24, 27] } // zinc-100/zinc-900
+        },
+        theme: 'grid',
+      });
+
+      doc.save(`Lich_Tap_PT_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Có lỗi xảy ra khi xuất PDF. Vui lòng kiểm tra kết nối mạng và thử lại.');
+    }
   };
 
   const openSlotEditor = (day: string, hour: number) => {
