@@ -231,8 +231,12 @@ export default function StudentManagement({ user, profile }: Props) {
     };
 
     if (editingStudent) {
+      console.log("Editing student:", editingStudent.id);
+      console.log("Form data:", formData);
       const updatedStudent = sanitize({ ...editingStudent, ...formData }) as Student;
+      console.log("Updated student:", updatedStudent);
       await updateStudent(updatedStudent.id, updatedStudent);
+      console.log("Student updated in Firestore");
       
       // Update User Profile in Firestore if it exists
       try {
@@ -240,10 +244,15 @@ export default function StudentManagement({ user, profile }: Props) {
           name: formData.name,
           branchId: formData.branchId || profile?.branchId || '',
         });
+        console.log("User profile updated");
         
         // Update Auth credentials if email or phone (password) changed
         if (formData.email !== editingStudent.email || formData.phone !== editingStudent.phone) {
-          await fetch('/api/update-user', {
+          if (formData.phone && formData.phone.length < 6) {
+            throw new Error("Mật khẩu (số điện thoại) phải có ít nhất 6 ký tự.");
+          }
+          console.log("Updating auth credentials...");
+          const response = await fetch('/api/update-user', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -252,6 +261,10 @@ export default function StudentManagement({ user, profile }: Props) {
               password: formData.phone
             })
           });
+          if (!response.ok) {
+            throw new Error(`Failed to update auth: ${await response.text()}`);
+          }
+          console.log("Auth credentials updated");
         }
       } catch (e) {
         console.error("Error updating user profile or auth:", e);
