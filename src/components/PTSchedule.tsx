@@ -70,10 +70,10 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
     try {
       const doc = new jsPDF('l', 'mm', 'a4');
       
-      // Fetch Arimo fonts (Arial clone) for full Vietnamese support
+      // Fetch Roboto fonts for full Vietnamese support
       const [regularRes, boldRes] = await Promise.all([
-        fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/Arimo-Regular.ttf'),
-        fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/arimo/Arimo-Bold.ttf')
+        fetch('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf'),
+        fetch('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Medium.ttf')
       ]);
       
       const regularBlob = await regularRes.blob();
@@ -92,13 +92,13 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
         blobToBase64(boldBlob)
       ]);
 
-      doc.addFileToVFS('Arimo-Regular.ttf', regularBase64);
-      doc.addFont('Arimo-Regular.ttf', 'Arimo', 'normal');
+      doc.addFileToVFS('Roboto-Regular.ttf', regularBase64);
+      doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
       
-      doc.addFileToVFS('Arimo-Bold.ttf', boldBase64);
-      doc.addFont('Arimo-Bold.ttf', 'Arimo', 'bold');
+      doc.addFileToVFS('Roboto-Medium.ttf', boldBase64);
+      doc.addFont('Roboto-Medium.ttf', 'Roboto', 'bold');
       
-      doc.setFont('Arimo', 'normal');
+      doc.setFont('Roboto', 'normal');
       
       doc.setFontSize(16);
       doc.text('Lịch Tập PT', 14, 15);
@@ -124,7 +124,7 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
         body: tableData,
         startY: 30,
         styles: {
-          font: 'Arimo',
+          font: 'Roboto',
           fontSize: 9,
           cellPadding: 3,
           overflow: 'linebreak',
