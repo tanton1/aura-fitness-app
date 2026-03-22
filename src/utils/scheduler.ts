@@ -191,7 +191,7 @@ function scheduleStudentWithTrainer(
     if (scheduledDays.has(day)) continue; 
 
     // Check if this trainer has capacity in this slot
-    const trainerEntries = schedule[slot].filter(e => e.trainerId === trainer.id);
+    const trainerEntries = (schedule[slot] || []).filter(e => e.trainerId === trainer.id);
     const isOff = trainerEntries.some(e => e.type === 'off');
     if (!isOff && trainerEntries.length < MAX_STUDENTS_PER_PT) {
       if (!slotsByDay[day]) slotsByDay[day] = [];
@@ -277,7 +277,7 @@ function scheduleStudentWithTrainer(
           const hour = parseInt(hourStr, 10);
           const hourIndex = HOURS.indexOf(hour);
           
-          const count = schedule[slot].filter(e => e.trainerId === trainer.id).length;
+          const count = (schedule[slot] || []).filter(e => e.trainerId === trainer.id).length;
           if (count === 1) comboScore += 200; // Prioritize pairing students (filling a slot to 2/2)
 
           // Contiguous shift logic for the trainer
@@ -344,7 +344,7 @@ function getSuggestions(
       for (let i = 0; i < trainers.length; i++) {
         const t = trainers[i];
         
-        const trainerEntries = schedule[slot].filter(e => e.trainerId === t.id);
+        const trainerEntries = (schedule[slot] || []).filter(e => e.trainerId === t.id);
         const isOff = trainerEntries.some(e => e.type === 'off');
         if (isOff) continue;
 
