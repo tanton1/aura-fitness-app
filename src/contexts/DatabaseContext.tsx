@@ -280,6 +280,46 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         schedule: newSchedule,
         warnings: newWarnings
       }, { merge: true });
+
+      // SYNC SESSIONS if already deployed
+      const isDeployed = sessions.some(s => s.scheduleEntryId?.startsWith(weekId));
+      if (isDeployed) {
+        // Find all sessions for this week and remove them to recreate from new schedule
+        const sessionsToDelete = sessions.filter(s => s.scheduleEntryId?.startsWith(weekId));
+        sessionsToDelete.forEach(s => {
+          transaction.delete(doc(db, 'sessions', s.id));
+        });
+
+        const mondayStr = weekId.replace('schedule_', '');
+        const mondayDate = new Date(mondayStr);
+        const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+        Object.entries(newSchedule).forEach(([slotId, entries]) => {
+          const [dayCode, hour] = slotId.split('-');
+          const dayIndex = dayNames.indexOf(dayCode);
+          if (dayIndex === -1) return;
+          const targetDate = new Date(mondayDate);
+          targetDate.setDate(mondayDate.getDate() + dayIndex);
+          const dateStr = targetDate.toISOString().split('T')[0];
+
+          entries.forEach(entry => {
+            if (entry.type === 'off') return;
+            const sessionId = `${slotId}-${entry.studentId}-${dateStr}`;
+            const contract = contracts.find(c => c.studentId === entry.studentId && c.status === 'active');
+            const sessionData: Session = {
+              id: sessionId,
+              trainerId: entry.trainerId,
+              studentId: entry.studentId,
+              date: dateStr,
+              status: 'scheduled',
+              branchId: entry.branchId || contract?.branchId || trainers.find(t => t.id === entry.trainerId)?.branchId || null,
+              verifiedByStudent: false,
+              scheduleEntryId: `${weekId}-${slotId}-${entry.studentId}`
+            };
+            transaction.set(doc(db, 'sessions', sessionId), sessionData);
+          });
+        });
+      }
     });
   };
 
@@ -296,6 +336,49 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       transaction.update(docRef, {
         [`schedule.${slotId}`]: newEntries
       });
+
+      // SYNC SESSIONS if already deployed
+      const isDeployed = sessions.some(s => s.scheduleEntryId?.startsWith(weekId));
+      if (isDeployed) {
+        const [dayCode, hour] = slotId.split('-');
+        const mondayStr = weekId.replace('schedule_', '');
+        const mondayDate = new Date(mondayStr);
+        const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+        const dayIndex = dayNames.indexOf(dayCode);
+        if (dayIndex === -1) return;
+        const targetDate = new Date(mondayDate);
+        targetDate.setDate(mondayDate.getDate() + dayIndex);
+        const dateStr = targetDate.toISOString().split('T')[0];
+
+        // Remove sessions for students no longer in the slot or if trainer is now OFF
+        for (const oldEntry of currentEntries) {
+          if (oldEntry.type === 'off') continue;
+          const isStillInSlot = newEntries.some(e => e.studentId === oldEntry.studentId && e.trainerId === oldEntry.trainerId && e.type !== 'off');
+          if (!isStillInSlot) {
+            const sessionId = `${slotId}-${oldEntry.studentId}-${dateStr}`;
+            transaction.delete(doc(db, 'sessions', sessionId));
+          }
+        }
+
+        // Add/Update sessions for students in the new slot
+        for (const newEntry of newEntries) {
+          if (newEntry.type === 'off') continue;
+          const sessionId = `${slotId}-${newEntry.studentId}-${dateStr}`;
+          const contract = contracts.find(c => c.studentId === newEntry.studentId && c.status === 'active');
+          
+          const sessionData: Session = {
+            id: sessionId,
+            trainerId: newEntry.trainerId,
+            studentId: newEntry.studentId,
+            date: dateStr,
+            status: 'scheduled',
+            branchId: newEntry.branchId || contract?.branchId || trainers.find(t => t.id === newEntry.trainerId)?.branchId || null,
+            verifiedByStudent: false,
+            scheduleEntryId: `${weekId}-${slotId}-${newEntry.studentId}`
+          };
+          transaction.set(doc(db, 'sessions', sessionId), sessionData, { merge: true });
+        }
+      }
     });
   };
 
@@ -315,6 +398,55 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       
       if (Object.keys(updateData).length > 0) {
         transaction.update(docRef, updateData);
+
+        // SYNC SESSIONS if already deployed
+        const isDeployed = sessions.some(s => s.scheduleEntryId?.startsWith(weekId));
+        if (isDeployed) {
+          const mondayStr = weekId.replace('schedule_', '');
+          const mondayDate = new Date(mondayStr);
+          const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+          Object.keys(updatedSlots).forEach(slotId => {
+            const [dayCode, hour] = slotId.split('-');
+            const dayIndex = dayNames.indexOf(dayCode);
+            if (dayIndex === -1) return;
+            const targetDate = new Date(mondayDate);
+            targetDate.setDate(mondayDate.getDate() + dayIndex);
+            const dateStr = targetDate.toISOString().split('T')[0];
+
+            const currentEntries = currentSchedule[slotId] || [];
+            const newEntries = updatedSlots[slotId];
+
+            // Remove sessions for students no longer in the slot
+            for (const oldEntry of currentEntries) {
+              if (oldEntry.type === 'off') continue;
+              const isStillInSlot = newEntries.some(e => e.studentId === oldEntry.studentId && e.trainerId === oldEntry.trainerId && e.type !== 'off');
+              if (!isStillInSlot) {
+                const sessionId = `${slotId}-${oldEntry.studentId}-${dateStr}`;
+                transaction.delete(doc(db, 'sessions', sessionId));
+              }
+            }
+
+            // Add/Update sessions for students in the new slot
+            for (const newEntry of newEntries) {
+              if (newEntry.type === 'off') continue;
+              const sessionId = `${slotId}-${newEntry.studentId}-${dateStr}`;
+              const contract = contracts.find(c => c.studentId === newEntry.studentId && c.status === 'active');
+              
+              const sessionData: Session = {
+                id: sessionId,
+                trainerId: newEntry.trainerId,
+                studentId: newEntry.studentId,
+                date: dateStr,
+                status: 'scheduled',
+                branchId: newEntry.branchId || contract?.branchId || trainers.find(t => t.id === newEntry.trainerId)?.branchId || null,
+                verifiedByStudent: false,
+                scheduleEntryId: `${weekId}-${slotId}-${newEntry.studentId}`
+              };
+              transaction.set(doc(db, 'sessions', sessionId), sessionData, { merge: true });
+            }
+          });
+        }
       }
     });
   };
