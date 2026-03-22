@@ -155,9 +155,6 @@ function scheduleStudentWithTrainer(
     const [day, hourStr] = slot.split('-');
     const hour = parseInt(hourStr, 10);
     
-    // Rule: PT2 and beyond only work from 10h onwards
-    if (isPT2AndBeyond && hour < 10) continue; 
-    
     // Rule: Max 1 session per day per student
     if (scheduledDays.has(day)) continue; 
 
@@ -314,7 +311,6 @@ function getSuggestions(
 
       for (let i = 0; i < trainers.length; i++) {
         const t = trainers[i];
-        if (i >= 1 && hour < 10) continue; // PT2+ only works from 10h
         
         const trainerEntries = schedule[slot].filter(e => e.trainerId === t.id);
         const isOff = trainerEntries.some(e => e.type === 'off');
