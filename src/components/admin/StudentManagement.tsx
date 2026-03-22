@@ -240,8 +240,21 @@ export default function StudentManagement({ user, profile }: Props) {
           name: formData.name,
           branchId: formData.branchId || profile?.branchId || '',
         });
+        
+        // Update Auth credentials if email or phone (password) changed
+        if (formData.email !== editingStudent.email || formData.phone !== editingStudent.phone) {
+          await fetch('/api/update-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              uid: editingStudent.id,
+              email: formData.email,
+              password: formData.phone
+            })
+          });
+        }
       } catch (e) {
-        console.error("Error updating user profile:", e);
+        console.error("Error updating user profile or auth:", e);
       }
     } else {
       let studentId = Date.now().toString();
