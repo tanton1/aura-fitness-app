@@ -412,8 +412,15 @@ export default function SchedulerWrapper({ user, profile }: Props) {
 
   if (isTrainer) {
     const targetWeekDates = getDatesForWeek(weekOffset);
+    const currentTrainer = trainers.find(t => 
+      t.id === user?.uid || 
+      (user?.email && t.email === user.email) || 
+      (user?.phoneNumber && t.phone === user.phoneNumber)
+    );
+    const actualTrainerId = currentTrainer?.id || user?.uid;
+
     const trainerStudents = (students || []).filter(s => 
-      (contracts || []).some(c => c.studentId === s.id && c.trainerId === user?.uid && c.status === 'active')
+      (contracts || []).some(c => c.studentId === s.id && c.trainerId === actualTrainerId && c.status === 'active')
     );
     const trainerWarnings = (warnings || []).filter(w => 
       trainerStudents.some(s => s.id === w.studentId)
@@ -512,7 +519,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
             students={students} 
             trainers={trainers} 
             contracts={contracts}
-            currentTrainerId={user?.uid} 
+            currentTrainerId={actualTrainerId} 
             selectedBranchId={profile?.branchId || 'all'}
             weekOffset={weekOffset}
             onUpdateSlot={(slotId, updater) => {
