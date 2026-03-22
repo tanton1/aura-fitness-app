@@ -17,17 +17,29 @@ async function startServer() {
 
   // API route to update user credentials
   app.post("/api/update-user", async (req, res) => {
+    console.log("Received update request:", req.body);
     const { uid, email, password } = req.body;
     try {
       const updateData: any = {};
       if (email) updateData.email = email;
       if (password) updateData.password = password;
       
-      await auth.updateUser(uid, updateData);
-      res.json({ success: true });
+      console.log("Updating user in Firebase Auth:", uid, updateData);
+      try {
+        await auth.updateUser(uid, updateData);
+        console.log("User updated successfully");
+        res.json({ success: true });
+      } catch (authError: any) {
+        if (authError.code === 'auth/user-not-found') {
+          console.log("User not found in Auth, skipping update");
+          res.json({ success: true, message: "User not found in Auth, skipped" });
+        } else {
+          throw authError;
+        }
+      }
     } catch (error) {
       console.error("Error updating user:", error);
-      res.status(500).json({ error: "Failed to update user" });
+      res.status(500).json({ error: "Failed to update user", details: error instanceof Error ? error.message : String(error) });
     }
   });
 

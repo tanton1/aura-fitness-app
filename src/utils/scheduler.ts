@@ -41,11 +41,11 @@ export function generateSchedule(
         const slotId = `${day}-${hour}`;
         const existingEntries = existingSchedule[slotId] || [];
         for (const entry of existingEntries) {
-          if (entry.isLocked) {
+          if (entry.isLocked || entry.type === 'off') {
             schedule[slotId].push(entry);
             
             // Update student tracking
-            if (studentNeeds[entry.studentId] !== undefined) {
+            if (entry.studentId !== 'OFF' && studentNeeds[entry.studentId] !== undefined) {
               studentNeeds[entry.studentId]--;
               studentScheduledDays[entry.studentId].add(day);
               studentScheduledSlots[entry.studentId].push(slotId);
@@ -162,8 +162,9 @@ function scheduleStudentWithTrainer(
     if (scheduledDays.has(day)) continue; 
 
     // Check if this trainer has capacity in this slot
-    const count = schedule[slot].filter(e => e.trainerId === trainer.id).length;
-    if (count < MAX_STUDENTS_PER_PT) {
+    const trainerEntries = schedule[slot].filter(e => e.trainerId === trainer.id);
+    const isOff = trainerEntries.some(e => e.type === 'off');
+    if (!isOff && trainerEntries.length < MAX_STUDENTS_PER_PT) {
       if (!slotsByDay[day]) slotsByDay[day] = [];
       slotsByDay[day].push(slot);
     }
@@ -314,9 +315,13 @@ function getSuggestions(
       for (let i = 0; i < trainers.length; i++) {
         const t = trainers[i];
         if (i >= 1 && hour < 10) continue; // PT2+ only works from 10h
-        capacity += MAX_STUDENTS_PER_PT;
         
-        const count = schedule[slot].filter(e => e.trainerId === t.id).length;
+        const trainerEntries = schedule[slot].filter(e => e.trainerId === t.id);
+        const isOff = trainerEntries.some(e => e.type === 'off');
+        if (isOff) continue;
+
+        capacity += MAX_STUDENTS_PER_PT;
+        const count = trainerEntries.length;
         currentStudents += count;
         if (count === 1) hasHalfFullPT = true;
       }

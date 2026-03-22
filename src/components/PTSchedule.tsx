@@ -146,7 +146,7 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
         // Add OFF entry
         return [
           ...currentEntries.filter(e => e.trainerId !== selectedTrainerId),
-          { studentId: 'OFF', trainerId: selectedTrainerId, type: 'off', branchId: selectedBranchId }
+          { studentId: 'OFF', trainerId: selectedTrainerId, type: 'off', branchId: selectedBranchId, isLocked: true }
         ];
       }
     });
