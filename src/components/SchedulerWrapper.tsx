@@ -411,8 +411,60 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   }
 
   if (isTrainer) {
+    const targetWeekDates = getDatesForWeek(weekOffset);
     return (
       <div className="p-6 space-y-8 pb-24">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-black text-white uppercase tracking-wider">Lịch Của Tôi</h1>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+                <button
+                  onClick={() => setWeekOffset(0)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                    weekOffset === 0 
+                      ? 'bg-pink-500 text-white shadow-[0_0_10px_rgba(255,0,127,0.3)]' 
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Tuần này
+                </button>
+                <button
+                  onClick={() => setWeekOffset(1)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                    weekOffset === 1 
+                      ? 'bg-pink-500 text-white shadow-[0_0_10px_rgba(255,0,127,0.3)]' 
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Tuần sau
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 ml-2">
+                <button 
+                  onClick={() => setWeekOffset(prev => Math.max(0, prev - 1))}
+                  className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+                  title="Tuần trước"
+                >
+                  <ChevronRight className="w-5 h-5 rotate-180" />
+                </button>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest px-2">
+                  {weekOffset > 1 ? `Tuần +${weekOffset}` : ''}
+                  <span className="ml-1 opacity-50">({targetWeekDates['T2'].display} - {targetWeekDates['T7'].display})</span>
+                </span>
+                <button 
+                  onClick={() => setWeekOffset(prev => prev + 1)}
+                  className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+                  title="Tuần sau"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <PTSchedule 
           schedule={schedule} 
           students={students} 
