@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Student, Trainer, Schedule, Warning, UserProfile, DAYS, HOURS, StudentContract, Session, ScheduleEntry, Branch } from '../types';
-import { generateSchedule } from '../utils/scheduler';
+import { generateSchedule, calculateWarnings } from '../utils/scheduler';
 import StudentForm from './StudentForm';
 import StudentList from './StudentList';
 import PTSchedule from './PTSchedule';
@@ -49,8 +49,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   }, [weekOffset]);
 
   const schedule = schedules[weekId]?.schedule || {};
-  const warnings = schedules[weekId]?.warnings || [];
-
+  
   const studentContracts = useMemo(() => {
     const map = new Map<string, StudentContract>();
     contracts.forEach(c => {
@@ -60,6 +59,13 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     });
     return map;
   }, [contracts]);
+
+  const warnings = useMemo(() => {
+    if (!isLoaded) return [];
+    // Only calculate for students with active contracts
+    const activeStudents = students.filter(s => studentContracts.has(s.id));
+    return calculateWarnings(activeStudents, trainers, schedule);
+  }, [isLoaded, students, trainers, schedule, studentContracts]);
 
   const filteredStudents = students.filter(s => 
     (selectedBranchId === 'all' || (selectedBranchId === 'none' ? !s.branchId : s.branchId === selectedBranchId)) &&

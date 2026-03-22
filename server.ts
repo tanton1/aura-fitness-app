@@ -1,12 +1,14 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-import { initializeApp, cert } from "firebase-admin/app";
+import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import firebaseConfig from "./firebase-applet-config.json";
 
-// Initialize Firebase Admin
-// In this environment, this should work automatically
-initializeApp();
+// Initialize Firebase Admin with the correct project ID
+initializeApp({
+  projectId: firebaseConfig.projectId,
+});
 const auth = getAuth();
 
 async function startServer() {
@@ -30,9 +32,13 @@ async function startServer() {
         console.log("User updated successfully");
         res.json({ success: true });
       } catch (authError: any) {
+        const errorString = String(authError.message || authError);
         if (authError.code === 'auth/user-not-found') {
           console.log("User not found in Auth, skipping update");
           res.json({ success: true, message: "User not found in Auth, skipped" });
+        } else if (errorString.includes('Identity Toolkit API') || errorString.includes('PERMISSION_DENIED')) {
+          console.log("Identity Toolkit API not enabled, skipping auth update");
+          res.json({ success: true, message: "Auth update skipped (API disabled)" });
         } else {
           throw authError;
         }

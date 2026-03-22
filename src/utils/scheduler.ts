@@ -116,11 +116,36 @@ export function generateSchedule(
     }
   }
 
-  // Generate warnings
-  for (const student of sortedStudents) {
-    const needed = studentNeeds[student.id];
-    if (needed > 0) {
-      const scheduled = student.sessionsPerWeek - needed;
+  return { schedule, warnings: calculateWarnings(activeStudents, trainers, schedule) };
+}
+
+export function calculateWarnings(
+  students: Student[],
+  trainers: Trainer[],
+  schedule: Schedule
+): Warning[] {
+  const warnings: Warning[] = [];
+  const studentScheduledSlots: Record<string, string[]> = {};
+
+  for (const s of students) {
+    studentScheduledSlots[s.id] = [];
+  }
+
+  for (const day of DAYS) {
+    for (const hour of HOURS) {
+      const slotId = `${day}-${hour}`;
+      const entries = schedule[slotId] || [];
+      for (const entry of entries) {
+        if (entry.studentId !== 'OFF' && studentScheduledSlots[entry.studentId]) {
+          studentScheduledSlots[entry.studentId].push(slotId);
+        }
+      }
+    }
+  }
+
+  for (const student of students) {
+    const scheduled = studentScheduledSlots[student.id].length;
+    if (scheduled < student.sessionsPerWeek) {
       const suggestions = getSuggestions(student, schedule, trainers, studentScheduledSlots[student.id]);
       warnings.push({
         studentId: student.id,
@@ -128,10 +153,17 @@ export function generateSchedule(
         requested: student.sessionsPerWeek,
         suggestions
       });
+    } else if (scheduled > student.sessionsPerWeek) {
+      warnings.push({
+        studentId: student.id,
+        scheduled,
+        requested: student.sessionsPerWeek,
+        suggestions: []
+      });
     }
   }
 
-  return { schedule, warnings };
+  return warnings;
 }
 
 function scheduleStudentWithTrainer(

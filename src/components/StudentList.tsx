@@ -138,7 +138,11 @@ export default function StudentList({ students, schedule, warnings, branches, co
               const hasNoBranch = !student.branchId || student.branchId === 'none';
               const hasLowSlots = (student.availableSlots?.length || 0) < 5;
               
-              const showRedWarning = hasBranchMismatch || hasNoBranch || hasLowSlots;
+              const warning = warnings.find(w => w.studentId === student.id);
+              const isUnderScheduled = warning && warning.scheduled < warning.requested;
+              const isOverScheduled = warning && warning.scheduled > warning.requested;
+              
+              const showRedWarning = hasBranchMismatch || hasNoBranch || hasLowSlots || isUnderScheduled || isOverScheduled;
               
               return (
                 <div key={student.id} className={`p-6 hover:bg-zinc-800/30 transition-colors ${showRedWarning ? 'bg-red-500/5 border-l-4 border-l-red-500' : ''}`}>
@@ -147,11 +151,13 @@ export default function StudentList({ students, schedule, warnings, branches, co
                       <h3 className="font-black text-zinc-100 text-xl flex items-center gap-2">
                         {student.name}
                         {showRedWarning && (
-                          <AlertCircle size={18} className="text-red-500" title="Cảnh báo: Chi nhánh không nhất quán hoặc số slot rảnh < 5" />
+                          <AlertCircle size={18} className="text-red-500" />
                         )}
                       </h3>
                       <p className="text-sm text-zinc-400 mt-1 font-medium">
-                        Đăng ký: <span className="text-pink-400">{student.sessionsPerWeek} buổi/tuần</span> | Rảnh: <span className={`${hasLowSlots ? 'text-red-400 font-bold' : 'text-pink-400'}`}>{student.availableSlots?.length || 0} slots</span>
+                        Đăng ký: <span className="text-pink-400">{student.sessionsPerWeek} buổi/tuần</span> | 
+                        Đã xếp: <span className={`${isUnderScheduled || isOverScheduled ? 'text-red-400 font-bold' : 'text-emerald-400'}`}>{warning?.scheduled || 0} buổi</span> | 
+                        Rảnh: <span className={`${hasLowSlots ? 'text-red-400 font-bold' : 'text-pink-400'}`}>{student.availableSlots?.length || 0} slots</span>
                       </p>
                       {showRedWarning && (
                         <div className="mt-2 text-xs font-medium text-red-400 flex flex-col gap-1">
@@ -160,6 +166,12 @@ export default function StudentList({ students, schedule, warnings, branches, co
                           )}
                           {hasLowSlots && (
                             <p>• Số khung giờ rảnh quá ít (dưới 5 slots)</p>
+                          )}
+                          {isUnderScheduled && (
+                            <p>• Chưa xếp đủ lịch ({warning.scheduled}/{warning.requested})</p>
+                          )}
+                          {isOverScheduled && (
+                            <p>• Xếp quá số buổi ({warning.scheduled}/{warning.requested})</p>
                           )}
                         </div>
                       )}
