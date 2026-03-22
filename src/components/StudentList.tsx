@@ -1,19 +1,20 @@
 import React from 'react';
-import { Student, Schedule, Warning, Branch } from '../types';
-import { AlertTriangle, MessageSquare, Trash2, Edit2, CheckCircle2, Circle, MapPin, Lock, Unlock } from 'lucide-react';
+import { Student, Schedule, Warning, Branch, StudentContract } from '../types';
+import { AlertTriangle, MessageSquare, Trash2, Edit2, CheckCircle2, Circle, MapPin, Lock, Unlock, AlertCircle } from 'lucide-react';
 
 interface Props {
   students: Student[];
   schedule: Schedule;
   warnings: Warning[];
   branches?: Branch[];
+  contracts?: StudentContract[];
   onDelete?: (id: string) => void;
   onEdit: (student: Student) => void;
   onToggleConfirm?: (id: string) => void;
   onToggleLockSchedule?: (id: string) => void;
 }
 
-export default function StudentList({ students, schedule, warnings, branches, onDelete, onEdit, onToggleConfirm, onToggleLockSchedule }: Props) {
+export default function StudentList({ students, schedule, warnings, branches, contracts = [], onDelete, onEdit, onToggleConfirm, onToggleLockSchedule }: Props) {
   const getStudentSchedule = (studentId: string) => {
     const slots: string[] = [];
     Object.entries(schedule).forEach(([slotId, entries]) => {
@@ -131,14 +132,37 @@ export default function StudentList({ students, schedule, warnings, branches, on
               const studentSchedule = getStudentSchedule(student.id);
               const message = `Chào ${student.name}, lịch tập tuần này của bạn là: ${studentSchedule.map(formatSlot).join(', ')}.`;
               
+              // Check for warnings
+              const activeContract = contracts.find(c => c.studentId === student.id && c.status === 'active');
+              const hasBranchMismatch = activeContract && activeContract.branchId !== student.branchId;
+              const hasNoBranch = !student.branchId || student.branchId === 'none';
+              const hasLowSlots = (student.availableSlots?.length || 0) < 5;
+              
+              const showRedWarning = hasBranchMismatch || hasNoBranch || hasLowSlots;
+              
               return (
-                <div key={student.id} className="p-6 hover:bg-zinc-800/30 transition-colors">
+                <div key={student.id} className={`p-6 hover:bg-zinc-800/30 transition-colors ${showRedWarning ? 'bg-red-500/5 border-l-4 border-l-red-500' : ''}`}>
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="font-black text-zinc-100 text-xl">{student.name}</h3>
+                      <h3 className="font-black text-zinc-100 text-xl flex items-center gap-2">
+                        {student.name}
+                        {showRedWarning && (
+                          <AlertCircle size={18} className="text-red-500" title="Cảnh báo: Chi nhánh không nhất quán hoặc số slot rảnh < 5" />
+                        )}
+                      </h3>
                       <p className="text-sm text-zinc-400 mt-1 font-medium">
-                        Đăng ký: <span className="text-pink-400">{student.sessionsPerWeek} buổi/tuần</span> | Rảnh: <span className="text-pink-400">{student.availableSlots?.length || 0} slots</span>
+                        Đăng ký: <span className="text-pink-400">{student.sessionsPerWeek} buổi/tuần</span> | Rảnh: <span className={`${hasLowSlots ? 'text-red-400 font-bold' : 'text-pink-400'}`}>{student.availableSlots?.length || 0} slots</span>
                       </p>
+                      {showRedWarning && (
+                        <div className="mt-2 text-xs font-medium text-red-400 flex flex-col gap-1">
+                          {(hasNoBranch || hasBranchMismatch) && (
+                            <p>• Chi nhánh học viên: {getBranchName(student.branchId || 'none')} | Chi nhánh hợp đồng: {activeContract ? getBranchName(activeContract.branchId || 'none') : 'Không có'}</p>
+                          )}
+                          {hasLowSlots && (
+                            <p>• Số khung giờ rảnh quá ít (dưới 5 slots)</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       {onToggleLockSchedule && studentSchedule.length > 0 && (

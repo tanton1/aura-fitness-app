@@ -347,6 +347,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                 schedule={schedule} 
                 warnings={filteredWarnings}
                 branches={branches}
+                contracts={contracts}
                 onEdit={setEditingStudent}
                 onToggleConfirm={(id) => {
                   const student = students.find(s => s.id === id);
