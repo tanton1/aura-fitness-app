@@ -25,7 +25,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   } = useDatabase();
   
   const [weekOffset, setWeekOffset] = useState(0);
-  const [activeSubTab, setActiveSubTab] = useState<'schedule' | 'students' | 'work_schedule'>('schedule');
+  const [activeSubTab, setActiveSubTab] = useState<'schedule' | 'students'>('schedule');
   const [studentTab, setStudentTab] = useState<'overview' | 'schedule' | 'profile'>('overview');
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState('all');
@@ -332,8 +332,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 mb-6">
           {[
             { id: 'schedule', label: 'Lịch PT', icon: Calendar },
-            { id: 'students', label: 'Học viên', icon: Users },
-            { id: 'work_schedule', label: 'Lịch làm việc', icon: Clock }
+            { id: 'students', label: 'Học viên', icon: Users }
           ].map(tab => (
             <button
               key={tab.id}
@@ -440,9 +439,6 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                 updateScheduleSlot(weekId, slotId, updater);
               }}
             />
-          )}
-          {activeSubTab === 'work_schedule' && (
-            <WorkScheduleMatrix trainers={trainers} schedule={schedule} />
           )}
         </div>
       </div>
@@ -642,9 +638,6 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               updateScheduleSlot(weekId, slotId, updater);
             }}
           />
-        )}
-        {activeSubTab === 'work_schedule' && (
-          <WorkScheduleMatrix trainers={trainers.filter(t => t.id === actualTrainerId)} schedule={schedule} />
         )}
       </div>
     );
