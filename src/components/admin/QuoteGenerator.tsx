@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { TrainingPackage, Quote, Student, StudentContract, Branch } from '../../types';
 import { User } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { FileText, Printer, Plus, Trash2, Download, Package, Edit2, Clock, Hash, DollarSign, ShoppingCart, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -43,8 +43,9 @@ export default function QuoteGenerator({ user }: Props) {
 
   useEffect(() => {
     if (user) {
-      const docRef = doc(db, 'schedules', 'global_schedule');
-      const unsub = onSnapshot(docRef, (docSnap) => {
+      const fetchData = async () => {
+        const docRef = doc(db, 'schedules', 'global_schedule');
+        const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
           setPackages(data.packages || [
@@ -56,8 +57,8 @@ export default function QuoteGenerator({ user }: Props) {
           setContracts(data.contracts || []);
           setBranches(data.branches || []);
         }
-      });
-      return () => unsub();
+      };
+      fetchData();
     }
   }, [user]);
 

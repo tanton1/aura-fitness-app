@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, runTransaction, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc, runTransaction, updateDoc, getDocs, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { Student, StudentContract, PaymentRecord, Session, Trainer, Branch, TrainingPackage, StaffMember, DailyCheckin, Schedule, Warning, ScheduleEntry } from '../types';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -55,6 +55,8 @@ interface DatabaseContextType {
   updateScheduleSlots: (weekId: string, updater: (currentSchedule: Schedule) => { [slotId: string]: ScheduleEntry[] }) => Promise<void>;
   updateUserProfile: (uid: string, data: any) => Promise<void>;
   
+  refreshData: () => Promise<void>;
+  
   migrateData: () => Promise<void>;
   isMigrating: boolean;
   isMigrated: boolean;
@@ -83,6 +85,24 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
   const [isMigrated, setIsMigrated] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const refreshData = async () => {
+    if (!isAuthenticated) return;
+    
+    // Fetch static data that doesn't need real-time updates
+    const staticCollections = [
+      { name: 'payments', setter: setPayments },
+      { name: 'branches', setter: setBranches },
+      { name: 'packages', setter: setPackages },
+      { name: 'staff', setter: setStaff },
+      { name: 'dailyCheckins', setter: setDailyCheckins },
+    ];
+
+    for (const { name, setter } of staticCollections) {
+      const snapshot = await getDocs(collection(db, name));
+      setter(snapshot.docs.map(doc => doc.data() as any));
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsAuthenticated(!!user);
@@ -92,40 +112,33 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-
-    const unsubs: (() => void)[] = [];
     
+    // Fetch static data once
+    refreshData();
+
+    // Set up real-time listeners for scheduling-critical data
+    const unsubs: (() => void)[] = [];
+
     unsubs.push(onSnapshot(collection(db, 'students'), (snapshot) => {
       setStudents(snapshot.docs.map(doc => doc.data() as Student));
     }));
+
     unsubs.push(onSnapshot(collection(db, 'contracts'), (snapshot) => {
       setContracts(snapshot.docs.map(doc => doc.data() as StudentContract));
     }));
-    unsubs.push(onSnapshot(collection(db, 'payments'), (snapshot) => {
-      setPayments(snapshot.docs.map(doc => doc.data() as PaymentRecord));
-    }));
+
     unsubs.push(onSnapshot(collection(db, 'sessions'), (snapshot) => {
       setSessions(snapshot.docs.map(doc => doc.data() as Session));
     }));
+
     unsubs.push(onSnapshot(collection(db, 'trainers'), (snapshot) => {
       setTrainers(snapshot.docs.map(doc => doc.data() as Trainer));
     }));
-    unsubs.push(onSnapshot(collection(db, 'branches'), (snapshot) => {
-      setBranches(snapshot.docs.map(doc => doc.data() as Branch));
-    }));
-    unsubs.push(onSnapshot(collection(db, 'packages'), (snapshot) => {
-      setPackages(snapshot.docs.map(doc => doc.data() as TrainingPackage));
-    }));
-    unsubs.push(onSnapshot(collection(db, 'staff'), (snapshot) => {
-      setStaff(snapshot.docs.map(doc => doc.data() as StaffMember));
-    }));
-    unsubs.push(onSnapshot(collection(db, 'dailyCheckins'), (snapshot) => {
-      setDailyCheckins(snapshot.docs.map(doc => doc.data() as DailyCheckin));
-    }));
-    
+
     unsubs.push(onSnapshot(collection(db, 'schedules'), (snapshot) => {
       const newSchedules: { [weekId: string]: { schedule: Schedule, warnings: Warning[] } } = {};
       snapshot.docs.forEach(doc => {
+        if (doc.id === 'global_schedule') return; // Handled separately
         const data = doc.data();
         newSchedules[doc.id] = {
           schedule: data.schedule || {},
@@ -470,6 +483,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       schedules,
       updateScheduleData, updateScheduleSlot, updateScheduleSlots,
       updateUserProfile,
+      refreshData,
       migrateData, isMigrating, isMigrated
     }}>
       {children}

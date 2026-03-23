@@ -34,22 +34,20 @@ export function generateSchedule(
     studentScheduledSlots[s.id] = [];
   }
 
-  // Pre-fill locked entries from existing schedule
+  // Pre-fill all entries from existing schedule
   if (existingSchedule) {
     for (const day of DAYS) {
       for (const hour of HOURS) {
         const slotId = `${day}-${hour}`;
         const existingEntries = existingSchedule[slotId] || [];
         for (const entry of existingEntries) {
-          if (entry.isLocked || entry.type === 'off') {
-            schedule[slotId].push(entry);
-            
-            // Update student tracking
-            if (entry.studentId !== 'OFF' && studentNeeds[entry.studentId] !== undefined) {
-              studentNeeds[entry.studentId]--;
-              studentScheduledDays[entry.studentId].add(day);
-              studentScheduledSlots[entry.studentId].push(slotId);
-            }
+          schedule[slotId].push(entry);
+          
+          // Update student tracking
+          if (entry.studentId !== 'OFF' && studentNeeds[entry.studentId] !== undefined) {
+            studentNeeds[entry.studentId]--;
+            studentScheduledDays[entry.studentId].add(day);
+            studentScheduledSlots[entry.studentId].push(slotId);
           }
         }
       }

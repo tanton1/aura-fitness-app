@@ -4,6 +4,7 @@ import { generateSchedule, calculateWarnings } from '../utils/scheduler';
 import StudentForm from './StudentForm';
 import StudentList from './StudentList';
 import PTSchedule from './PTSchedule';
+import { WorkScheduleMatrix } from './WorkScheduleMatrix';
 import { Calendar, Users, UserPlus, CheckCircle2, Package, User as UserIcon, Phone, Mail, MapPin, CheckCircle, ChevronRight, CreditCard, Clock, XCircle, RotateCcw, Edit2, Search, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from 'firebase/auth';
@@ -24,7 +25,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   } = useDatabase();
   
   const [weekOffset, setWeekOffset] = useState(0);
-  const [activeSubTab, setActiveSubTab] = useState<'schedule' | 'students'>('schedule');
+  const [activeSubTab, setActiveSubTab] = useState<'schedule' | 'students' | 'work_schedule'>('schedule');
   const [studentTab, setStudentTab] = useState<'overview' | 'schedule' | 'profile'>('overview');
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState('all');
@@ -66,6 +67,40 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     const activeStudents = students.filter(s => studentContracts.has(s.id));
     return calculateWarnings(activeStudents, trainers, schedule);
   }, [isLoaded, students, trainers, schedule, studentContracts]);
+
+  // Auto-copy schedule from previous week if current week is completely empty
+  useEffect(() => {
+    if (!isLoaded || !students.length || !trainers.length) return;
+
+    const currentSchedule = schedules[weekId]?.schedule;
+    
+    // Only copy if the schedule is completely empty (never touched)
+    if (!currentSchedule || Object.keys(currentSchedule).length === 0) {
+      const prevDates = getDatesForWeek(weekOffset - 1);
+      const prevWeekId = `schedule_${prevDates['T2'].full}`;
+      const prevSchedule = schedules[prevWeekId]?.schedule;
+
+      if (prevSchedule && Object.keys(prevSchedule).length > 0) {
+        // Copy from previous week
+        const activeStudentIds = new Set(students.filter(s => studentContracts.has(s.id)).map(s => s.id));
+        const activeTrainerIds = new Set(trainers.map(t => t.id));
+        const copiedSchedule: Schedule = {};
+        
+        for (const [slotId, entries] of Object.entries(prevSchedule) as [string, ScheduleEntry[]][]) {
+          copiedSchedule[slotId] = entries
+            .map(e => ({...e}))
+            .filter(e => 
+              (activeStudentIds.has(e.studentId) || e.type === 'off') && 
+              activeTrainerIds.has(e.trainerId)
+            );
+        }
+        
+        const activeStudents = students.filter(s => studentContracts.has(s.id));
+        const warnings = calculateWarnings(activeStudents, trainers, copiedSchedule);
+        updateScheduleData(weekId, copiedSchedule, warnings);
+      }
+    }
+  }, [isLoaded, students, trainers, weekId, weekOffset, schedules, studentContracts, updateScheduleData]);
 
   const filteredStudents = (students || []).filter(s => 
     (selectedBranchId === 'all' || (selectedBranchId === 'none' ? !s.branchId : s.branchId === selectedBranchId)) &&
@@ -297,7 +332,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 mb-6">
           {[
             { id: 'schedule', label: 'Lịch PT', icon: Calendar },
-            { id: 'students', label: 'Học viên', icon: Users }
+            { id: 'students', label: 'Học viên', icon: Users },
+            { id: 'work_schedule', label: 'Lịch làm việc', icon: Clock }
           ].map(tab => (
             <button
               key={tab.id}
@@ -404,6 +440,9 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                 updateScheduleSlot(weekId, slotId, updater);
               }}
             />
+          )}
+          {activeSubTab === 'work_schedule' && (
+            <WorkScheduleMatrix trainers={trainers} schedule={schedule} />
           )}
         </div>
       </div>
@@ -603,6 +642,9 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               updateScheduleSlot(weekId, slotId, updater);
             }}
           />
+        )}
+        {activeSubTab === 'work_schedule' && (
+          <WorkScheduleMatrix trainers={trainers.filter(t => t.id === actualTrainerId)} schedule={schedule} />
         )}
       </div>
     );
