@@ -17,7 +17,7 @@ interface Props {
   sessions: Session[];
   onBack: () => void;
   onSaveContract: (contract: StudentContract) => void;
-  onUpdateContract: (contract: StudentContract) => void;
+  onUpdateContract: (contract: StudentContract, skipPayment?: boolean) => void;
 }
 
 export default function StudentDetail({ student, contracts, packages, trainers, branches, sessions, onBack, onSaveContract, onUpdateContract }: Props) {
@@ -223,7 +223,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
           nextPaymentDate: nextPending ? nextPending.date : undefined
         };
 
-        onUpdateContract(updatedContract);
+        onUpdateContract(updatedContract, true);
         
         // Create a payment record
         addPayment({
@@ -271,7 +271,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
           nextPaymentDate: nextPending ? nextPending.date : undefined
         };
 
-        onUpdateContract(updatedContract);
+        onUpdateContract(updatedContract, true);
         
         // Find and delete the associated payment record
         const paymentToDelete = payments.find(p => p.contractId === contract.id && p.installmentId === installmentId);

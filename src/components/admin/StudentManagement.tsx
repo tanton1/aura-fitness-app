@@ -159,32 +159,34 @@ export default function StudentManagement({ user, profile }: Props) {
     }
   };
 
-  const handleUpdateContract = async (updatedContract: StudentContract) => {
+  const handleUpdateContract = async (updatedContract: StudentContract, skipPayment?: boolean) => {
     try {
       const oldContract = contracts.find(c => c.id === updatedContract.id);
       await updateContract(updatedContract);
       
-      if (oldContract && updatedContract.paidAmount > oldContract.paidAmount) {
-        const diff = updatedContract.paidAmount - oldContract.paidAmount;
-        const payment: PaymentRecord = {
-          id: Date.now().toString() + '-p',
-          contractId: updatedContract.id,
-          studentId: updatedContract.studentId,
-          amount: diff,
-          date: new Date().toISOString(),
-          method: 'transfer',
-          note: 'Thanh toán thêm (cập nhật hợp đồng)'
-        };
-        await addPayment(payment);
-      } else if (oldContract && updatedContract.paidAmount < oldContract.paidAmount) {
-        const diff = oldContract.paidAmount - updatedContract.paidAmount;
-        // Find the most recent payment for this contract with the exact amount
-        const contractPayments = payments.filter(p => p.contractId === updatedContract.id && p.amount === diff);
-        if (contractPayments.length > 0) {
-          // Sort by date descending to get the most recent one
-          contractPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          const paymentToRemove = contractPayments[0];
-          await deletePayment(paymentToRemove.id);
+      if (!skipPayment) {
+        if (oldContract && updatedContract.paidAmount > oldContract.paidAmount) {
+          const diff = updatedContract.paidAmount - oldContract.paidAmount;
+          const payment: PaymentRecord = {
+            id: Date.now().toString() + '-p',
+            contractId: updatedContract.id,
+            studentId: updatedContract.studentId,
+            amount: diff,
+            date: new Date().toISOString(),
+            method: 'transfer',
+            note: 'Thanh toán thêm (cập nhật hợp đồng)'
+          };
+          await addPayment(payment);
+        } else if (oldContract && updatedContract.paidAmount < oldContract.paidAmount) {
+          const diff = oldContract.paidAmount - updatedContract.paidAmount;
+          // Find the most recent payment for this contract with the exact amount
+          const contractPayments = payments.filter(p => p.contractId === updatedContract.id && p.amount === diff);
+          if (contractPayments.length > 0) {
+            // Sort by date descending to get the most recent one
+            contractPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            const paymentToRemove = contractPayments[0];
+            await deletePayment(paymentToRemove.id);
+          }
         }
       }
     } catch (e) {
