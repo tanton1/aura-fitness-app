@@ -199,88 +199,98 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const sanitize = (obj: any) => {
+    const cleanObj = { ...obj };
+    Object.keys(cleanObj).forEach(key => {
+      if (cleanObj[key] === undefined) {
+        delete cleanObj[key];
+      }
+    });
+    return cleanObj;
+  };
+
   const addStudent = async (student: Student) => {
-    await setDoc(doc(db, 'students', student.id), student);
+    await setDoc(doc(db, 'students', student.id), sanitize(student));
   };
   const updateStudent = async (id: string, updates: Partial<Student>) => {
-    await updateDoc(doc(db, 'students', id), updates);
+    await updateDoc(doc(db, 'students', id), sanitize(updates));
   };
   const deleteStudent = async (id: string) => {
     await deleteDoc(doc(db, 'students', id));
   };
 
   const addContract = async (contract: StudentContract) => {
-    await setDoc(doc(db, 'contracts', contract.id), contract);
+    await setDoc(doc(db, 'contracts', contract.id), sanitize(contract));
   };
   const updateContract = async (contract: StudentContract) => {
-    await setDoc(doc(db, 'contracts', contract.id), contract, { merge: true });
+    await setDoc(doc(db, 'contracts', contract.id), sanitize(contract), { merge: true });
   };
   const deleteContract = async (id: string) => {
     await deleteDoc(doc(db, 'contracts', id));
   };
 
   const addPayment = async (payment: PaymentRecord) => {
-    await setDoc(doc(db, 'payments', payment.id), payment);
+    await setDoc(doc(db, 'payments', payment.id), sanitize(payment));
   };
   const deletePayment = async (id: string) => {
     await deleteDoc(doc(db, 'payments', id));
   };
 
   const addSession = async (session: Session) => {
-    await setDoc(doc(db, 'sessions', session.id), session);
+    await setDoc(doc(db, 'sessions', session.id), sanitize(session));
   };
   const updateSession = async (session: Session) => {
-    await setDoc(doc(db, 'sessions', session.id), session, { merge: true });
+    await setDoc(doc(db, 'sessions', session.id), sanitize(session), { merge: true });
   };
   const deleteSession = async (id: string) => {
     await deleteDoc(doc(db, 'sessions', id));
   };
 
   const addTrainer = async (trainer: Trainer) => {
-    await setDoc(doc(db, 'trainers', trainer.id), trainer);
+    await setDoc(doc(db, 'trainers', trainer.id), sanitize(trainer));
   };
   const updateTrainer = async (trainer: Trainer) => {
-    await setDoc(doc(db, 'trainers', trainer.id), trainer, { merge: true });
+    await setDoc(doc(db, 'trainers', trainer.id), sanitize(trainer), { merge: true });
   };
   const deleteTrainer = async (id: string) => {
     await deleteDoc(doc(db, 'trainers', id));
   };
 
   const addBranch = async (branch: Branch) => {
-    await setDoc(doc(db, 'branches', branch.id), branch);
+    await setDoc(doc(db, 'branches', branch.id), sanitize(branch));
   };
   const updateBranch = async (branch: Branch) => {
-    await setDoc(doc(db, 'branches', branch.id), branch, { merge: true });
+    await setDoc(doc(db, 'branches', branch.id), sanitize(branch), { merge: true });
   };
   const deleteBranch = async (id: string) => {
     await deleteDoc(doc(db, 'branches', id));
   };
 
   const addPackage = async (pkg: TrainingPackage) => {
-    await setDoc(doc(db, 'packages', pkg.id), pkg);
+    await setDoc(doc(db, 'packages', pkg.id), sanitize(pkg));
   };
   const updatePackage = async (pkg: TrainingPackage) => {
-    await setDoc(doc(db, 'packages', pkg.id), pkg, { merge: true });
+    await setDoc(doc(db, 'packages', pkg.id), sanitize(pkg), { merge: true });
   };
   const deletePackage = async (id: string) => {
     await deleteDoc(doc(db, 'packages', id));
   };
 
   const addStaff = async (staffMember: StaffMember) => {
-    await setDoc(doc(db, 'staff', staffMember.id), staffMember);
+    await setDoc(doc(db, 'staff', staffMember.id), sanitize(staffMember));
   };
   const updateStaff = async (staffMember: StaffMember) => {
-    await setDoc(doc(db, 'staff', staffMember.id), staffMember, { merge: true });
+    await setDoc(doc(db, 'staff', staffMember.id), sanitize(staffMember), { merge: true });
   };
   const deleteStaff = async (id: string) => {
     await deleteDoc(doc(db, 'staff', id));
   };
 
   const addDailyCheckin = async (checkin: DailyCheckin) => {
-    await setDoc(doc(db, 'dailyCheckins', checkin.id), checkin);
+    await setDoc(doc(db, 'dailyCheckins', checkin.id), sanitize(checkin));
   };
   const updateDailyCheckin = async (checkin: DailyCheckin) => {
-    await setDoc(doc(db, 'dailyCheckins', checkin.id), checkin, { merge: true });
+    await setDoc(doc(db, 'dailyCheckins', checkin.id), sanitize(checkin), { merge: true });
   };
   const deleteDailyCheckin = async (id: string) => {
     await deleteDoc(doc(db, 'dailyCheckins', id));
