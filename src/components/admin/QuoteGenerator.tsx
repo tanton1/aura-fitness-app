@@ -7,12 +7,14 @@ import { FileText, Printer, Plus, Trash2, Download, Package, Edit2, Clock, Hash,
 import { motion, AnimatePresence } from 'motion/react';
 import PackageSettings from './PackageSettings';
 import DateRangeFilter from './DateRangeFilter';
+import { useDatabase } from '../../contexts/DatabaseContext';
 
 interface Props {
   user: User | null;
 }
 
 export default function QuoteGenerator({ user }: Props) {
+  const { addStudent, addContract } = useDatabase();
   const [activeSubTab, setActiveSubTab] = useState<'quotes' | 'packages'>('quotes');
   const [packages, setPackages] = useState<TrainingPackage[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -132,6 +134,21 @@ export default function QuoteGenerator({ user }: Props) {
       return;
     }
 
+    const sanitizePhone = (phone: string) => {
+      let p = phone.replace(/\D/g, '');
+      if (p.startsWith('84')) {
+        p = '0' + p.slice(2);
+      }
+      return p;
+    };
+    const sanitizedQuotePhone = quote.customerPhone ? sanitizePhone(quote.customerPhone) : '';
+    const isDuplicatePhone = students.some(s => s.phone && quote.customerPhone && sanitizePhone(s.phone) === sanitizedQuotePhone);
+
+    if (isDuplicatePhone) {
+      alert("Số điện thoại này đã tồn tại trong hệ thống. Không thể tạo học viên mới.");
+      return;
+    }
+
     // 1. Update quote status
     const newQuotes = quotes.map(q => q.id === quote.id ? { ...q, status: 'accepted' as const } : q);
     
@@ -140,6 +157,7 @@ export default function QuoteGenerator({ user }: Props) {
       id: Date.now().toString(),
       name: quote.customerName,
       phone: quote.customerPhone,
+      email: quote.customerPhone ? `${quote.customerPhone}@aurafitness.com` : '',
       sessionsPerWeek: 3,
       availableSlots: [],
       status: 'active',
@@ -183,9 +201,11 @@ export default function QuoteGenerator({ user }: Props) {
       try {
         await setDoc(doc(db, 'schedules', 'global_schedule'), { 
           quotes: JSON.parse(JSON.stringify(newQuotes)),
-          students: JSON.parse(JSON.stringify(newStudents)),
-          contracts: JSON.parse(JSON.stringify(newContracts))
         }, { merge: true });
+        
+        await addStudent(newStudent);
+        await addContract(newContract);
+        
         alert('Đã chốt sale thành công! Học viên và hợp đồng đã được tạo.');
       } catch (e) {
         console.error("Error accepting quote:", e);

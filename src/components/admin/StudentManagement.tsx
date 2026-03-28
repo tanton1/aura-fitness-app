@@ -98,7 +98,9 @@ export default function StudentManagement({ user, profile }: Props) {
             const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
             const sessionsLeft = latestContract.totalSessions - latestContract.usedSessions;
             
-            if (daysLeft <= 7 || sessionsLeft <= 2) {
+            if (daysLeft < 0 || sessionsLeft <= 0) {
+              status = 'expired';
+            } else if (daysLeft <= 7 || sessionsLeft <= 2) {
               status = 'expiring_week';
             } else {
               const isSameMonth = !isNaN(endDate.getTime()) && endDate.getMonth() === now.getMonth() && endDate.getFullYear() === now.getFullYear();
@@ -195,6 +197,9 @@ export default function StudentManagement({ user, profile }: Props) {
     }
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+
+  // ... (inside handleSave)
   const handleSave = async () => {
     if (profile?.role !== 'admin') {
       setAlertMessage("Bạn không có quyền thực hiện thao tác này.");
@@ -202,8 +207,15 @@ export default function StudentManagement({ user, profile }: Props) {
     }
     if (!formData.name) return;
     setError(null);
+    setIsSaving(true);
 
-    const sanitizePhone = (phone: string) => phone.replace(/\D/g, '');
+    const sanitizePhone = (phone: string) => {
+      let p = phone.replace(/\D/g, '');
+      if (p.startsWith('84')) {
+        p = '0' + p.slice(2);
+      }
+      return p;
+    };
     const sanitizedFormDataPhone = formData.phone ? sanitizePhone(formData.phone) : '';
 
     const isDuplicatePhone = students.some(s => 
@@ -215,10 +227,12 @@ export default function StudentManagement({ user, profile }: Props) {
 
     if (isDuplicatePhone) {
       setError("Số điện thoại này đã tồn tại trong hệ thống.");
+      setIsSaving(false);
       return;
     }
     if (isDuplicateEmail) {
       setError("Email này đã tồn tại trong hệ thống.");
+      setIsSaving(false);
       return;
     }
 
@@ -273,6 +287,7 @@ export default function StudentManagement({ user, profile }: Props) {
       }
     } else {
       let studentId = Date.now().toString();
+      let authCreated = false;
       if (formData.phone) {
         try {
           const email = formData.email || `${formData.phone}@aurafitness.com`;
@@ -285,10 +300,16 @@ export default function StudentManagement({ user, profile }: Props) {
             const secondaryAuth = getAuth(secondaryApp);
             const userCred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
             studentId = userCred.user.uid;
+            authCreated = true;
             await secondaryAuth.signOut();
           }
         } catch (e: any) {
           console.error("Error creating auth user:", e);
+          if (e.code === 'auth/email-already-in-use') {
+            setError("Email hoặc số điện thoại này đã được sử dụng cho một tài khoản khác.");
+            setIsSaving(false);
+            return;
+          }
         }
       }
 
@@ -312,6 +333,7 @@ export default function StudentManagement({ user, profile }: Props) {
     setEditingStudent(null);
     setFormData({ name: '', phone: '', email: '', dob: '', sessionsPerWeek: 3, availableSlots: [], status: 'active', branchId: '' });
     setError(null);
+    setIsSaving(false);
   };
 
   const handleDelete = (id: string) => {
@@ -460,15 +482,17 @@ export default function StudentManagement({ user, profile }: Props) {
                 return pending.some(i => new Date(i.date) <= new Date());
               });
 
-              const { isExpiringThisMonth, isExpiringThisWeek } = (() => {
+              const { isExpiringThisMonth, isExpiringThisWeek, isExpired } = (() => {
                 const studentContracts = contracts.filter(c => c.studentId === student.id);
-                if (studentContracts.length === 0) return { isExpiringThisMonth: false, isExpiringThisWeek: false };
+                if (studentContracts.length === 0) return { isExpiringThisMonth: false, isExpiringThisWeek: false, isExpired: false };
                 
                 studentContracts.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
                 const latestContract = studentContracts[0];
                 
-                if (latestContract.status === 'expired' || latestContract.status !== 'active') {
-                  return { isExpiringThisMonth: false, isExpiringThisWeek: false };
+                if (latestContract.status === 'expired') {
+                  return { isExpiringThisMonth: false, isExpiringThisWeek: false, isExpired: true };
+                } else if (latestContract.status !== 'active') {
+                  return { isExpiringThisMonth: false, isExpiringThisWeek: false, isExpired: false };
                 }
                 
                 const endDate = new Date(latestContract.endDate);
@@ -478,14 +502,18 @@ export default function StudentManagement({ user, profile }: Props) {
                 const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
                 const sessionsLeft = latestContract.totalSessions - latestContract.usedSessions;
                 
+                if (daysLeft < 0 || sessionsLeft <= 0) {
+                  return { isExpiringThisMonth: false, isExpiringThisWeek: false, isExpired: true };
+                }
+                
                 const isWeek = daysLeft <= 7 || sessionsLeft <= 2;
                 const isMonth = (!isNaN(endDate.getTime()) && endDate.getMonth() === now.getMonth() && endDate.getFullYear() === now.getFullYear()) || sessionsLeft <= 5;
                 
-                return { isExpiringThisMonth: isMonth, isExpiringThisWeek: isWeek };
+                return { isExpiringThisMonth: isMonth, isExpiringThisWeek: isWeek, isExpired: false };
               })();
 
               return (
-              <div key={student.id} className={`bg-zinc-900 border rounded-2xl p-4 shadow-sm transition-colors ${hasOverdueDebt ? 'border-red-500/30' : (isExpiringThisMonth || isExpiringThisWeek) ? 'border-amber-500/30' : 'border-zinc-800'}`}>
+              <div key={student.id} className={`bg-zinc-900 border rounded-2xl p-4 shadow-sm transition-colors ${hasOverdueDebt ? 'border-red-500/30' : isExpired ? 'border-red-500/30' : (isExpiringThisMonth || isExpiringThisWeek) ? 'border-amber-500/30' : 'border-zinc-800'}`}>
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="text-lg font-medium text-white flex items-center gap-2 flex-wrap">
@@ -501,7 +529,12 @@ export default function StudentManagement({ user, profile }: Props) {
                           Nợ quá hạn
                         </span>
                       )}
-                      {isExpiringThisWeek ? (
+                      {isExpired ? (
+                        <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full border border-red-500/20">
+                          <AlertCircle className="w-3 h-3" />
+                          Đã hết hạn
+                        </span>
+                      ) : isExpiringThisWeek ? (
                         <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-orange-500/10 text-orange-500 px-2 py-0.5 rounded-full border border-orange-500/20">
                           <AlertCircle className="w-3 h-3" />
                           Sắp hết hạn (Tuần)
@@ -710,10 +743,10 @@ export default function StudentManagement({ user, profile }: Props) {
                   </button>
                   <button 
                     onClick={handleSave}
-                    disabled={!formData.name}
+                    disabled={!formData.name || isSaving}
                     className="flex-1 py-3 rounded-xl font-medium text-white bg-pink-500 hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_15px_rgba(255,0,127,0.4)]"
                   >
-                    Lưu thông tin
+                    {isSaving ? 'Đang lưu...' : 'Lưu thông tin'}
                   </button>
                 </div>
               </div>
