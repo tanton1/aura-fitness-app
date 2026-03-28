@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Student, StudentContract, TrainingPackage, Installment, Trainer, Branch, Session, DailyCheckin } from '../../types';
-import { ArrowLeft, CheckCircle, Plus, Activity, History, FileText, CreditCard, Calendar as CalendarIcon, AlertCircle, TrendingUp, Package, ClipboardCheck, Droplets, Moon, Smile, Zap } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Plus, Activity, History, FileText, CreditCard, Calendar as CalendarIcon, AlertCircle, TrendingUp, Package, ClipboardCheck, Droplets, Moon, Smile, Zap, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ContractInvoice from './ContractInvoice';
 import EditContractModal from './EditContractModal';
+import RenewContractModal from './RenewContractModal';
 import StudentProgressAdmin from './StudentProgressAdmin';
 import ConfirmationModal from '../ConfirmationModal';
 import { useDatabase } from '../../contexts/DatabaseContext';
@@ -34,6 +35,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   const [installments, setInstallments] = useState<{date: string, amount: number}[]>([]);
   const [viewingContract, setViewingContract] = useState<StudentContract | null>(null);
   const [editingContract, setEditingContract] = useState<StudentContract | null>(null);
+  const [renewingContract, setRenewingContract] = useState<StudentContract | null>(null);
   const [isManagingDebt, setIsManagingDebt] = useState(false);
   const [payingInstallmentId, setPayingInstallmentId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{title: string, message: string, onConfirm: () => void} | null>(null);
@@ -465,6 +467,14 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
           <div className="flex gap-2">
             {activeContract && (
               <button 
+                onClick={() => setRenewingContract(activeContract)}
+                className="text-xs font-medium text-emerald-500 hover:text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded-lg"
+              >
+                <RefreshCw className="w-3 h-3" /> Gia hạn
+              </button>
+            )}
+            {activeContract && (
+              <button 
                 onClick={() => setViewingContract(activeContract)}
                 className="text-xs font-medium text-pink-500 hover:text-pink-400 flex items-center gap-1 bg-pink-500/10 px-2 py-1 rounded-lg"
               >
@@ -668,6 +678,13 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                   <span className="text-xs font-medium px-2 py-1 rounded-md bg-zinc-800 text-zinc-400">
                     {c.status === 'expired' ? 'Đã hết hạn' : 'Đã hủy'}
                   </span>
+                  <button 
+                    onClick={() => setRenewingContract(c)}
+                    className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-400 rounded-lg transition-colors"
+                    title="Gia hạn"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
                   <button 
                     onClick={() => setViewingContract(c)}
                     className="p-1.5 bg-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-colors"
@@ -893,6 +910,15 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
           </motion.div>
         )}
       </AnimatePresence>
+
+      {renewingContract && (
+        <RenewContractModal
+          isOpen={true}
+          onClose={() => setRenewingContract(null)}
+          student={student}
+          latestContract={renewingContract}
+        />
+      )}
 
       {/* Confirmation Modal */}
       {confirmAction && (

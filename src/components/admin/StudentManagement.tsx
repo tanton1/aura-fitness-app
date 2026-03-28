@@ -6,10 +6,11 @@ import { db } from '../../lib/firebase';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import firebaseConfig from '../../../firebase-applet-config.json';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { Search, Plus, Edit2, Trash2, Phone, Mail, Calendar, CheckCircle, XCircle, AlertCircle, User as UserIcon, Package } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Phone, Mail, Calendar, CheckCircle, XCircle, AlertCircle, User as UserIcon, Package, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import StudentDetail from './StudentDetail';
 import DateRangeFilter from './DateRangeFilter';
+import RenewContractModal from './RenewContractModal';
 import { LOGO_URL } from '../../constants';
 import { useDatabase } from '../../contexts/DatabaseContext';
 
@@ -38,6 +39,7 @@ export default function StudentManagement({ user, profile }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [renewingStudent, setRenewingStudent] = useState<{ student: Student, contract: StudentContract } | null>(null);
   const [formData, setFormData] = useState<Partial<Student>>({
     name: '',
     phone: '',
@@ -572,6 +574,21 @@ export default function StudentManagement({ user, profile }: Props) {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    {(isExpired || isExpiringThisMonth || isExpiringThisWeek) && profile?.role === 'admin' && (
+                      <button
+                        onClick={() => {
+                          const studentContracts = contracts.filter(c => c.studentId === student.id);
+                          if (studentContracts.length > 0) {
+                            studentContracts.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+                            setRenewingStudent({ student, contract: studentContracts[0] });
+                          }
+                        }}
+                        className="p-2 rounded-lg transition-colors text-pink-500 hover:text-pink-400 bg-pink-500/10 hover:bg-pink-500/20 flex items-center gap-1"
+                        title="Gia hạn hợp đồng"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         if (profile?.role !== 'admin') {
@@ -754,6 +771,15 @@ export default function StudentManagement({ user, profile }: Props) {
           </div>
         )}
       </AnimatePresence>
+
+      {renewingStudent && (
+        <RenewContractModal
+          isOpen={true}
+          onClose={() => setRenewingStudent(null)}
+          student={renewingStudent.student}
+          latestContract={renewingStudent.contract}
+        />
+      )}
 
       {/* Confirm Delete Modal */}
       <AnimatePresence>
