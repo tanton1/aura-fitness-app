@@ -26,8 +26,16 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
   const scheduleRef = useRef<HTMLDivElement>(null);
   
   const activeStudents = useMemo(() => {
+    const now = new Date();
     return (students || []).filter(s => {
-      const contract = (contracts || []).find(c => c.studentId === s.id && c.status === 'active');
+      const contract = (contracts || []).find(c => {
+        if (c.studentId !== s.id || c.status !== 'active') return false;
+        const endDate = new Date(c.endDate);
+        const timeDiff = endDate.getTime() - now.getTime();
+        const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        const sessionsLeft = c.totalSessions - c.usedSessions;
+        return daysLeft >= 0 && sessionsLeft > 0;
+      });
       return !!contract;
     });
   }, [students, contracts]);

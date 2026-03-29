@@ -56,9 +56,17 @@ export function generateSchedule(
 
   // Map students to their active contracts
   const studentContracts = new Map<string, StudentContract>();
+  const now = new Date();
   contracts.forEach(c => {
     if (c.status === 'active') {
-      studentContracts.set(c.studentId, c);
+      const endDate = new Date(c.endDate);
+      const timeDiff = endDate.getTime() - now.getTime();
+      const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      const sessionsLeft = c.totalSessions - c.usedSessions;
+      
+      if (daysLeft >= 0 && sessionsLeft > 0) {
+        studentContracts.set(c.studentId, c);
+      }
     }
   });
 

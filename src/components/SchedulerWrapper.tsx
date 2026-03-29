@@ -53,9 +53,17 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   
   const studentContracts = useMemo(() => {
     const map = new Map<string, StudentContract>();
+    const now = new Date();
     contracts.forEach(c => {
       if (c.status === 'active') {
-        map.set(c.studentId, c);
+        const endDate = new Date(c.endDate);
+        const timeDiff = endDate.getTime() - now.getTime();
+        const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        const sessionsLeft = c.totalSessions - c.usedSessions;
+        
+        if (daysLeft >= 0 && sessionsLeft > 0) {
+          map.set(c.studentId, c);
+        }
       }
     });
     return map;
@@ -454,10 +462,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     );
     const actualTrainerId = currentTrainer?.id || user?.uid;
 
-    const trainerStudents = (students || []).filter(s => {
-      const hasActiveContract = (contracts || []).some(c => c.studentId === s.id && c.status === 'active');
-      return hasActiveContract;
-    });
+    const trainerStudents = (students || []).filter(s => studentContracts.has(s.id));
     
     const filteredTrainerStudents = trainerStudents.filter(s => 
       (selectedBranchId === 'all' || (selectedBranchId === 'none' ? !s.branchId : s.branchId === selectedBranchId)) &&

@@ -133,7 +133,15 @@ export default function StudentList({ students, schedule, warnings, branches, co
               const message = `Chào ${student.name}, lịch tập tuần này của bạn là: ${studentSchedule.map(formatSlot).join(', ')}.`;
               
               // Check for warnings
-              const activeContract = contracts.find(c => c.studentId === student.id && c.status === 'active');
+              const now = new Date();
+              const activeContract = contracts.find(c => {
+                if (c.studentId !== student.id || c.status !== 'active') return false;
+                const endDate = new Date(c.endDate);
+                const timeDiff = endDate.getTime() - now.getTime();
+                const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                const sessionsLeft = c.totalSessions - c.usedSessions;
+                return daysLeft >= 0 && sessionsLeft > 0;
+              });
               const hasBranchMismatch = activeContract && activeContract.branchId !== student.branchId;
               const hasNoBranch = !student.branchId || student.branchId === 'none';
               const hasLowSlots = (student.availableSlots?.length || 0) < 5;
