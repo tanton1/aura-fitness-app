@@ -1,4 +1,14 @@
 {
+  "firestore": [
+    {
+      "database": "ai-studio-e5f97025-f298-4bc8-a850-b867e95f717b",
+      "rules": "firestore.rules"
+    },
+    {
+      "database": "aura-fitness-db",
+      "rules": "firestore.rules"
+    }
+  ],
   "hosting": {
     "public": "dist",
     "ignore": [

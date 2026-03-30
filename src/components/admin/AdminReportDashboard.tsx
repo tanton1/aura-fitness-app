@@ -6,7 +6,8 @@ import {
   ArrowDownRight,
   Calendar,
   DollarSign,
-  Building2
+  Building2,
+  Database
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -296,23 +297,32 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
             <p className="text-zinc-400 text-sm mt-3">Theo dõi hiệu suất kinh doanh và hoạt động của phòng tập.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
+        <div className="flex flex-col items-end gap-2">
           <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'overview' ? 'bg-zinc-800 text-white' : 'text-zinc-400'
-            }`}
+            onClick={() => onNavigate && onNavigate('migrate')}
+            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg shadow-orange-500/20"
           >
-            Tổng quan
+            <Database className="w-4 h-4" />
+            Chuyển dữ liệu Database
           </button>
-          <button
-            onClick={() => setActiveTab('pt')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'pt' ? 'bg-zinc-800 text-white' : 'text-zinc-400'
-            }`}
-          >
-            Báo cáo PT
-          </button>
+          <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                activeTab === 'overview' ? 'bg-zinc-800 text-white' : 'text-zinc-400'
+              }`}
+            >
+              Tổng quan
+            </button>
+            <button
+              onClick={() => setActiveTab('pt')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                activeTab === 'pt' ? 'bg-zinc-800 text-white' : 'text-zinc-400'
+              }`}
+            >
+              Báo cáo PT
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
           <select 

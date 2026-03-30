@@ -17,6 +17,7 @@ const AuthScreen = lazy(() => import('./components/AuthScreen'));
 const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
 const PersonalDashboard = lazy(() => import('./components/admin/PersonalDashboard'));
 const FoodDatabase = lazy(() => import('./components/FoodDatabase'));
+const MigrationTool = lazy(() => import('./components/admin/MigrationTool'));
 
 const LoadingSpinner = () => (
   <div className="bg-zinc-950 min-h-screen flex items-center justify-center">
@@ -176,6 +177,8 @@ export default function App() {
         return <AdminDashboard user={user} profile={profile} activeTab="hr" onNavigate={setCurrentScreen} />;
       case 'payroll':
         return <AdminDashboard user={user} profile={profile} activeTab="payroll" onNavigate={setCurrentScreen} />;
+      case 'migrate':
+        return <MigrationTool />;
       default:
         return <Dashboard profile={profile} onUpdateProfile={handleUpdateProfile} />;
     }

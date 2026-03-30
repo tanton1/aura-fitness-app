@@ -5,6 +5,7 @@ import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import firebaseConfig from '../../../firebase-applet-config.json';
+// Force reload: 2026-03-29
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { Search, Plus, Edit2, Trash2, Phone, Mail, Calendar, CheckCircle, XCircle, AlertCircle, User as UserIcon, Package, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';

@@ -49,18 +49,6 @@ export default function AdminDashboard({ user, profile, activeTab, onNavigate }:
     <div className="min-h-screen bg-zinc-950 pb-24">
       {/* Tab Content */}
       <div className="p-4 pt-6">
-        <div className="mb-4 flex justify-between items-center">
-          {/* Removed Admin Dashboard title */}
-          {!isMigrated && (
-            <button
-              onClick={migrateData}
-              disabled={isMigrating}
-              className="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg disabled:opacity-50"
-            >
-              {isMigrating ? 'Migrating Data...' : 'Migrate Data'}
-            </button>
-          )}
-        </div>
         {activeTab === 'overview' && <AdminReportDashboard onNavigate={onNavigate} />}
         {activeTab === 'students' && <StudentManagement user={user} profile={profile} />}
         {activeTab === 'finance' && <FinanceManagement user={user} profile={profile} />}
