@@ -402,6 +402,10 @@ export default function TrainerPayroll({ user, profile }: Props) {
                     <p>Lịch cũ: {isValidDate ? dateObj.toLocaleDateString('vi-VN') : 'N/A'} - {s.id.split('-')[1]}h</p>
                   </div>
                   <div className="flex justify-end gap-2 mt-2">
+                    <button onClick={() => markSession(s.id, 'cancelled')} className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-sm rounded-lg transition-colors flex items-center gap-1">
+                      <XCircle className="w-4 h-4" />
+                      Hủy
+                    </button>
                     <button onClick={() => handleEditSession(s)} className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-sm rounded-lg transition-colors flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       Xếp lịch bù
