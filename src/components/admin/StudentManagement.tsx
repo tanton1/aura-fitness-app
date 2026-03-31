@@ -471,7 +471,11 @@ export default function StudentManagement({ user, profile }: Props) {
             <span className="hidden sm:inline ml-2 font-medium">Thêm mới</span>
           </button>
         </div>
-        <DateRangeFilter onFilter={(start, end) => setDateRange({ start, end })} />
+        <DateRangeFilter excludeFuture onFilter={(start, end) => setDateRange({ start, end })} />
+      </div>
+
+      <div className="mb-4 text-zinc-400">
+        Tổng số: <span className="text-white font-medium">{filteredStudents.length}</span> học viên
       </div>
 
           <div className="space-y-3">

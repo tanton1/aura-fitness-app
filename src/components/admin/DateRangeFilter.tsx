@@ -3,9 +3,10 @@ import { Calendar } from 'lucide-react';
 
 interface Props {
   onFilter: (start: Date, end: Date) => void;
+  excludeFuture?: boolean;
 }
 
-export default function DateRangeFilter({ onFilter }: Props) {
+export default function DateRangeFilter({ onFilter, excludeFuture }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [range, setRange] = useState('Tất cả');
   const [customStart, setCustomStart] = useState('');
@@ -64,6 +65,12 @@ export default function DateRangeFilter({ onFilter }: Props) {
     onFilter(s, e);
   };
 
+  const options = ['Tất cả', 'Hôm nay', 'Hôm qua', 'Tuần này', 'Tháng này', 'Tháng trước'];
+  if (!excludeFuture) {
+    options.splice(2, 0, 'Ngày mai');
+    options.splice(5, 0, 'Tuần sau');
+  }
+
   return (
     <div className="relative">
       <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-zinc-400 hover:text-white text-sm shrink-0 whitespace-nowrap">
@@ -72,7 +79,7 @@ export default function DateRangeFilter({ onFilter }: Props) {
       </button>
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 bg-zinc-900 border border-zinc-800 rounded-xl p-2 shadow-xl z-[60] w-64 sm:w-48">
-          {['Tất cả', 'Hôm nay', 'Ngày mai', 'Hôm qua', 'Tuần này', 'Tuần sau', 'Tháng này', 'Tháng trước'].map(r => (
+          {options.map(r => (
             <button key={r} onClick={() => { setRange(r); applyFilter(r); setIsOpen(false); }} className="block w-full text-left px-4 py-2 text-zinc-300 hover:bg-zinc-800 rounded-lg text-sm">
               {r}
             </button>
