@@ -14,13 +14,9 @@ interface Props {
 }
 
 export default function QuoteGenerator({ user }: Props) {
-  const { addStudent, addContract } = useDatabase();
+  const { students, contracts, packages, branches, addStudent, addContract } = useDatabase();
   const [activeSubTab, setActiveSubTab] = useState<'quotes' | 'packages'>('quotes');
-  const [packages, setPackages] = useState<TrainingPackage[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [contracts, setContracts] = useState<StudentContract[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
@@ -50,14 +46,7 @@ export default function QuoteGenerator({ user }: Props) {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setPackages(data.packages || [
-            { id: 'p1', name: 'Gói 12 buổi', totalSessions: 12, price: 4200000, durationMonths: 1 },
-            { id: 'p2', name: 'Gói 36 buổi', totalSessions: 36, price: 10800000, durationMonths: 3 }
-          ]);
           setQuotes(data.quotes || []);
-          setStudents(data.students || []);
-          setContracts(data.contracts || []);
-          setBranches(data.branches || []);
         }
       };
       fetchData();
@@ -183,19 +172,17 @@ export default function QuoteGenerator({ user }: Props) {
       totalPrice: quote.finalPrice,
       paidAmount: 0,
       status: 'active',
-      installments: []
+      installments: quote.finalPrice > 0 ? [{
+        id: Date.now().toString() + '-inst-0',
+        amount: quote.finalPrice,
+        date: startDate.toISOString().split('T')[0],
+        status: 'pending'
+      }] : [],
+      nextPaymentDate: quote.finalPrice > 0 ? startDate.toISOString().split('T')[0] : undefined
     };
 
     // Re-fetch current state to be safe after potential awaits (though none here yet, good practice)
-    const currentStudents = [...students];
-    const currentContracts = [...contracts];
-    
-    const newStudents = [...currentStudents, newStudent];
-    const newContracts = [...currentContracts, newContract];
-
     setQuotes(newQuotes);
-    setStudents(newStudents);
-    setContracts(newContracts);
 
     if (user) {
       try {

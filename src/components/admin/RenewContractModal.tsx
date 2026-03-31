@@ -70,12 +70,19 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
     const discountAmount = Number(discount) || 0;
     const debt = (selectedPackage.price - discountAmount) - (Number(paidAmount) || 0);
     if (debt > 0) {
-      const base = Math.floor(debt / installmentCount);
-      const rem = debt % installmentCount;
-      setInstallments(prev => Array.from({ length: installmentCount }).map((_, i) => ({
-        date: prev[i]?.date || '',
-        amount: i === 0 ? base + rem : base
-      })));
+      setInstallments(prev => {
+        const currentSum = prev.reduce((sum, inst) => sum + inst.amount, 0);
+        if (prev.length === installmentCount && currentSum === debt) {
+          return prev;
+        }
+
+        const base = Math.floor(debt / installmentCount);
+        const rem = debt % installmentCount;
+        return Array.from({ length: installmentCount }).map((_, i) => ({
+          date: prev[i]?.date || '',
+          amount: i === 0 ? base + rem : base
+        }));
+      });
     } else {
       setInstallments([]);
     }
@@ -91,6 +98,22 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
     e.preventDefault();
     if (!selectedPackage || !startDate) return;
 
+    const initialPaid = Number(paidAmount) || 0;
+    const discountAmount = Number(discount) || 0;
+    const debt = (selectedPackage.price - discountAmount) - initialPaid;
+
+    if (debt > 0) {
+      const sum = installments.reduce((a, b) => a + Number(b.amount), 0);
+      if (sum !== debt) {
+        alert('Tổng số tiền các kỳ phải bằng số tiền còn nợ!');
+        return;
+      }
+      if (installments.some(i => !i.date)) {
+        alert('Vui lòng chọn ngày cho tất cả các kỳ!');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       // 1. Calculate End Date
@@ -99,7 +122,8 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
 
       // 2. Create New Contract
       const newContractId = Date.now().toString() + '-renew';
-      const initialPaid = Number(paidAmount) || 0;
+      
+      const pendingInstallments = installments.filter(i => i.amount > 0); // They are all pending from the UI
       
       const newContract: StudentContract = {
         id: newContractId,
@@ -122,13 +146,14 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
             date: new Date().toISOString(),
             status: 'paid' as const
           }] : []),
-          ...installments.map((inst, idx) => ({
+          ...pendingInstallments.map((inst, idx) => ({
             id: Date.now().toString() + `-inst-${idx}`,
             amount: inst.amount,
             date: inst.date,
             status: 'pending' as const
           }))
-        ]
+        ],
+        nextPaymentDate: pendingInstallments.length > 0 ? pendingInstallments[0].date : undefined
       };
 
       // 3. Update Old Contract (Mark as expired if carrying over to prevent double counting)

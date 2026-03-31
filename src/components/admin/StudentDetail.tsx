@@ -70,7 +70,6 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   useEffect(() => {
     const pkg = packages.find(p => p.id === selectedPackageId);
     if (!pkg) {
-      setInstallments([]);
       setEndDate('');
       return;
     }
@@ -80,20 +79,37 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
       const end = new Date(start.getTime() + pkg.durationMonths * 30 * 24 * 60 * 60 * 1000);
       setEndDate(end.toISOString().split('T')[0]);
     }
+  }, [selectedPackageId, packages, startDate]);
+
+  useEffect(() => {
+    const pkg = packages.find(p => p.id === selectedPackageId);
+    if (!pkg) {
+      setInstallments([]);
+      return;
+    }
 
     const discountAmount = Number(discount) || 0;
     const debt = (pkg.price - discountAmount) - (Number(paidAmount) || 0);
+    
     if (debt > 0) {
-      const base = Math.floor(debt / installmentCount);
-      const rem = debt % installmentCount;
-      setInstallments(prev => Array.from({ length: installmentCount }).map((_, i) => ({
-        date: prev[i]?.date || '',
-        amount: i === 0 ? base + rem : base
-      })));
+      setInstallments(prev => {
+        // Only recalculate if the number of installments changed or the total debt changed
+        const currentSum = prev.reduce((sum, inst) => sum + inst.amount, 0);
+        if (prev.length === installmentCount && currentSum === debt) {
+          return prev;
+        }
+
+        const base = Math.floor(debt / installmentCount);
+        const rem = debt % installmentCount;
+        return Array.from({ length: installmentCount }).map((_, i) => ({
+          date: prev[i]?.date || '',
+          amount: i === 0 ? base + rem : base
+        }));
+      });
     } else {
       setInstallments([]);
     }
-  }, [installmentCount, paidAmount, discount, selectedPackageId, packages, startDate]);
+  }, [installmentCount, paidAmount, discount, selectedPackageId, packages]);
 
   const handleInstallmentChange = (index: number, field: 'date' | 'amount', value: string | number) => {
     const newInsts = [...installments];
@@ -142,6 +158,15 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
       }
     }
 
+    if (amountPaid > 0) {
+      finalInstallments.push({
+        id: Date.now().toString() + '-init',
+        amount: amountPaid,
+        date: new Date().toISOString(),
+        status: 'paid'
+      });
+    }
+
     if (debt > 0) {
       const sum = installments.reduce((a, b) => a + b.amount, 0);
       if (sum !== debt) {
@@ -152,12 +177,15 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
         alert('Vui lòng chọn ngày hẹn trả cho tất cả các kỳ!');
         return;
       }
-      finalInstallments = installments.map((inst, idx) => ({
-        id: Date.now().toString() + '-' + idx,
-        amount: inst.amount,
-        date: inst.date,
-        status: 'pending'
-      }));
+      finalInstallments = [
+        ...finalInstallments,
+        ...installments.map((inst, idx) => ({
+          id: Date.now().toString() + '-' + idx,
+          amount: inst.amount,
+          date: inst.date,
+          status: 'pending' as const
+        }))
+      ];
     }
 
     const newContract: StudentContract = {
@@ -180,8 +208,9 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
       referralCommission: referralCommissionAmount || null,
     };
     
-    if (finalInstallments.length > 0) {
-      newContract.nextPaymentDate = finalInstallments[0].date;
+    const pendingInstallments = finalInstallments.filter(i => i.status === 'pending');
+    if (pendingInstallments.length > 0) {
+      newContract.nextPaymentDate = pendingInstallments[0].date;
     }
 
     onSaveContract(newContract);

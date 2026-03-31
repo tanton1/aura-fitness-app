@@ -17,7 +17,8 @@ export default function EditContractModal({ contract, packages, trainers, branch
   const [installments, setInstallments] = useState<Installment[]>(contract.installments || []);
 
   const debt = (formData.totalPrice - (formData.discount || 0)) - formData.paidAmount;
-  const totalInstallments = installments.reduce((sum, inst) => sum + inst.amount, 0);
+  const pendingInstallments = installments.filter(i => i.status === 'pending');
+  const totalInstallments = pendingInstallments.reduce((sum, inst) => sum + inst.amount, 0);
 
   const handleSave = () => {
     if (totalInstallments !== debt && debt > 0) {
@@ -155,9 +156,14 @@ export default function EditContractModal({ contract, packages, trainers, branch
             <div className="space-y-2">
               {installments.map(inst => (
                 <div key={inst.id} className="flex gap-2 items-center">
-                  <input type="date" value={inst.date} onChange={e => handleInstallmentChange(inst.id, 'date', e.target.value)} className="flex-1 p-2 rounded-lg border border-zinc-800 bg-zinc-950 text-white text-sm" />
-                  <input type="number" value={inst.amount} onChange={e => handleInstallmentChange(inst.id, 'amount', Number(e.target.value))} className="flex-1 p-2 rounded-lg border border-zinc-800 bg-zinc-950 text-white text-sm" />
-                  <button onClick={() => removeInstallment(inst.id)} className="text-zinc-500 hover:text-red-500"><X className="w-4 h-4" /></button>
+                  <input type="date" value={inst.date} disabled={inst.status === 'paid'} onChange={e => handleInstallmentChange(inst.id, 'date', e.target.value)} className={`flex-1 p-2 rounded-lg border border-zinc-800 bg-zinc-950 text-white text-sm ${inst.status === 'paid' ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                  <input type="number" value={inst.amount} disabled={inst.status === 'paid'} onChange={e => handleInstallmentChange(inst.id, 'amount', Number(e.target.value))} className={`flex-1 p-2 rounded-lg border border-zinc-800 bg-zinc-950 text-white text-sm ${inst.status === 'paid' ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                  {inst.status === 'pending' && (
+                    <button onClick={() => removeInstallment(inst.id)} className="text-zinc-500 hover:text-red-500"><X className="w-4 h-4" /></button>
+                  )}
+                  {inst.status === 'paid' && (
+                    <span className="text-emerald-500 text-xs font-medium w-4 flex justify-center">✓</span>
+                  )}
                 </div>
               ))}
             </div>
