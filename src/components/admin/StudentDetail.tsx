@@ -8,6 +8,7 @@ import RenewContractModal from './RenewContractModal';
 import StudentProgressAdmin from './StudentProgressAdmin';
 import ConfirmationModal from '../ConfirmationModal';
 import { useDatabase } from '../../contexts/DatabaseContext';
+import { formatDate, isSameDayOrAfter } from '../../utils/dateUtils';
 
 interface Props {
   student: Student;
@@ -412,7 +413,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
               {dailyCheckins.map(checkin => (
                 <div key={checkin.id} className="p-4 bg-zinc-950 rounded-xl border border-zinc-800/50 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-300 font-bold">{new Date(checkin.date).toLocaleDateString('vi-VN')}</span>
+                    <span className="text-zinc-300 font-bold">{formatDate(checkin.date)}</span>
                     <span className={`text-xs font-bold px-2 py-1 rounded-md ${
                       checkin.compliance >= 80 ? 'bg-emerald-500/10 text-emerald-500' :
                       checkin.compliance >= 50 ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'
@@ -464,7 +465,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
               return (
                 <div key={s.id} className="flex justify-between items-center p-3 bg-zinc-950 rounded-xl border border-zinc-800/50">
                   <div>
-                    <p className="text-zinc-300 font-medium">{s.date && !isNaN(new Date(s.date).getTime()) ? new Date(s.date).toLocaleDateString('vi-VN') : 'N/A'}</p>
+                    <p className="text-zinc-300 font-medium">{formatDate(s.date)}</p>
                     <p className="text-xs text-zinc-500">PT: {trainer?.name || 'Không xác định'}</p>
                   </div>
                   <span className={`text-xs font-medium px-2 py-1 rounded-md ${
@@ -576,7 +577,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
             <div className="flex justify-between text-sm text-zinc-400 bg-zinc-950/50 p-3 rounded-xl">
               <div className="flex flex-col">
                 <span className="text-xs text-zinc-500">Hạn sử dụng</span>
-                <span className="font-medium text-zinc-300">{activeContract.endDate && !isNaN(new Date(activeContract.endDate).getTime()) ? new Date(activeContract.endDate).toLocaleDateString('vi-VN') : 'N/A'}</span>
+                <span className="font-medium text-zinc-300">{formatDate(activeContract.endDate)}</span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-xs text-zinc-500">Công nợ</span>
@@ -603,7 +604,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                 
                 <div className="space-y-2">
                   {activeContract.installments.map((inst, idx) => {
-                    const isOverdue = inst.status === 'pending' && new Date(inst.date) < new Date(new Date().setHours(0,0,0,0));
+                    const isOverdue = inst.status === 'pending' && !isSameDayOrAfter(inst.date, new Date());
                     
                     return (
                       <div key={inst.id} className={`flex justify-between items-center text-sm p-3 rounded-xl border ${
@@ -623,7 +624,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                             </p>
                             <p className="text-xs text-zinc-500 flex items-center gap-1">
                               <CalendarIcon className="w-3 h-3" />
-                              {inst.date && !isNaN(new Date(inst.date).getTime()) ? new Date(inst.date).toLocaleDateString('vi-VN') : 'N/A'}
+                              {formatDate(inst.date)}
                             </p>
                           </div>
                         </div>
@@ -701,7 +702,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
               <div key={c.id} className="flex justify-between items-center p-3 bg-zinc-950 rounded-xl border border-zinc-800/50">
                 <div>
                   <p className="text-zinc-300 font-medium">{c.packageName}</p>
-                  <p className="text-xs text-zinc-500">{c.startDate && !isNaN(new Date(c.startDate).getTime()) ? new Date(c.startDate).toLocaleDateString('vi-VN') : 'N/A'} - {c.endDate && !isNaN(new Date(c.endDate).getTime()) ? new Date(c.endDate).toLocaleDateString('vi-VN') : 'N/A'}</p>
+                  <p className="text-xs text-zinc-500">{formatDate(c.startDate)} - {formatDate(c.endDate)}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium px-2 py-1 rounded-md bg-zinc-800 text-zinc-400">

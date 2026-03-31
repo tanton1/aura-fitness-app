@@ -51,10 +51,41 @@ export const getMonthRange = (monthOffset: number = 0) => {
   return { start, end };
 };
 
-export const isSameDayOrAfter = (dateStr: string, referenceDate: Date) => {
+export const robustParseDate = (dateStr: string | undefined | null) => {
+  if (!dateStr) return new Date(NaN);
   const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return new Date(NaN);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+};
+
+export const isSameDayOrAfter = (dateStr: string | undefined | null, referenceDate: Date) => {
+  if (!dateStr) return false;
+  const parts = dateStr.split('T')[0].split('-');
+  let d: Date;
+  if (parts.length === 3) {
+    const [year, month, day] = parts.map(Number);
+    d = new Date(year, month - 1, day);
+  } else {
+    d = new Date(dateStr);
+  }
+  
+  if (isNaN(d.getTime())) return false;
+  
   const r = new Date(referenceDate);
   d.setHours(0, 0, 0, 0);
   r.setHours(0, 0, 0, 0);
   return d >= r;
+};
+
+export const formatDate = (dateStr: string | undefined | null): string => {
+  if (!dateStr) return 'N/A';
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts.map(Number);
+    if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+      return new Date(year, month - 1, day).toLocaleDateString('vi-VN');
+    }
+  }
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('vi-VN');
 };

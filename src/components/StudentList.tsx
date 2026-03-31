@@ -119,7 +119,7 @@ export default function StudentList({ students, schedule, warnings, branches, co
         <div className="p-6 border-b border-zinc-800 bg-zinc-900/50">
           <h2 className="text-xl font-black text-white uppercase tracking-wide flex items-center gap-3">
             <span className="w-2 h-6 bg-pink-500 rounded-full shadow-[0_0_10px_rgba(236,72,153,0.8)]"></span>
-            Danh sách Học viên
+            Danh sách Học viên ({(students || []).length})
           </h2>
         </div>
         <div className="divide-y divide-zinc-800/50">

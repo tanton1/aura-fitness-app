@@ -87,7 +87,24 @@ export default function DateRangeFilter({ onFilter, excludeFuture }: Props) {
           <div className="border-t border-zinc-800 pt-2 mt-2">
             <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="w-full bg-zinc-950 text-white p-2 rounded-lg mb-1" />
             <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-full bg-zinc-950 text-white p-2 rounded-lg mb-2" />
-            <button onClick={() => { setRange('Tùy chỉnh'); applyFilter('Tùy chỉnh', new Date(customStart), new Date(customEnd)); setIsOpen(false); }} className="w-full bg-pink-500 text-white py-2 rounded-lg">Áp dụng</button>
+            <button onClick={() => { 
+              setRange('Tùy chỉnh'); 
+              
+              let sDate = new Date();
+              if (customStart) {
+                const [y, m, d] = customStart.split('-').map(Number);
+                sDate = new Date(y, m - 1, d, 0, 0, 0, 0);
+              }
+              
+              let eDate = new Date();
+              if (customEnd) {
+                const [y, m, d] = customEnd.split('-').map(Number);
+                eDate = new Date(y, m - 1, d, 23, 59, 59, 999);
+              }
+              
+              applyFilter('Tùy chỉnh', sDate, eDate); 
+              setIsOpen(false); 
+            }} className="w-full bg-pink-500 text-white py-2 rounded-lg">Áp dụng</button>
           </div>
         </div>
       )}

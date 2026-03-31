@@ -416,7 +416,7 @@ export default function StudentManagement({ user, profile }: Props) {
         <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
         <div>
           <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
-            Học viên
+            Học viên ({filteredStudents.length})
           </h1>
           <p className="text-zinc-400 mt-2">Quản lý danh sách học viên và hợp đồng</p>
         </div>
@@ -471,11 +471,7 @@ export default function StudentManagement({ user, profile }: Props) {
             <span className="hidden sm:inline ml-2 font-medium">Thêm mới</span>
           </button>
         </div>
-        <DateRangeFilter excludeFuture onFilter={(start, end) => setDateRange({ start, end })} />
-      </div>
-
-      <div className="mb-4 text-zinc-400">
-        Tổng số: <span className="text-white font-medium">{filteredStudents.length}</span> học viên
+        <DateRangeFilter onFilter={(start, end) => setDateRange({ start, end })} />
       </div>
 
           <div className="space-y-3">
