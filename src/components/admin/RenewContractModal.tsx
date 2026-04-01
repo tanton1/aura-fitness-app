@@ -153,7 +153,7 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
             status: 'pending' as const
           }))
         ],
-        nextPaymentDate: pendingInstallments.length > 0 ? pendingInstallments[0].date : undefined
+        nextPaymentDate: pendingInstallments.length > 0 ? pendingInstallments[0].date : null
       };
 
       // 3. Update Old Contract (Mark as expired if carrying over to prevent double counting)

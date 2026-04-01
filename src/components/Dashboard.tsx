@@ -270,8 +270,8 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
 
   const overdueContracts = myContracts.flatMap(c => {
     const pending = c.installments?.filter(i => i.status === 'pending') || [];
-    if (pending.length === 0 && c.nextPaymentDate && c.paidAmount < c.totalPrice && new Date(c.nextPaymentDate) <= new Date()) {
-      return [{ ...c, overdueAmount: c.totalPrice - c.paidAmount, dueDate: c.nextPaymentDate }];
+    if (pending.length === 0 && c.nextPaymentDate && c.paidAmount < (c.totalPrice - (c.discount || 0)) && new Date(c.nextPaymentDate) <= new Date()) {
+      return [{ ...c, overdueAmount: (c.totalPrice - (c.discount || 0)) - c.paidAmount, dueDate: c.nextPaymentDate }];
     }
     return pending.filter(i => new Date(i.date) <= new Date()).map(i => ({
       ...c,
@@ -284,11 +284,11 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
     const pending = c.installments?.filter(i => i.status === 'pending') || [];
     const today = new Date();
     
-    if (pending.length === 0 && c.nextPaymentDate && c.paidAmount < c.totalPrice) {
+    if (pending.length === 0 && c.nextPaymentDate && c.paidAmount < (c.totalPrice - (c.discount || 0))) {
       const paymentDate = new Date(c.nextPaymentDate);
       const diffDays = Math.ceil((paymentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       if (diffDays > 0 && diffDays <= 3) {
-        return [{ ...c, upcomingAmount: c.totalPrice - c.paidAmount, dueDate: c.nextPaymentDate }];
+        return [{ ...c, upcomingAmount: (c.totalPrice - (c.discount || 0)) - c.paidAmount, dueDate: c.nextPaymentDate }];
       }
       return [];
     }

@@ -178,7 +178,7 @@ export default function QuoteGenerator({ user }: Props) {
         date: startDate.toISOString().split('T')[0],
         status: 'pending'
       }] : [],
-      nextPaymentDate: quote.finalPrice > 0 ? startDate.toISOString().split('T')[0] : undefined
+      nextPaymentDate: quote.finalPrice > 0 ? startDate.toISOString().split('T')[0] : null
     };
 
     // Re-fetch current state to be safe after potential awaits (though none here yet, good practice)

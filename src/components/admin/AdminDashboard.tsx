@@ -39,7 +39,7 @@ export default function AdminDashboard({ user, profile, activeTab, onNavigate }:
 
   const overdueCount = contracts.filter(c => {
     const pending = c.installments?.filter(i => i.status === 'pending') || [];
-    if (pending.length === 0 && c.nextPaymentDate && c.paidAmount < c.totalPrice && new Date(c.nextPaymentDate) <= new Date()) {
+    if (pending.length === 0 && c.nextPaymentDate && c.paidAmount < (c.totalPrice - (c.discount || 0)) && new Date(c.nextPaymentDate) <= new Date()) {
       return true;
     }
     return pending.some(i => new Date(i.date) <= new Date());

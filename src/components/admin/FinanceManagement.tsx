@@ -45,7 +45,7 @@ export default function FinanceManagement({ user, profile }: Props) {
       setInstallments([]);
       return;
     }
-    const remainingDebt = selectedContract.totalPrice - selectedContract.paidAmount - (Number(payAmount) || 0);
+    const remainingDebt = (selectedContract.totalPrice - (selectedContract.discount || 0)) - selectedContract.paidAmount - (Number(payAmount) || 0);
     if (remainingDebt > 0) {
       const base = Math.floor(remainingDebt / installmentCount);
       const rem = remainingDebt % installmentCount;
@@ -122,12 +122,12 @@ export default function FinanceManagement({ user, profile }: Props) {
 
   const totalRevenue = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
   const totalDebt = filteredContracts.reduce((sum, c) => {
-    const debt = c.totalPrice - c.paidAmount;
+    const debt = (c.totalPrice - (c.discount || 0)) - c.paidAmount;
     return debt > 0 ? sum + debt : sum;
   }, 0);
 
   const contractsWithDebt = useMemo(() => {
-    const withDebt = filteredContracts.filter(c => c.totalPrice > c.paidAmount);
+    const withDebt = filteredContracts.filter(c => (c.totalPrice - (c.discount || 0)) > c.paidAmount);
     
     if (debtFilter === 'all') return withDebt;
 
@@ -165,7 +165,7 @@ export default function FinanceManagement({ user, profile }: Props) {
     });
   }, [filteredContracts, debtFilter]);
 
-  const contractsOverpaid = filteredContracts.filter(c => c.paidAmount > c.totalPrice);
+  const contractsOverpaid = filteredContracts.filter(c => c.paidAmount > (c.totalPrice - (c.discount || 0)));
 
   const confirmCleanup = async () => {
     setShowCleanupConfirm(false);
@@ -240,7 +240,7 @@ export default function FinanceManagement({ user, profile }: Props) {
         ...contract,
         paidAmount: newPaidAmount,
         installments: newInstallments,
-        nextPaymentDate: pendingInstallments.length > 0 ? pendingInstallments[0].date : undefined
+        nextPaymentDate: pendingInstallments.length > 0 ? pendingInstallments[0].date : null
       };
 
       try {
@@ -269,7 +269,7 @@ export default function FinanceManagement({ user, profile }: Props) {
     const amount = Number(payAmount);
     if (amount <= 0) return;
     
-    const remainingDebt = selectedContract.totalPrice - selectedContract.paidAmount - amount;
+    const remainingDebt = (selectedContract.totalPrice - (selectedContract.discount || 0)) - selectedContract.paidAmount - amount;
     
     let finalInstallments: Installment[] = selectedContract.installments ? [...selectedContract.installments] : [];
     
@@ -338,10 +338,13 @@ export default function FinanceManagement({ user, profile }: Props) {
       installments: finalInstallments,
     };
     
-    if (finalInstallments.length > 0) {
-      updatedContract.nextPaymentDate = finalInstallments[0].date;
+    const pendingInstallments = finalInstallments.filter(i => i.status === 'pending');
+    pendingInstallments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    if (pendingInstallments.length > 0) {
+      updatedContract.nextPaymentDate = pendingInstallments[0].date;
     } else {
-      delete updatedContract.nextPaymentDate;
+      updatedContract.nextPaymentDate = null;
     }
 
     if (user) {
@@ -465,7 +468,7 @@ export default function FinanceManagement({ user, profile }: Props) {
         <div className="space-y-3">
           {contractsWithDebt.length > 0 ? (
             contractsWithDebt.map(contract => {
-              const debtAmount = contract.totalPrice - contract.paidAmount;
+              const debtAmount = (contract.totalPrice - (contract.discount || 0)) - contract.paidAmount;
               const pendingInstallments = contract.installments?.filter(i => i.status === 'pending') || [];
               const nextInstallment = pendingInstallments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
               
@@ -533,7 +536,7 @@ export default function FinanceManagement({ user, profile }: Props) {
                   <h4 className="text-white font-medium">{getStudentName(contract.studentId)}</h4>
                   <p className="text-xs text-zinc-500 mt-1">{contract.packageName}</p>
                 </div>
-                <p className="text-sm font-bold text-amber-400">Dư: {(contract.paidAmount - contract.totalPrice).toLocaleString('vi-VN')}đ</p>
+                <p className="text-sm font-bold text-amber-400">Dư: {(contract.paidAmount - (contract.totalPrice - (contract.discount || 0))).toLocaleString('vi-VN')}đ</p>
               </div>
             ))}
           </div>
@@ -622,7 +625,7 @@ export default function FinanceManagement({ user, profile }: Props) {
                 <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-zinc-500">Tổng tiền gói:</span>
-                    <span className="text-zinc-300">{selectedContract.totalPrice.toLocaleString('vi-VN')}đ</span>
+                    <span className="text-zinc-300">{(selectedContract.totalPrice - (selectedContract.discount || 0)).toLocaleString('vi-VN')}đ</span>
                   </div>
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-zinc-500">Đã thanh toán:</span>
@@ -630,7 +633,7 @@ export default function FinanceManagement({ user, profile }: Props) {
                   </div>
                   <div className="flex justify-between font-bold pt-2 border-t border-zinc-800">
                     <span className="text-zinc-400">Còn nợ:</span>
-                    <span className="text-red-400">{(selectedContract.totalPrice - selectedContract.paidAmount).toLocaleString('vi-VN')}đ</span>
+                    <span className="text-red-400">{((selectedContract.totalPrice - (selectedContract.discount || 0)) - selectedContract.paidAmount).toLocaleString('vi-VN')}đ</span>
                   </div>
                 </div>
 
@@ -662,7 +665,7 @@ export default function FinanceManagement({ user, profile }: Props) {
                   />
                 </div>
 
-                {Number(payAmount) < (selectedContract.totalPrice - selectedContract.paidAmount) && 
+                {Number(payAmount) < ((selectedContract.totalPrice - (selectedContract.discount || 0)) - selectedContract.paidAmount) && 
                  (!selectedContract.installments || !selectedContract.installments.some(i => i.status === 'pending' && i.amount === Number(payAmount))) && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
@@ -672,7 +675,7 @@ export default function FinanceManagement({ user, profile }: Props) {
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-zinc-400">Số tiền còn nợ sau khi trả:</span>
                       <span className="text-red-400 font-bold">
-                        {((selectedContract.totalPrice - selectedContract.paidAmount) - Number(payAmount)).toLocaleString('vi-VN')}đ
+                        {(((selectedContract.totalPrice - (selectedContract.discount || 0)) - selectedContract.paidAmount) - Number(payAmount)).toLocaleString('vi-VN')}đ
                       </span>
                     </div>
 

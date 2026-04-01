@@ -162,7 +162,7 @@ export interface StudentContract {
   paidAmount: number;
   discount?: number;
   status: 'active' | 'expired' | 'cancelled' | 'frozen';
-  nextPaymentDate?: string;
+  nextPaymentDate?: string | null;
   installments?: Installment[];
   attendedClasses?: string[]; // Array of "slotId-date" like "T2-6-2026-03-16"
   referralCode?: string; // PT employee code

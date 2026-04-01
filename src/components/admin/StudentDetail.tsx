@@ -252,7 +252,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
           ...contract,
           installments: updatedInstallments,
           paidAmount: newPaidAmount,
-          nextPaymentDate: nextPending ? nextPending.date : undefined
+          nextPaymentDate: nextPending ? nextPending.date : null
         };
 
         onUpdateContract(updatedContract, true);
@@ -300,7 +300,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
           ...contract,
           installments: updatedInstallments,
           paidAmount: newPaidAmount,
-          nextPaymentDate: nextPending ? nextPending.date : undefined
+          nextPaymentDate: nextPending ? nextPending.date : null
         };
 
         onUpdateContract(updatedContract, true);
@@ -581,8 +581,8 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-xs text-zinc-500">Công nợ</span>
-                <span className={`font-medium ${activeContract.totalPrice > activeContract.paidAmount ? 'text-red-400' : 'text-emerald-400'}`}>
-                  {(activeContract.totalPrice - activeContract.paidAmount).toLocaleString('vi-VN')}đ
+                <span className={`font-medium ${(activeContract.totalPrice - (activeContract.discount || 0)) > activeContract.paidAmount ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {((activeContract.totalPrice - (activeContract.discount || 0)) - activeContract.paidAmount).toLocaleString('vi-VN')}đ
                 </span>
               </div>
             </div>

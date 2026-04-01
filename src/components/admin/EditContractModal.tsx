@@ -25,7 +25,14 @@ export default function EditContractModal({ contract, packages, trainers, branch
       alert(`Tổng số tiền trả góp (${totalInstallments.toLocaleString('vi-VN')}đ) phải bằng số tiền còn nợ (${debt.toLocaleString('vi-VN')}đ)!`);
       return;
     }
-    onSave({ ...formData, installments });
+    
+    const nextPending = installments.find(i => i.status === 'pending');
+    
+    onSave({ 
+      ...formData, 
+      installments,
+      nextPaymentDate: nextPending ? nextPending.date : null
+    });
     onClose();
   };
 

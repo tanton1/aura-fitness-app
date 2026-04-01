@@ -186,14 +186,14 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
 
   // Customer Debt Report
   const totalDebt = filteredContracts.reduce((sum, c) => {
-    const debt = c.totalPrice - c.paidAmount;
+    const debt = (c.totalPrice - (c.discount || 0)) - c.paidAmount;
     return debt > 0 ? sum + debt : sum;
   }, 0);
   const debtList = filteredContracts
-    .filter(c => c.totalPrice > c.paidAmount)
+    .filter(c => (c.totalPrice - (c.discount || 0)) > c.paidAmount)
     .map(c => ({
       name: students.find(s => s.id === c.studentId)?.name || 'Học viên ẩn (Đã xóa)',
-      debt: c.totalPrice - c.paidAmount
+      debt: (c.totalPrice - (c.discount || 0)) - c.paidAmount
     }));
 
   // Revenue Data based on timeRange
