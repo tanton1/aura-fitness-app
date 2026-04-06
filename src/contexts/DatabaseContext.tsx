@@ -131,14 +131,17 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       setSessions(snapshot.docs.map(doc => doc.data() as Session));
     }));
 
-    // Fetch trainers and schedules once instead of real-time
-    const fetchStaticSchedulingData = async () => {
+    // Fetch trainers once instead of real-time
+    const fetchTrainers = async () => {
       const trainersSnapshot = await getDocs(collection(db, 'trainers'));
       setTrainers(trainersSnapshot.docs.map(doc => doc.data() as Trainer));
+    };
+    fetchTrainers();
 
-      const schedulesSnapshot = await getDocs(collection(db, 'schedules'));
+    // Set up real-time listener for schedules
+    unsubs.push(onSnapshot(collection(db, 'schedules'), (snapshot) => {
       const newSchedules: { [weekId: string]: { schedule: Schedule, warnings: Warning[] } } = {};
-      schedulesSnapshot.docs.forEach(doc => {
+      snapshot.docs.forEach(doc => {
         if (doc.id === 'global_schedule') return; // Handled separately
         const data = doc.data();
         newSchedules[doc.id] = {
@@ -147,8 +150,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         };
       });
       setSchedules(newSchedules);
-    };
-    fetchStaticSchedulingData();
+    }));
 
     unsubs.push(onSnapshot(doc(db, 'schedules', 'global_schedule'), (doc) => {
       if (doc.exists()) {
