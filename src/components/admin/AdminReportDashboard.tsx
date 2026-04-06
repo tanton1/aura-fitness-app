@@ -298,12 +298,54 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
+          {students.length === 0 && (
+            <button
+              onClick={() => onNavigate && onNavigate('migrate')}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg shadow-orange-500/20"
+            >
+              <Database className="w-4 h-4" />
+              Chuyển dữ liệu Database
+            </button>
+          )}
           <button
-            onClick={() => onNavigate && onNavigate('migrate')}
-            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg shadow-orange-500/20"
+            onClick={() => {
+              let errors = [];
+              const studentsNoBranch = students.filter(s => !s.branchId);
+              if (studentsNoBranch.length > 0) errors.push(`- ${studentsNoBranch.length} học viên thiếu chi nhánh (branchId)`);
+              
+              const contractsNoBranch = contracts.filter(c => !c.branchId);
+              if (contractsNoBranch.length > 0) errors.push(`- ${contractsNoBranch.length} hợp đồng thiếu chi nhánh (branchId)`);
+              
+              const contractsOverused = contracts.filter(c => c.usedSessions > c.totalSessions);
+              if (contractsOverused.length > 0) errors.push(`- ${contractsOverused.length} hợp đồng có số buổi đã tập > tổng số buổi`);
+              
+              const sessionsNoTrainer = sessions.filter(s => !s.trainerId);
+              if (sessionsNoTrainer.length > 0) errors.push(`- ${sessionsNoTrainer.length} buổi tập thiếu PT (trainerId)`);
+              
+              const sessionsNoStudent = sessions.filter(s => !s.studentId);
+              if (sessionsNoStudent.length > 0) errors.push(`- ${sessionsNoStudent.length} buổi tập thiếu học viên (studentId)`);
+              
+              // Financial consistency check
+              const financialErrors = [];
+              contracts.forEach(c => {
+                const totalPaid = payments
+                  .filter(p => p.contractId === c.id)
+                  .reduce((sum, p) => sum + p.amount, 0);
+                
+                if (Math.abs(totalPaid - c.paidAmount) > 1000) {
+                  financialErrors.push(`- Hợp đồng ${c.id} (Học viên: ${students.find(s => s.id === c.studentId)?.name || 'Unknown'}): Tổng thanh toán (${totalPaid}) lệch với paidAmount (${c.paidAmount})`);
+                }
+              });
+              
+              if (errors.length > 0 || financialErrors.length > 0) {
+                alert('Phát hiện các lỗi dữ liệu sau:\n' + errors.join('\n') + '\n\nLỗi tài chính:\n' + financialErrors.join('\n'));
+              } else {
+                alert('Dữ liệu hoàn toàn bình thường, không phát hiện lỗi nghiêm trọng nào.');
+              }
+            }}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg"
           >
-            <Database className="w-4 h-4" />
-            Chuyển dữ liệu Database
+            Kiểm tra lỗi dữ liệu & Tài chính
           </button>
           <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
             <button

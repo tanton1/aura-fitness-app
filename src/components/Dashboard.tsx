@@ -26,9 +26,15 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
   const [showEatOutModal, setShowEatOutModal] = useState(false);
   const [showCravingsModal, setShowCravingsModal] = useState(false);
   const [sessionFilter, setSessionFilter] = useState<'upcoming' | 'history' | 'this_week'>('upcoming');
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const localTodayStr = `${year}-${month}-${day}`;
+
   const [customRange, setCustomRange] = useState<{ start: string, end: string }>({
-    start: new Date().toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
+    start: localTodayStr,
+    end: localTodayStr
   });
   
   // Track local swapped meals (in a real app, this would be saved to profile/db)
@@ -59,13 +65,12 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
   const historySessions = filteredSessions.filter(s => s.status === 'completed' || s.status === 'cancelled' || s.status === 'canceled_by_student');
 
   const currentMacros = profile.target_macros?.[profile.current_mode || 'standard'] || { kcal: 0, protein: 0, carb: 0, fat: 0 };
-  const todayDateStr = new Date().toISOString().split('T')[0];
-  const rawEatenMeals = profile.eaten_meals?.[todayDateStr] || [];
+  const rawEatenMeals = profile.eaten_meals?.[localTodayStr] || [];
 
   // Get today's meals based on current day of week
   const todayMeals = useMemo(() => {
-    const today = new Date();
-    const currentDayOfWeek = today.getDay();
+    const todayDate = new Date();
+    const currentDayOfWeek = todayDate.getDay();
     const todayIndex = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
     const baseMeals = getMealsForDay(todayIndex, profile);
     
@@ -552,7 +557,10 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
               filteredSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(s => (
                 <div key={s.id} className="flex justify-between items-center p-3 bg-zinc-950 rounded-xl border border-zinc-800/50">
                   <div>
-                    <p className="text-zinc-300 font-medium">{new Date(s.date).toLocaleDateString('vi-VN')}</p>
+                    <p className="text-zinc-300 font-medium">
+                      {new Date(s.date).toLocaleDateString('vi-VN')}
+                      {s.hour !== undefined ? ` - ${s.hour}:00` : ''}
+                    </p>
                   </div>
                   <span className={`text-xs font-medium px-2 py-1 rounded-md ${
                     s.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' :

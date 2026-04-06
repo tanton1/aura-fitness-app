@@ -226,6 +226,7 @@ export interface Session {
   trainerId: string;
   studentId: string;
   date: string; // ISO date
+  hour?: number; // Add hour field
   status: 'scheduled' | 'completed' | 'cancelled' | 'canceled_by_student';
   branchId?: string;
   verifiedByStudent?: boolean; // Add this

@@ -13,9 +13,14 @@ export const getDatesForWeek = (weekOffset: number = 0) => {
   dayNames.forEach((day, index) => {
     const date = new Date(mondayDate);
     date.setDate(mondayDate.getDate() + index);
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    
     dates[day] = {
       display: date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-      full: date.toISOString().split('T')[0]
+      full: `${year}-${month}-${d}`
     };
   });
   

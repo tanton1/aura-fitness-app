@@ -55,8 +55,6 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
     }
   }, [isOpen, latestContract, remainingSessions]);
 
-  if (!isOpen) return null;
-
   const selectedPackage = packages.find(p => p.id === selectedPackageId);
   const finalPrice = selectedPackage ? Math.max(0, selectedPackage.price - (Number(discount) || 0)) : 0;
   const newTotalSessions = selectedPackage ? selectedPackage.totalSessions + (carryOver ? remainingSessions : 0) : 0;
@@ -87,6 +85,8 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
       setInstallments([]);
     }
   }, [installmentCount, paidAmount, discount, selectedPackageId, packages, selectedPackage]);
+
+  if (!isOpen) return null;
 
   const handleInstallmentChange = (index: number, field: 'date' | 'amount', value: string | number) => {
     const newInsts = [...installments];

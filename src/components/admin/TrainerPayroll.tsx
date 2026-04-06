@@ -486,7 +486,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
                             ) : (
                               <button onClick={() => markSession(s.id, 'scheduled')} className="p-2 text-zinc-400 hover:text-white bg-zinc-800 rounded-lg transition-colors" title="Hoàn tác"><RotateCcw className="w-4 h-4" /></button>
                             )}
-                            <button onClick={() => deleteSession(s.id)} className="p-2 text-zinc-600 hover:text-red-400 transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-4 h-4" /></button>
+                            <button onClick={() => handleDeleteSession(s.id)} className="p-2 text-zinc-600 hover:text-red-400 transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </div>
                       );

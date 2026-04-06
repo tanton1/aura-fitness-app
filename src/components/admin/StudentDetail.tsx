@@ -465,7 +465,10 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
               return (
                 <div key={s.id} className="flex justify-between items-center p-3 bg-zinc-950 rounded-xl border border-zinc-800/50">
                   <div>
-                    <p className="text-zinc-300 font-medium">{formatDate(s.date)}</p>
+                    <p className="text-zinc-300 font-medium">
+                      {formatDate(s.date)}
+                      {s.hour !== undefined ? ` - ${s.hour}:00` : ''}
+                    </p>
                     <p className="text-xs text-zinc-500">PT: {trainer?.name || 'Không xác định'}</p>
                   </div>
                   <span className={`text-xs font-medium px-2 py-1 rounded-md ${

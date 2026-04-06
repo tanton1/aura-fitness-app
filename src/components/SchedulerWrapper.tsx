@@ -170,6 +170,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           trainerId: entry.trainerId,
           studentId: entry.studentId,
           date: dateStr,
+          hour: parseInt(hour),
           status: 'scheduled',
           branchId: contract?.branchId || trainers.find(t => t.id === entry.trainerId)?.branchId || null,
           verifiedByStudent: false,

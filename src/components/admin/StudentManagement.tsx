@@ -31,7 +31,7 @@ export default function StudentManagement({ user, profile }: Props) {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
-  const [contractFilter, setContractFilter] = useState<'active' | 'expiring_week' | 'expiring_month' | 'expired' | 'all'>('all');
+  const [contractFilter, setContractFilter] = useState<'active' | 'expiring_week' | 'expiring_month' | 'expired' | 'paused' | 'all'>('all');
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -40,6 +40,7 @@ export default function StudentManagement({ user, profile }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [renewingStudent, setRenewingStudent] = useState<{ student: Student, contract: StudentContract } | null>(null);
   const [formData, setFormData] = useState<Partial<Student>>({
     name: '',
@@ -54,7 +55,7 @@ export default function StudentManagement({ user, profile }: Props) {
 
   const filteredStudents = useMemo(() => {
     let filtered = students.filter(s => 
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (s.name && s.name.toLowerCase().includes(searchTerm.toLowerCase())) || 
       (s.phone && s.phone.includes(searchTerm))
     );
 
@@ -91,6 +92,8 @@ export default function StudentManagement({ user, profile }: Props) {
           
           if (latestContract.status === 'expired') {
             status = 'expired';
+          } else if (latestContract.status === 'paused') {
+            status = 'paused';
           } else if (latestContract.status !== 'active') {
             status = 'inactive';
           } else {
@@ -121,6 +124,10 @@ export default function StudentManagement({ user, profile }: Props) {
         }
         if (contractFilter === 'expiring_month') {
           return status === 'expiring_month' || status === 'expiring_week';
+        }
+        if (contractFilter === 'paused') {
+          const latestContract = studentContracts.length > 0 ? studentContracts[0] : null;
+          return latestContract?.status === 'frozen';
         }
         return status === contractFilter;
       });
@@ -243,7 +250,7 @@ export default function StudentManagement({ user, profile }: Props) {
       const newObj = { ...obj };
       Object.keys(newObj).forEach(key => {
         if (newObj[key] === undefined) {
-          newObj[key] = null;
+          delete newObj[key];
         }
       });
       return newObj;
@@ -325,7 +332,13 @@ export default function StudentManagement({ user, profile }: Props) {
         sessionsPerWeek: formData.sessionsPerWeek || 3,
         availableSlots: formData.availableSlots || [],
         status: formData.status || 'active',
-        joinDate: new Date().toISOString().split('T')[0],
+        joinDate: (() => {
+          const d = new Date();
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        })(),
         branchId: formData.branchId || profile?.branchId || '',
       };
       
@@ -410,16 +423,66 @@ export default function StudentManagement({ user, profile }: Props) {
     }
   }
 
+  const handleRestoreStudents = async () => {
+    if (!confirm('Bạn có chắc chắn muốn khôi phục thông tin cho các học viên bị mất dữ liệu (do chốt báo giá) không?')) return;
+    setIsRestoring(true);
+    try {
+      let restoreCount = 0;
+      // Find students with no branchId
+      const studentsToFix = students.filter(s => !s.branchId);
+      
+      for (const badStudent of studentsToFix) {
+        // Find original student with same name and HAS branchId
+        const originalStudent = students.find(s => 
+          s.id !== badStudent.id && 
+          s.name.toLowerCase().trim() === badStudent.name.toLowerCase().trim() && 
+          s.branchId
+        );
+
+        if (originalStudent) {
+          console.log(`Restoring info for ${badStudent.name} (${badStudent.id}) from ${originalStudent.id}`);
+          
+          // Copy info from originalStudent to badStudent
+          await updateStudent(badStudent.id, {
+            branchId: originalStudent.branchId,
+            phone: originalStudent.phone || badStudent.phone,
+            email: originalStudent.email || badStudent.email,
+            dob: originalStudent.dob || badStudent.dob,
+            availableSlots: originalStudent.availableSlots?.length ? originalStudent.availableSlots : badStudent.availableSlots,
+            sessionsPerWeek: originalStudent.sessionsPerWeek || badStudent.sessionsPerWeek
+          });
+          
+          restoreCount++;
+        }
+      }
+      alert(`Đã khôi phục thành công thông tin cho ${restoreCount} học viên!`);
+    } catch (error) {
+      console.error("Error restoring students:", error);
+      alert("Có lỗi xảy ra khi khôi phục học viên.");
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="mb-8 flex items-center gap-3">
-        <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
-        <div>
-          <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
-            Học viên ({filteredStudents.length})
-          </h1>
-          <p className="text-zinc-400 mt-2">Quản lý danh sách học viên và hợp đồng</p>
+      <div className="mb-8 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
+          <div>
+            <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
+              Học viên ({filteredStudents.length})
+            </h1>
+            <p className="text-zinc-400 mt-2">Quản lý danh sách học viên và hợp đồng</p>
+          </div>
         </div>
+        <button
+          onClick={handleRestoreStudents}
+          disabled={isRestoring}
+          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-colors text-sm flex items-center gap-2"
+        >
+          {isRestoring ? 'Đang khôi phục...' : 'Khôi phục dữ liệu'}
+        </button>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -452,6 +515,7 @@ export default function StudentManagement({ user, profile }: Props) {
             <option value="expiring_week">Sắp hết trong tuần</option>
             <option value="expiring_month">Sắp hết trong tháng</option>
             <option value="expired">Đã hết hạn</option>
+            <option value="paused">Khách bảo lưu</option>
             <option value="all">Tất cả</option>
           </select>
           <button

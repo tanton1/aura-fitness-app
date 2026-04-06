@@ -115,7 +115,7 @@ export default function QuoteGenerator({ user }: Props) {
   };
 
   const handleAcceptQuote = async (quote: Quote) => {
-    if (!confirm('Chốt báo giá này và tạo hồ sơ học viên?')) return;
+    if (!confirm('Chốt báo giá này và tạo/cập nhật hồ sơ học viên?')) return;
 
     const pkg = packages.find(p => p.id === quote.packageId);
     if (!pkg) {
@@ -131,28 +131,47 @@ export default function QuoteGenerator({ user }: Props) {
       return p;
     };
     const sanitizedQuotePhone = quote.customerPhone ? sanitizePhone(quote.customerPhone) : '';
-    const isDuplicatePhone = students.some(s => s.phone && quote.customerPhone && sanitizePhone(s.phone) === sanitizedQuotePhone);
+    
+    // Find existing student by phone or name
+    let existingStudent = students.find(s => 
+      (s.phone && quote.customerPhone && sanitizePhone(s.phone) === sanitizedQuotePhone) ||
+      (s.name.toLowerCase().trim() === quote.customerName.toLowerCase().trim())
+    );
 
-    if (isDuplicatePhone) {
-      alert("Số điện thoại này đã tồn tại trong hệ thống. Không thể tạo học viên mới.");
-      return;
+    let studentIdToUse = '';
+    let isNewStudent = false;
+    let newStudent: Student | null = null;
+
+    const getLocalDateStr = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    if (existingStudent) {
+      if (!confirm(`Tìm thấy học viên "${existingStudent.name}" đã tồn tại trong hệ thống. Bạn có muốn thêm gói tập này cho học viên hiện tại không? (Chọn Cancel để hủy)`)) {
+        return;
+      }
+      studentIdToUse = existingStudent.id;
+    } else {
+      isNewStudent = true;
+      studentIdToUse = Date.now().toString();
+      newStudent = {
+        id: studentIdToUse,
+        name: quote.customerName,
+        phone: quote.customerPhone,
+        email: quote.customerPhone ? `${quote.customerPhone}@aurafitness.com` : '',
+        sessionsPerWeek: 3,
+        availableSlots: [],
+        status: 'active',
+        joinDate: getLocalDateStr(new Date()),
+        branchId: quote.branchId,
+      };
     }
 
     // 1. Update quote status
     const newQuotes = quotes.map(q => q.id === quote.id ? { ...q, status: 'accepted' as const } : q);
-    
-    // 2. Create Student
-    const newStudent: Student = {
-      id: Date.now().toString(),
-      name: quote.customerName,
-      phone: quote.customerPhone,
-      email: quote.customerPhone ? `${quote.customerPhone}@aurafitness.com` : '',
-      sessionsPerWeek: 3,
-      availableSlots: [],
-      status: 'active',
-      joinDate: new Date().toISOString().split('T')[0],
-      branchId: quote.branchId,
-    };
 
     // 3. Create Contract
     const startDate = new Date();
@@ -161,12 +180,12 @@ export default function QuoteGenerator({ user }: Props) {
 
     const newContract: StudentContract = {
       id: Date.now().toString() + '-c',
-      studentId: newStudent.id,
-      branchId: quote.branchId,
+      studentId: studentIdToUse,
+      branchId: quote.branchId || existingStudent?.branchId || '',
       packageId: pkg.id,
       packageName: pkg.name,
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
+      startDate: getLocalDateStr(startDate),
+      endDate: getLocalDateStr(endDate),
       totalSessions: pkg.totalSessions,
       usedSessions: 0,
       totalPrice: quote.finalPrice,
@@ -175,10 +194,10 @@ export default function QuoteGenerator({ user }: Props) {
       installments: quote.finalPrice > 0 ? [{
         id: Date.now().toString() + '-inst-0',
         amount: quote.finalPrice,
-        date: startDate.toISOString().split('T')[0],
+        date: getLocalDateStr(startDate),
         status: 'pending'
       }] : [],
-      nextPaymentDate: quote.finalPrice > 0 ? startDate.toISOString().split('T')[0] : null
+      nextPaymentDate: quote.finalPrice > 0 ? getLocalDateStr(startDate) : null
     };
 
     // Re-fetch current state to be safe after potential awaits (though none here yet, good practice)
@@ -190,10 +209,12 @@ export default function QuoteGenerator({ user }: Props) {
           quotes: JSON.parse(JSON.stringify(newQuotes)),
         }, { merge: true });
         
-        await addStudent(newStudent);
+        if (isNewStudent && newStudent) {
+          await addStudent(newStudent);
+        }
         await addContract(newContract);
         
-        alert('Đã chốt sale thành công! Học viên và hợp đồng đã được tạo.');
+        alert('Đã chốt sale thành công! Hợp đồng đã được tạo.');
       } catch (e) {
         console.error("Error accepting quote:", e);
         alert("Có lỗi khi chốt báo giá!");
