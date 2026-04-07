@@ -5,6 +5,7 @@ import { CheckCircle, XCircle, DollarSign, Calendar, Trash2, RotateCcw, User as 
 import DateRangeFilter from './DateRangeFilter';
 import { LOGO_URL } from '../../constants';
 import { useDatabase } from '../../contexts/DatabaseContext';
+import { OrphanedSessionChecker } from './OrphanedSessionChecker';
 
 interface Props {
   user: FirebaseUser | null;
@@ -292,6 +293,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <OrphanedSessionChecker />
       <div className="mb-8 flex items-center gap-3">
         <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
         <div>

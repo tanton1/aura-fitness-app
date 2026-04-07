@@ -311,27 +311,32 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       // SYNC SESSIONS if already deployed
       const isDeployed = sessions.some(s => s.scheduleEntryId?.startsWith(weekId));
       if (isDeployed) {
-        // Find all sessions for this week and remove them to recreate from new schedule
-        const sessionsToDelete = sessions.filter(s => s.scheduleEntryId?.startsWith(weekId));
+        // Find all scheduled sessions for this week and remove them to recreate from new schedule
+        // DO NOT delete completed, cancelled, or noshow sessions
+        const sessionsToDelete = sessions.filter(s => s.scheduleEntryId?.startsWith(weekId) && s.status === 'scheduled');
         sessionsToDelete.forEach(s => {
           transaction.delete(doc(db, 'sessions', s.id));
         });
 
         const mondayStr = weekId.replace('schedule_', '');
-        const mondayDate = new Date(mondayStr);
+        const [year, month, day] = mondayStr.split('-').map(Number);
         const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
         Object.entries(newSchedule).forEach(([slotId, entries]) => {
           const [dayCode, hour] = slotId.split('-');
           const dayIndex = dayNames.indexOf(dayCode);
           if (dayIndex === -1) return;
-          const targetDate = new Date(mondayDate);
-          targetDate.setDate(mondayDate.getDate() + dayIndex);
-          const dateStr = targetDate.toISOString().split('T')[0];
+          const targetDate = new Date(year, month - 1, day + dayIndex);
+          const dateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
 
           entries.forEach(entry => {
             if (entry.type === 'off') return;
             const sessionId = `${slotId}-${entry.studentId}-${dateStr}`;
+            
+            // Skip if session already exists and is not 'scheduled'
+            const existingSession = sessions.find(s => s.id === sessionId);
+            if (existingSession && existingSession.status !== 'scheduled') return;
+
             const contract = contracts.find(c => c.studentId === entry.studentId && c.status === 'active');
             const sessionData: Session = {
               id: sessionId,
@@ -369,13 +374,12 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       if (isDeployed) {
         const [dayCode, hour] = slotId.split('-');
         const mondayStr = weekId.replace('schedule_', '');
-        const mondayDate = new Date(mondayStr);
+        const [year, month, day] = mondayStr.split('-').map(Number);
         const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
         const dayIndex = dayNames.indexOf(dayCode);
         if (dayIndex === -1) return;
-        const targetDate = new Date(mondayDate);
-        targetDate.setDate(mondayDate.getDate() + dayIndex);
-        const dateStr = targetDate.toISOString().split('T')[0];
+        const targetDate = new Date(year, month - 1, day + dayIndex);
+        const dateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
 
         // Remove sessions for students no longer in the slot or if trainer is now OFF
         for (const oldEntry of currentEntries) {
@@ -383,7 +387,11 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
           const isStillInSlot = newEntries.some(e => e.studentId === oldEntry.studentId && e.trainerId === oldEntry.trainerId && e.type !== 'off');
           if (!isStillInSlot) {
             const sessionId = `${slotId}-${oldEntry.studentId}-${dateStr}`;
-            transaction.delete(doc(db, 'sessions', sessionId));
+            const existingSession = sessions.find(s => s.id === sessionId);
+            // Only delete if it's still 'scheduled'. Do not delete historical records.
+            if (!existingSession || existingSession.status === 'scheduled') {
+              transaction.delete(doc(db, 'sessions', sessionId));
+            }
           }
         }
 
@@ -391,6 +399,12 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         for (const newEntry of newEntries) {
           if (newEntry.type === 'off') continue;
           const sessionId = `${slotId}-${newEntry.studentId}-${dateStr}`;
+          
+          const existingSession = sessions.find(s => s.id === sessionId);
+          if (existingSession && existingSession.status !== 'scheduled') {
+            continue; // Do not overwrite status of completed/cancelled sessions
+          }
+
           const contract = contracts.find(c => c.studentId === newEntry.studentId && c.status === 'active');
           
           const sessionData: Session = {
@@ -430,16 +444,15 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         const isDeployed = sessions.some(s => s.scheduleEntryId?.startsWith(weekId));
         if (isDeployed) {
           const mondayStr = weekId.replace('schedule_', '');
-          const mondayDate = new Date(mondayStr);
+          const [year, month, day] = mondayStr.split('-').map(Number);
           const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
           Object.keys(updatedSlots).forEach(slotId => {
             const [dayCode, hour] = slotId.split('-');
             const dayIndex = dayNames.indexOf(dayCode);
             if (dayIndex === -1) return;
-            const targetDate = new Date(mondayDate);
-            targetDate.setDate(mondayDate.getDate() + dayIndex);
-            const dateStr = targetDate.toISOString().split('T')[0];
+            const targetDate = new Date(year, month - 1, day + dayIndex);
+            const dateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
 
             const currentEntries = currentSchedule[slotId] || [];
             const newEntries = updatedSlots[slotId];
@@ -450,7 +463,10 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
               const isStillInSlot = newEntries.some(e => e.studentId === oldEntry.studentId && e.trainerId === oldEntry.trainerId && e.type !== 'off');
               if (!isStillInSlot) {
                 const sessionId = `${slotId}-${oldEntry.studentId}-${dateStr}`;
-                transaction.delete(doc(db, 'sessions', sessionId));
+                const existingSession = sessions.find(s => s.id === sessionId);
+                if (!existingSession || existingSession.status === 'scheduled') {
+                  transaction.delete(doc(db, 'sessions', sessionId));
+                }
               }
             }
 
@@ -458,6 +474,12 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             for (const newEntry of newEntries) {
               if (newEntry.type === 'off') continue;
               const sessionId = `${slotId}-${newEntry.studentId}-${dateStr}`;
+              
+              const existingSession = sessions.find(s => s.id === sessionId);
+              if (existingSession && existingSession.status !== 'scheduled') {
+                continue; // Do not overwrite status of completed/cancelled sessions
+              }
+
               const contract = contracts.find(c => c.studentId === newEntry.studentId && c.status === 'active');
               
               const sessionData: Session = {
