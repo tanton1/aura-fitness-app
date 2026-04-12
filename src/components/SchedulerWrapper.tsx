@@ -364,7 +364,10 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               {editingStudent && (
                 <StudentForm 
                   onSave={(s) => {
-                    updateStudent(s.id, s);
+                    updateStudent(s.id, {
+                      availableSlots: s.availableSlots,
+                      sessionsPerWeek: s.sessionsPerWeek
+                    });
                     setEditingStudent(null);
                   }}
                   initialData={editingStudent}

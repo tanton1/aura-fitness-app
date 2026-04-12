@@ -259,9 +259,23 @@ export default function StudentManagement({ user, profile }: Props) {
     if (editingStudent) {
       console.log("Editing student:", editingStudent.id);
       console.log("Form data:", formData);
-      const updatedStudent = sanitize({ ...editingStudent, ...formData }) as Student;
+      
+      // CHỈ CẬP NHẬT CÁC TRƯỜNG CÓ TRONG FORM, BỎ QUA availableSlots ĐỂ TRÁNH LƯU ĐÈ
+      const updates: Partial<Student> = {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        dob: formData.dob,
+        sessionsPerWeek: formData.sessionsPerWeek,
+        status: formData.status,
+        branchId: formData.branchId,
+      };
+
+      const updatedStudent = sanitize({ ...editingStudent, ...updates }) as Student;
       console.log("Updated student:", updatedStudent);
-      await updateStudent(updatedStudent.id, updatedStudent);
+      
+      // Send only the updates to Firestore to avoid overwriting fields like availableSlots
+      await updateStudent(editingStudent.id, sanitize(updates));
       console.log("Student updated in Firestore");
       
       // Update User Profile in Firestore if it exists
