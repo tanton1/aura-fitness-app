@@ -331,10 +331,11 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
               contracts.forEach(c => {
                 const totalPaid = payments
                   .filter(p => p.contractId === c.id)
-                  .reduce((sum, p) => sum + p.amount, 0);
+                  .reduce((sum, p) => sum + Number(p.amount || 0), 0);
                 
-                if (Math.abs(totalPaid - c.paidAmount) > 1000) {
-                  financialErrors.push(`- Hợp đồng ${c.id} (Học viên: ${students.find(s => s.id === c.studentId)?.name || 'Unknown'}): Tổng thanh toán (${totalPaid}) lệch với paidAmount (${c.paidAmount})`);
+                const paidAmount = Number(c.paidAmount || 0);
+                if (Math.abs(totalPaid - paidAmount) > 1000) {
+                  financialErrors.push(`- Hợp đồng ${c.id} (Học viên: ${students.find(s => s.id === c.studentId)?.name || 'Unknown'}): Tổng thanh toán (${totalPaid}) lệch với paidAmount (${paidAmount})`);
                 }
               });
               
@@ -356,20 +357,21 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
                 let syncCount = 0;
                 for (const c of contracts) {
                   const contractPayments = payments.filter(p => p.contractId === c.id);
-                  const totalPaid = contractPayments.reduce((sum, p) => sum + p.amount, 0);
+                  const totalPaid = contractPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+                  const paidAmount = Number(c.paidAmount || 0);
                   
-                  if (Math.abs(totalPaid - c.paidAmount) > 1000) {
+                  if (Math.abs(totalPaid - paidAmount) > 1000) {
                     // Mismatch found, delete old payments
                     for (const p of contractPayments) {
                       await deletePayment(p.id);
                     }
                     // Create new single payment if paidAmount > 0
-                    if (c.paidAmount > 0) {
+                    if (paidAmount > 0) {
                       await addPayment({
                         id: Date.now().toString() + Math.random().toString(36).substring(7),
                         studentId: c.studentId,
                         contractId: c.id,
-                        amount: c.paidAmount,
+                        amount: paidAmount,
                         date: c.startDate || new Date().toISOString(),
                         method: 'transfer',
                         note: 'Phiếu thu tổng hợp do hệ thống tự động đồng bộ'
