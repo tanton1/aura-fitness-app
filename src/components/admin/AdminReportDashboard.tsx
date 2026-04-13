@@ -7,7 +7,9 @@ import {
   Calendar,
   DollarSign,
   Building2,
-  Database
+  Database,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -308,91 +310,6 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
               Chuyển dữ liệu Database
             </button>
           )}
-          <button
-            onClick={() => {
-              let errors = [];
-              const studentsNoBranch = students.filter(s => !s.branchId);
-              if (studentsNoBranch.length > 0) errors.push(`- ${studentsNoBranch.length} học viên thiếu chi nhánh (branchId)`);
-              
-              const contractsNoBranch = contracts.filter(c => !c.branchId);
-              if (contractsNoBranch.length > 0) errors.push(`- ${contractsNoBranch.length} hợp đồng thiếu chi nhánh (branchId)`);
-              
-              const contractsOverused = contracts.filter(c => c.usedSessions > c.totalSessions);
-              if (contractsOverused.length > 0) errors.push(`- ${contractsOverused.length} hợp đồng có số buổi đã tập > tổng số buổi`);
-              
-              const sessionsNoTrainer = sessions.filter(s => !s.trainerId);
-              if (sessionsNoTrainer.length > 0) errors.push(`- ${sessionsNoTrainer.length} buổi tập thiếu PT (trainerId)`);
-              
-              const sessionsNoStudent = sessions.filter(s => !s.studentId);
-              if (sessionsNoStudent.length > 0) errors.push(`- ${sessionsNoStudent.length} buổi tập thiếu học viên (studentId)`);
-              
-              // Financial consistency check
-              const financialErrors = [];
-              contracts.forEach(c => {
-                const totalPaid = payments
-                  .filter(p => p.contractId === c.id)
-                  .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-                
-                const paidAmount = Number(c.paidAmount || 0);
-                if (Math.abs(totalPaid - paidAmount) > 1000) {
-                  financialErrors.push(`- Hợp đồng ${c.id} (Học viên: ${students.find(s => s.id === c.studentId)?.name || 'Unknown'}): Tổng thanh toán (${totalPaid}) lệch với paidAmount (${paidAmount})`);
-                }
-              });
-              
-              if (errors.length > 0 || financialErrors.length > 0) {
-                alert('Phát hiện các lỗi dữ liệu sau:\n' + errors.join('\n') + '\n\nLỗi tài chính:\n' + financialErrors.join('\n'));
-              } else {
-                alert('Dữ liệu hoàn toàn bình thường, không phát hiện lỗi nghiêm trọng nào.');
-              }
-            }}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg"
-          >
-            Kiểm tra lỗi dữ liệu & Tài chính
-          </button>
-          <button
-            onClick={async () => {
-              if (!confirm('Bạn có chắc chắn muốn đồng bộ lại Sổ quỹ theo Hợp đồng không? Các phiếu thu bị lệch sẽ bị xóa và tạo lại 1 phiếu thu tổng hợp duy nhất.')) return;
-              setIsSyncing(true);
-              try {
-                let syncCount = 0;
-                for (const c of contracts) {
-                  const contractPayments = payments.filter(p => p.contractId === c.id);
-                  const totalPaid = contractPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-                  const paidAmount = Number(c.paidAmount || 0);
-                  
-                  if (Math.abs(totalPaid - paidAmount) > 1000) {
-                    // Mismatch found, delete old payments
-                    for (const p of contractPayments) {
-                      await deletePayment(p.id);
-                    }
-                    // Create new single payment if paidAmount > 0
-                    if (paidAmount > 0) {
-                      await addPayment({
-                        id: Date.now().toString() + Math.random().toString(36).substring(7),
-                        studentId: c.studentId,
-                        contractId: c.id,
-                        amount: paidAmount,
-                        date: c.startDate || new Date().toISOString(),
-                        method: 'transfer',
-                        note: 'Phiếu thu tổng hợp do hệ thống tự động đồng bộ'
-                      });
-                    }
-                    syncCount++;
-                  }
-                }
-                alert(`Đã đồng bộ thành công Sổ quỹ cho ${syncCount} hợp đồng bị lệch!`);
-              } catch (error) {
-                console.error("Error syncing ledger:", error);
-                alert("Có lỗi xảy ra khi đồng bộ Sổ quỹ.");
-              } finally {
-                setIsSyncing(false);
-              }
-            }}
-            disabled={isSyncing}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg disabled:opacity-50"
-          >
-            {isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ Sổ quỹ'}
-          </button>
           <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
             <button
               onClick={() => setActiveTab('overview')}
@@ -636,6 +553,97 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
           </div>
         </div>
       )}
+
+      {/* System Tools */}
+      <div className="mt-8 pt-6 border-t border-zinc-800/50 flex flex-wrap justify-end gap-3">
+        <button
+          onClick={() => {
+            let errors = [];
+            const studentsNoBranch = students.filter(s => !s.branchId);
+            if (studentsNoBranch.length > 0) errors.push(`- ${studentsNoBranch.length} học viên thiếu chi nhánh (branchId)`);
+            
+            const contractsNoBranch = contracts.filter(c => !c.branchId);
+            if (contractsNoBranch.length > 0) errors.push(`- ${contractsNoBranch.length} hợp đồng thiếu chi nhánh (branchId)`);
+            
+            const contractsOverused = contracts.filter(c => c.usedSessions > c.totalSessions);
+            if (contractsOverused.length > 0) errors.push(`- ${contractsOverused.length} hợp đồng có số buổi đã tập > tổng số buổi`);
+            
+            const sessionsNoTrainer = sessions.filter(s => !s.trainerId);
+            if (sessionsNoTrainer.length > 0) errors.push(`- ${sessionsNoTrainer.length} buổi tập thiếu PT (trainerId)`);
+            
+            const sessionsNoStudent = sessions.filter(s => !s.studentId);
+            if (sessionsNoStudent.length > 0) errors.push(`- ${sessionsNoStudent.length} buổi tập thiếu học viên (studentId)`);
+            
+            // Financial consistency check
+            const financialErrors = [];
+            contracts.forEach(c => {
+              const totalPaid = payments
+                .filter(p => p.contractId === c.id)
+                .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+              
+              const paidAmount = Number(c.paidAmount || 0);
+              if (Math.abs(totalPaid - paidAmount) > 1000) {
+                financialErrors.push(`- Hợp đồng ${c.id} (Học viên: ${students.find(s => s.id === c.studentId)?.name || 'Unknown'}): Tổng thanh toán (${totalPaid}) lệch với paidAmount (${paidAmount})`);
+              }
+            });
+            
+            if (errors.length > 0 || financialErrors.length > 0) {
+              alert('Phát hiện các lỗi dữ liệu sau:\n' + errors.join('\n') + '\n\nLỗi tài chính:\n' + financialErrors.join('\n'));
+            } else {
+              alert('Dữ liệu hoàn toàn bình thường, không phát hiện lỗi nghiêm trọng nào.');
+            }
+          }}
+          className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors"
+        >
+          <AlertTriangle className="w-4 h-4" />
+          Kiểm tra lỗi dữ liệu
+        </button>
+        <button
+          onClick={async () => {
+            if (!confirm('Bạn có chắc chắn muốn đồng bộ lại Sổ quỹ theo Hợp đồng không? Các phiếu thu bị lệch sẽ bị xóa và tạo lại 1 phiếu thu tổng hợp duy nhất.')) return;
+            setIsSyncing(true);
+            try {
+              let syncCount = 0;
+              for (const c of contracts) {
+                const contractPayments = payments.filter(p => p.contractId === c.id);
+                const totalPaid = contractPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+                const paidAmount = Number(c.paidAmount || 0);
+                
+                if (Math.abs(totalPaid - paidAmount) > 1000) {
+                  // Mismatch found, delete old payments
+                  for (const p of contractPayments) {
+                    await deletePayment(p.id);
+                  }
+                  // Create new single payment if paidAmount > 0
+                  if (paidAmount > 0) {
+                    await addPayment({
+                      id: Date.now().toString() + Math.random().toString(36).substring(7),
+                      studentId: c.studentId,
+                      contractId: c.id,
+                      amount: paidAmount,
+                      date: c.startDate || new Date().toISOString(),
+                      method: 'transfer',
+                      note: 'Phiếu thu tổng hợp do hệ thống tự động đồng bộ'
+                    });
+                  }
+                  syncCount++;
+                }
+              }
+              alert(`Đã đồng bộ thành công Sổ quỹ cho ${syncCount} hợp đồng bị lệch!`);
+            } catch (error) {
+              console.error("Error syncing ledger:", error);
+              alert("Có lỗi xảy ra khi đồng bộ Sổ quỹ.");
+            } finally {
+              setIsSyncing(false);
+            }
+          }}
+          disabled={isSyncing}
+          className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-emerald-400 border border-zinc-800 rounded-lg text-xs font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          {isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ Sổ quỹ'}
+        </button>
+      </div>
     </div>
   );
 }
