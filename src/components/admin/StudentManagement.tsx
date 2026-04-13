@@ -40,7 +40,6 @@ export default function StudentManagement({ user, profile }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(false);
   const [renewingStudent, setRenewingStudent] = useState<{ student: Student, contract: StudentContract } | null>(null);
   const [formData, setFormData] = useState<Partial<Student>>({
     name: '',
@@ -437,47 +436,6 @@ export default function StudentManagement({ user, profile }: Props) {
     }
   }
 
-  const handleRestoreStudents = async () => {
-    if (!confirm('Bạn có chắc chắn muốn khôi phục thông tin cho các học viên bị mất dữ liệu (do chốt báo giá) không?')) return;
-    setIsRestoring(true);
-    try {
-      let restoreCount = 0;
-      // Find students with no branchId
-      const studentsToFix = students.filter(s => !s.branchId);
-      
-      for (const badStudent of studentsToFix) {
-        // Find original student with same name and HAS branchId
-        const originalStudent = students.find(s => 
-          s.id !== badStudent.id && 
-          s.name.toLowerCase().trim() === badStudent.name.toLowerCase().trim() && 
-          s.branchId
-        );
-
-        if (originalStudent) {
-          console.log(`Restoring info for ${badStudent.name} (${badStudent.id}) from ${originalStudent.id}`);
-          
-          // Copy info from originalStudent to badStudent
-          await updateStudent(badStudent.id, {
-            branchId: originalStudent.branchId,
-            phone: originalStudent.phone || badStudent.phone,
-            email: originalStudent.email || badStudent.email,
-            dob: originalStudent.dob || badStudent.dob,
-            availableSlots: originalStudent.availableSlots?.length ? originalStudent.availableSlots : badStudent.availableSlots,
-            sessionsPerWeek: originalStudent.sessionsPerWeek || badStudent.sessionsPerWeek
-          });
-          
-          restoreCount++;
-        }
-      }
-      alert(`Đã khôi phục thành công thông tin cho ${restoreCount} học viên!`);
-    } catch (error) {
-      console.error("Error restoring students:", error);
-      alert("Có lỗi xảy ra khi khôi phục học viên.");
-    } finally {
-      setIsRestoring(false);
-    }
-  };
-
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
       <div className="mb-8 flex items-center justify-between gap-3">
@@ -490,13 +448,6 @@ export default function StudentManagement({ user, profile }: Props) {
             <p className="text-zinc-400 mt-2">Quản lý danh sách học viên và hợp đồng</p>
           </div>
         </div>
-        <button
-          onClick={handleRestoreStudents}
-          disabled={isRestoring}
-          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-colors text-sm flex items-center gap-2"
-        >
-          {isRestoring ? 'Đang khôi phục...' : 'Khôi phục dữ liệu'}
-        </button>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
