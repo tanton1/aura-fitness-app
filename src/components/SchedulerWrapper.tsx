@@ -76,39 +76,35 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     return calculateWarnings(activeStudents, trainers, schedule);
   }, [isLoaded, students, trainers, schedule, studentContracts]);
 
-  // Auto-copy schedule from previous week if current week is completely empty
-  useEffect(() => {
-    if (!isLoaded || !students.length || !trainers.length) return;
+  const handleCopyPreviousWeek = () => {
+    if (!confirm('Bạn có chắc chắn muốn copy lịch từ tuần trước sang tuần này không? Lịch hiện tại (nếu có) sẽ bị ghi đè.')) return;
 
-    const currentSchedule = schedules[weekId]?.schedule;
-    
-    // Only copy if the schedule is completely empty (never touched)
-    if (!currentSchedule || Object.keys(currentSchedule).length === 0) {
-      const prevDates = getDatesForWeek(weekOffset - 1);
-      const prevWeekId = `schedule_${prevDates['T2'].full}`;
-      const prevSchedule = schedules[prevWeekId]?.schedule;
+    const prevDates = getDatesForWeek(weekOffset - 1);
+    const prevWeekId = `schedule_${prevDates['T2'].full}`;
+    const prevSchedule = schedules[prevWeekId]?.schedule;
 
-      if (prevSchedule && Object.keys(prevSchedule).length > 0) {
-        // Copy from previous week
-        const activeStudentIds = new Set(students.filter(s => studentContracts.has(s.id)).map(s => s.id));
-        const activeTrainerIds = new Set(trainers.map(t => t.id));
-        const copiedSchedule: Schedule = {};
-        
-        for (const [slotId, entries] of Object.entries(prevSchedule) as [string, ScheduleEntry[]][]) {
-          copiedSchedule[slotId] = entries
-            .map(e => ({...e}))
-            .filter(e => 
-              (activeStudentIds.has(e.studentId) || e.type === 'off') && 
-              activeTrainerIds.has(e.trainerId)
-            );
-        }
-        
-        const activeStudents = students.filter(s => studentContracts.has(s.id));
-        const warnings = calculateWarnings(activeStudents, trainers, copiedSchedule);
-        updateScheduleData(weekId, copiedSchedule, warnings);
-      }
+    if (!prevSchedule || Object.keys(prevSchedule).length === 0) {
+      alert('Tuần trước không có dữ liệu lịch để copy.');
+      return;
     }
-  }, [isLoaded, students, trainers, weekId, weekOffset, schedules, studentContracts, updateScheduleData]);
+
+    const activeStudentIds = new Set(students.filter(s => studentContracts.has(s.id)).map(s => s.id));
+    const activeTrainerIds = new Set(trainers.map(t => t.id));
+    const copiedSchedule: Schedule = {};
+    
+    for (const [slotId, entries] of Object.entries(prevSchedule) as [string, ScheduleEntry[]][]) {
+      copiedSchedule[slotId] = entries
+        .map(e => ({...e}))
+        .filter(e => 
+          (activeStudentIds.has(e.studentId) || e.type === 'off') && 
+          activeTrainerIds.has(e.trainerId)
+        );
+    }
+    
+    const activeStudents = students.filter(s => studentContracts.has(s.id));
+    const warnings = calculateWarnings(activeStudents, trainers, copiedSchedule);
+    updateScheduleData(weekId, copiedSchedule, warnings);
+  };
 
   const filteredStudents = (students || []).filter(s => 
     (selectedBranchId === 'all' || (selectedBranchId === 'none' ? !s.branchId : s.branchId === selectedBranchId)) &&
@@ -325,6 +321,11 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           </div>
           
           <div className="flex gap-2">
+            {(!schedule || Object.keys(schedule).length === 0) && weekOffset > 0 && (
+              <button onClick={handleCopyPreviousWeek} className="bg-zinc-800 text-zinc-300 px-4 py-2 text-sm rounded-xl font-bold hover:bg-zinc-700 hover:text-white transition-all flex items-center gap-2 border border-zinc-700">
+                <RotateCcw className="w-4 h-4" /> Copy tuần trước
+              </button>
+            )}
             <button onClick={handleResetSchedule} className="bg-zinc-800 text-zinc-300 px-4 py-2 text-sm rounded-xl font-bold hover:bg-zinc-700 hover:text-white transition-all flex items-center gap-2 border border-zinc-700">
               <RotateCcw className="w-4 h-4" /> Reset Lịch
             </button>
