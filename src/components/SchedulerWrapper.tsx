@@ -68,12 +68,14 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const studentContracts = useMemo(() => {
     const map = new Map<string, StudentContract>();
     const now = new Date();
+    now.setHours(0, 0, 0, 0); // Start of today
     contracts.forEach(c => {
       if (c.status === 'active') {
         const endDate = new Date(c.endDate);
+        endDate.setHours(23, 59, 59, 999);
         const timeDiff = endDate.getTime() - now.getTime();
         const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
-        const sessionsLeft = c.totalSessions - c.usedSessions;
+        const sessionsLeft = c.totalSessions - (c.usedSessions || 0);
         
         if (daysLeft >= 0 && sessionsLeft > 0) {
           map.set(c.studentId, c);
@@ -165,14 +167,30 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   };
 
   const handleGenerate = () => {
-    const unconfirmedStudents = students.filter(s => !s.isScheduleConfirmed);
+    const activeStudentList = students.filter(s => studentContracts.has(s.id));
+    const unconfirmedStudents = activeStudentList.filter(s => !s.isScheduleConfirmed);
     if (unconfirmedStudents.length > 0) {
-      if (!confirm(`Có ${unconfirmedStudents.length} học viên chưa chốt lịch rảnh. Bạn có chắc chắn muốn chạy xếp lịch không?`)) {
+      if (!confirm(`Có ${unconfirmedStudents.length} học viên đang active chưa chốt lịch rảnh. Bạn có chắc chắn muốn chạy xếp lịch không?`)) {
         return;
       }
     }
     const result = generateSchedule(students, trainers, contracts, activeScheduleConfig, schedule, overriddenSessions);
-    updateScheduleData(weekId, result.schedule, result.warnings);
+    
+    // Check if any slots were effectively generated
+    let generatedCount = 0;
+    Object.values(result.schedule).forEach(entries => {
+      generatedCount += entries.filter(e => e.type !== 'off').length;
+    });
+    let previousCount = 0;
+    Object.values(schedule || {}).forEach(entries => {
+      previousCount += entries.filter(e => e.type !== 'off').length;
+    });
+    
+    if (generatedCount === previousCount) {
+      alert("Hệ thống không thể xếp thêm được lịch nào. Vui lòng kiểm tra lại:\n- Học viên đã chọn giờ rảnh chưa?\n- PT có trống lịch vào giờ học viên rảnh không?\n- Học viên đã có đủ số buổi tuần này chưa?\n- PT có bị khoá lịch vào giờ đó không?");
+    } else {
+      updateScheduleData(weekId, result.schedule, result.warnings);
+    }
   };
 
   const handleDeploySchedule = async () => {
