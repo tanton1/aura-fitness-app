@@ -174,16 +174,25 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         return;
       }
     }
-    const result = generateSchedule(students, trainers, contracts, activeScheduleConfig, schedule, overriddenSessions);
+    // Only preserve locked and 'off' entries before generating
+    const preservedSchedule: Schedule = {};
+    for (const day of activeScheduleConfig.workingDays) {
+      for (const hour of activeScheduleConfig.workingHours) {
+        const slotId = `${day}-${hour}`;
+        preservedSchedule[slotId] = (schedule[slotId] || []).filter(e => e.isLocked || e.type === 'off');
+      }
+    }
+
+    const result = generateSchedule(students, trainers, contracts, activeScheduleConfig, preservedSchedule, overriddenSessions);
     
     // Check if any slots were effectively generated
     let generatedCount = 0;
     Object.values(result.schedule).forEach(entries => {
-      generatedCount += entries.filter(e => e.type !== 'off').length;
+      generatedCount += entries.filter(e => e.type !== 'off' && e.studentId !== 'OFF').length;
     });
     let previousCount = 0;
-    Object.values(schedule || {}).forEach(entries => {
-      previousCount += entries.filter(e => e.type !== 'off').length;
+    Object.values(preservedSchedule).forEach(entries => {
+      previousCount += entries.filter(e => e.type !== 'off' && e.studentId !== 'OFF').length;
     });
     
     if (generatedCount === previousCount) {

@@ -210,12 +210,14 @@ function scheduleStudentWithTrainer(
     const [day, hourStr] = slot.split('-');
     const hour = parseInt(hourStr, 10);
     
+    if (!config.workingDays.includes(day as any)) continue;
+
     // Rule: Max 1 session per day per student
     if (scheduledDays.has(day)) continue; 
 
     // Check if this trainer has capacity in this slot
     const trainerEntries = (schedule[slot] || []).filter(e => e.trainerId === trainer.id);
-    const isOff = trainerEntries.some(e => e.type === 'off');
+    const isOff = trainerEntries.some(e => e.type === 'off' || e.studentId === 'OFF');
     if (!isOff && trainerEntries.length < MAX_STUDENTS_PER_PT) {
       if (!slotsByDay[day]) slotsByDay[day] = [];
       slotsByDay[day].push(slot);
@@ -369,7 +371,7 @@ function getSuggestions(
         const t = trainers[i];
         
         const trainerEntries = (schedule[slot] || []).filter(e => e.trainerId === t.id);
-        const isOff = trainerEntries.some(e => e.type === 'off');
+        const isOff = trainerEntries.some(e => e.type === 'off' || e.studentId === 'OFF');
         if (isOff) continue;
 
         capacity += MAX_STUDENTS_PER_PT;
