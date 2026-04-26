@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Student, DAYS, HOURS } from '../types';
+import { Student, ScheduleConfig } from '../types';
 import { Save, X } from 'lucide-react';
 import { getDatesForWeek } from '../utils/dateUtils';
 
@@ -8,9 +8,10 @@ interface Props {
   initialData?: Student | null;
   onCancelEdit?: () => void;
   isAvailabilityOnly?: boolean;
+  scheduleConfig: ScheduleConfig;
 }
 
-export default function StudentForm({ onSave, initialData, onCancelEdit, isAvailabilityOnly }: Props) {
+export default function StudentForm({ onSave, initialData, onCancelEdit, isAvailabilityOnly, scheduleConfig }: Props) {
   const [name, setName] = useState('');
   const [sessions, setSessions] = useState(3);
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
@@ -103,8 +104,8 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
                   type="number"
                   min="1"
                   max="6"
-                  value={sessions}
-                  onChange={(e) => setSessions(parseInt(e.target.value))}
+                  value={sessions || ''}
+                  onChange={(e) => setSessions(parseInt(e.target.value) || 0)}
                   className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none text-white transition-all appearance-none"
                   required={!isAvailabilityOnly}
                 />
@@ -149,7 +150,7 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
               <thead>
                 <tr>
                   <th className="border-b border-r border-zinc-800 p-1 md:p-2 bg-zinc-900 w-10 md:w-20 text-center font-bold text-zinc-400 uppercase sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">Giờ</th>
-                  {DAYS.map(day => (
+                  {scheduleConfig.workingDays.map(day => (
                     <th key={day} className="border-b border-r border-zinc-800 p-1 md:p-2 bg-zinc-900 text-center font-bold text-zinc-300 uppercase tracking-wider">
                       <div className="flex flex-col items-center justify-center">
                         <span>{day}</span>
@@ -160,12 +161,12 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
                 </tr>
               </thead>
               <tbody>
-                {HOURS.map(hour => (
+                {scheduleConfig.workingHours.map(hour => (
                   <tr key={hour} className="group">
                     <td className="border-b border-r border-zinc-800 p-1 md:p-2 text-center font-mono font-bold bg-zinc-900 text-zinc-400 group-hover:text-zinc-200 transition-colors sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">
                       {hour}h
                     </td>
-                    {DAYS.map(day => {
+                    {scheduleConfig.workingDays.map(day => {
                       const slotId = `${day}-${hour}`;
                       const isSelected = selectedSlots.has(slotId);
                       return (

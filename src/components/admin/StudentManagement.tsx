@@ -20,9 +20,11 @@ interface Props {
   profile: UserProfile | null;
 }
 
+import LeaveApprovals from './LeaveApprovals';
+
 export default function StudentManagement({ user, profile }: Props) {
   const { 
-    students, contracts, payments, packages, trainers, branches, sessions,
+    students, contracts, payments, packages, trainers, branches, sessions, leaveRequests,
     addStudent, updateStudent, deleteStudent,
     addContract, updateContract, deleteContract,
     addPayment, deletePayment, deleteSession,
@@ -503,7 +505,13 @@ export default function StudentManagement({ user, profile }: Props) {
         <DateRangeFilter onFilter={(start, end) => setDateRange({ start, end })} />
       </div>
 
-          <div className="space-y-3">
+      <LeaveApprovals 
+        leaveRequests={leaveRequests || []} 
+        students={students} 
+        contracts={contracts} 
+      />
+
+      <div className="space-y-3">
             {filteredStudents.map(student => {
               const hasOverdueDebt = contracts.some(c => {
                 if (c.studentId !== student.id) return false;

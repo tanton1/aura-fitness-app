@@ -1,16 +1,25 @@
-import { Student, Trainer, Schedule, Warning, SchedulerResult, DAYS, HOURS, StudentContract } from '../types';
+import { Student, Trainer, Schedule, Warning, SchedulerResult, StudentContract, ScheduleConfig } from '../types';
 
-function getDayIndex(day: string): number {
-  return DAYS.indexOf(day as any);
+function getDayIndex(day: string, config: ScheduleConfig): number {
+  return config.workingDays.indexOf(day as any);
 }
 
 const MAX_STUDENTS_PER_PT = 2;
+
+export function getStudentSessionsPerWeek(student: Student, config: ScheduleConfig, overriddenSessions?: Record<string, number>): number {
+  if (overriddenSessions && overriddenSessions[student.id] !== undefined) {
+    return overriddenSessions[student.id];
+  }
+  return student.sessionsPerWeek;
+}
 
 export function generateSchedule(
   students: Student[], 
   trainers: Trainer[], 
   contracts: StudentContract[],
-  existingSchedule?: Schedule
+  config: ScheduleConfig,
+  existingSchedule?: Schedule,
+  overriddenSessions?: Record<string, number>
 ): SchedulerResult {
   const schedule: Schedule = {};
   const warnings: Warning[] = [];
@@ -18,8 +27,8 @@ export function generateSchedule(
   if (trainers.length === 0) return { schedule, warnings };
 
   // Initialize schedule
-  for (const day of DAYS) {
-    for (const hour of HOURS) {
+  for (const day of config.workingDays) {
+    for (const hour of config.workingHours) {
       schedule[`${day}-${hour}`] = [];
     }
   }
@@ -29,15 +38,16 @@ export function generateSchedule(
   const studentScheduledSlots: Record<string, string[]> = {};
 
   for (const s of students) {
-    studentNeeds[s.id] = s.sessionsPerWeek;
+    const sessions = getStudentSessionsPerWeek(s, config, overriddenSessions);
+    studentNeeds[s.id] = sessions;
     studentScheduledDays[s.id] = new Set();
     studentScheduledSlots[s.id] = [];
   }
 
   // Pre-fill all entries from existing schedule
   if (existingSchedule) {
-    for (const day of DAYS) {
-      for (const hour of HOURS) {
+    for (const day of config.workingDays) {
+      for (const hour of config.workingHours) {
         const slotId = `${day}-${hour}`;
         const existingEntries = existingSchedule[slotId] || [];
         for (const entry of existingEntries) {
@@ -115,20 +125,23 @@ export function generateSchedule(
             schedule, 
             studentNeeds, 
             studentScheduledDays, 
-            studentScheduledSlots
+            studentScheduledSlots,
+            config
           );
         }
       }
     }
   }
 
-  return { schedule, warnings: calculateWarnings(activeStudents, trainers, schedule) };
+  return { schedule, warnings: calculateWarnings(activeStudents, trainers, schedule, config, overriddenSessions) };
 }
 
 export function calculateWarnings(
   students: Student[],
   trainers: Trainer[],
-  schedule: Schedule
+  schedule: Schedule,
+  config: ScheduleConfig,
+  overriddenSessions?: Record<string, number>
 ): Warning[] {
   const warnings: Warning[] = [];
   const studentScheduledSlots: Record<string, string[]> = {};
@@ -137,8 +150,8 @@ export function calculateWarnings(
     studentScheduledSlots[s.id] = [];
   }
 
-  for (const day of DAYS) {
-    for (const hour of HOURS) {
+  for (const day of config.workingDays) {
+    for (const hour of config.workingHours) {
       const slotId = `${day}-${hour}`;
       const entries = schedule[slotId] || [];
       for (const entry of entries) {
@@ -151,19 +164,20 @@ export function calculateWarnings(
 
   for (const student of students) {
     const scheduled = studentScheduledSlots[student.id].length;
-    if (scheduled < student.sessionsPerWeek) {
-      const suggestions = getSuggestions(student, schedule, trainers, studentScheduledSlots[student.id]);
+    const requested = getStudentSessionsPerWeek(student, config, overriddenSessions);
+    if (scheduled < requested) {
+      const suggestions = getSuggestions(student, schedule, trainers, studentScheduledSlots[student.id], config);
       warnings.push({
         studentId: student.id,
         scheduled,
-        requested: student.sessionsPerWeek,
+        requested,
         suggestions
       });
-    } else if (scheduled > student.sessionsPerWeek) {
+    } else if (scheduled > requested) {
       warnings.push({
         studentId: student.id,
         scheduled,
-        requested: student.sessionsPerWeek,
+        requested,
         suggestions: []
       });
     }
@@ -179,7 +193,8 @@ function scheduleStudentWithTrainer(
   schedule: Schedule,
   studentNeeds: Record<string, number>,
   studentScheduledDays: Record<string, Set<string>>,
-  studentScheduledSlots: Record<string, string[]>
+  studentScheduledSlots: Record<string, string[]>,
+  config: ScheduleConfig
 ) {
   let needed = studentNeeds[student.id];
   if (needed <= 0) return;
@@ -205,7 +220,7 @@ function scheduleStudentWithTrainer(
     }
   }
 
-  const availableDays = Object.keys(slotsByDay).sort((a, b) => getDayIndex(a) - getDayIndex(b));
+  const availableDays = Object.keys(slotsByDay).sort((a, b) => getDayIndex(a, config) - getDayIndex(b, config));
   if (availableDays.length === 0) return;
 
   const findDayCombinations = (days: string[], k: number): string[][] => {
@@ -247,14 +262,14 @@ function scheduleStudentWithTrainer(
     
     for (const dayCombo of dayCombos) {
       // Calculate day gap violations
-      const allDays = [...Array.from(scheduledDays), ...dayCombo].sort((d1, d2) => getDayIndex(d1) - getDayIndex(d2));
+      const allDays = [...Array.from(scheduledDays), ...dayCombo].sort((d1, d2) => getDayIndex(d1, config) - getDayIndex(d2, config));
       
       let consecutiveCount = 1;
       let maxConsecutive = 1;
       let twoConsecutiveCount = 0;
 
       for (let i = 1; i < allDays.length; i++) {
-        const diff = getDayIndex(allDays[i]) - getDayIndex(allDays[i - 1]);
+        const diff = getDayIndex(allDays[i], config) - getDayIndex(allDays[i - 1], config);
         if (diff === 1) {
           consecutiveCount++;
           if (consecutiveCount === 2) twoConsecutiveCount++;
@@ -281,16 +296,16 @@ function scheduleStudentWithTrainer(
         for (const slot of slotCombo) {
           const [day, hourStr] = slot.split('-');
           const hour = parseInt(hourStr, 10);
-          const hourIndex = HOURS.indexOf(hour);
+          const hourIndex = config.workingHours.indexOf(hour);
           
           const count = (schedule[slot] || []).filter(e => e.trainerId === trainer.id).length;
           if (count === 1) comboScore += 200; // Prioritize pairing students (filling a slot to 2/2)
 
           // Contiguous shift logic for the trainer
           let hasClassesToday = false;
-          for (let i = 0; i < HOURS.length; i++) {
+          for (let i = 0; i < config.workingHours.length; i++) {
             if (i === hourIndex) continue;
-            const h = HOURS[i];
+            const h = config.workingHours[i];
             const isTeaching = schedule[`${day}-${h}`]?.some(e => e.trainerId === trainer.id);
             if (isTeaching) {
               hasClassesToday = true;
@@ -333,13 +348,14 @@ function getSuggestions(
   student: Student,
   schedule: Schedule,
   trainers: Trainer[],
-  scheduledSlots: string[]
+  scheduledSlots: string[],
+  config: ScheduleConfig
 ): string[] {
   const suggestions: string[] = [];
   const scoredSlots: { slot: string, score: number }[] = [];
 
-  for (const day of DAYS) {
-    for (const hour of HOURS) {
+  for (const day of config.workingDays) {
+    for (const hour of config.workingHours) {
       const slot = `${day}-${hour}`;
       if (scheduledSlots.includes(slot)) continue;
 

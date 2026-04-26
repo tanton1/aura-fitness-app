@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Student, Trainer, Schedule, DAYS, HOURS, ScheduleEntry, StudentContract } from '../types';
+import { Student, Trainer, Schedule, ScheduleEntry, StudentContract, ScheduleConfig } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar, User, Clock, Info, Download, X, Lock, Unlock, Plus, Trash2, Search } from 'lucide-react';
 import { getDatesForCurrentWeek, getDatesForWeek } from '../utils/dateUtils';
@@ -16,13 +16,14 @@ interface Props {
   weekOffset?: number;
   onUpdateSlot?: (slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => void;
   selectedBranchId: string;
+  scheduleConfig: ScheduleConfig;
 }
 
-export default function PTSchedule({ schedule, students, trainers, contracts, currentTrainerId, weekOffset = 0, onUpdateSlot, selectedBranchId }: Props) {
+export default function PTSchedule({ schedule, students, trainers, contracts, currentTrainerId, weekOffset = 0, onUpdateSlot, selectedBranchId, scheduleConfig }: Props) {
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>(currentTrainerId || trainers[0]?.id || '');
   const [highlightedStudentId, setHighlightedStudentId] = useState<string | null>(null);
   const [hoveredStudentId, setHoveredStudentId] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<string>(DAYS[0]);
+  const [selectedDay, setSelectedDay] = useState<string>(scheduleConfig.workingDays[0]);
   const scheduleRef = useRef<HTMLDivElement>(null);
   
   const activeStudents = useMemo(() => {
@@ -54,11 +55,11 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
 
   const handleExportExcel = () => {
     const data = [
-      ['Giờ', ...DAYS],
-      ...HOURS.map(hour => {
+      ['Giờ', ...scheduleConfig.workingDays],
+      ...scheduleConfig.workingHours.map(hour => {
         return [
           `${hour}:00`,
-          ...DAYS.map(day => {
+          ...scheduleConfig.workingDays.map(day => {
             const slotId = `${day}-${hour}`;
             const slotEntries = schedule[slotId] || [];
             const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
@@ -115,10 +116,10 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
       doc.setFontSize(12);
       doc.text(`Huấn luyện viên: ${trainerName}`, 14, 25);
 
-      const tableData = HOURS.map(hour => {
+      const tableData = scheduleConfig.workingHours.map(hour => {
         return [
           `${hour}:00`,
-          ...DAYS.map(day => {
+          ...scheduleConfig.workingDays.map(day => {
             const slotId = `${day}-${hour}`;
             const slotEntries = schedule[slotId] || [];
             const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);
@@ -128,7 +129,7 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
       });
 
       autoTable(doc, {
-        head: [['Giờ', ...DAYS]],
+        head: [['Giờ', ...scheduleConfig.workingDays]],
         body: tableData,
         startY: 30,
         styles: {
@@ -323,7 +324,7 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
 
       {/* Mobile Day Selector */}
       <div className="md:hidden flex overflow-x-auto gap-2 px-4 mb-4 pb-2">
-        {DAYS.map(day => (
+        {scheduleConfig.workingDays.map(day => (
           <button
             key={day}
             onClick={() => setSelectedDay(day)}
@@ -349,7 +350,7 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
                     <Clock className="w-4 h-4 mx-auto mb-1 opacity-50" />
                     Giờ
                   </th>
-                  {DAYS.map(day => (
+                  {scheduleConfig.workingDays.map(day => (
                     <th key={day} className={`border-b border-r border-zinc-800 p-2 bg-zinc-900 text-center font-bold text-zinc-200 uppercase tracking-wider ${selectedDay !== day ? 'hidden md:table-cell' : ''}`}>
                       <div className="flex flex-col items-center justify-center">
                         <span>{day}</span>
@@ -360,12 +361,12 @@ export default function PTSchedule({ schedule, students, trainers, contracts, cu
                 </tr>
               </thead>
               <tbody>
-                {HOURS.map(hour => (
+                {scheduleConfig.workingHours.map(hour => (
                   <tr key={hour} className="group">
                     <td className="border-b border-r border-zinc-800 p-2 text-center font-mono font-bold bg-zinc-900/80 text-zinc-500 group-hover:text-pink-400 transition-colors sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]">
                       {hour}:00
                     </td>
-                    {DAYS.map(day => {
+                    {scheduleConfig.workingDays.map(day => {
                       const slotId = `${day}-${hour}`;
                       const slotEntries = schedule[slotId] || [];
                       const trainerEntries = slotEntries.filter(e => e.trainerId === selectedTrainerId);

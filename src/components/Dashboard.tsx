@@ -17,9 +17,12 @@ interface Props {
   onUpdateProfile: (profile: UserProfile) => void;
 }
 
+import LeaveRequestModal from './LeaveRequestModal';
+
 export default function Dashboard({ profile, onUpdateProfile }: Props) {
   const { contracts, sessions } = useDatabase();
   const [showSwapModal, setShowSwapModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [swapStep, setSwapStep] = useState<'menu' | 'swap_meal' | 'swap_item'>('menu');
   const [itemToSwap, setItemToSwap] = useState<{ foodId: string, rule: any } | null>(null);
   const [swapSearchTerm, setSwapSearchTerm] = useState('');
@@ -548,6 +551,14 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
                   {f.label}
                 </button>
               ))}
+              {activeContract && (
+                <button
+                  onClick={() => setShowLeaveModal(true)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border bg-zinc-800 text-pink-400 border-zinc-700 hover:text-pink-300 ml-auto"
+                >
+                  Xin nghỉ / Bảo lưu
+                </button>
+              )}
             </div>
 
           </div>
@@ -791,6 +802,14 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
             </button>
           </motion.div>
         </div>
+      )}
+
+      {showLeaveModal && activeContract && (
+        <LeaveRequestModal 
+          onClose={() => setShowLeaveModal(false)}
+          studentId={auth.currentUser!.uid}
+          contractId={activeContract.id}
+        />
       )}
     </div>
   );

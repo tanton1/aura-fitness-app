@@ -8,13 +8,15 @@ interface Props {
   warnings: Warning[];
   branches?: Branch[];
   contracts?: StudentContract[];
+  overriddenSessions?: Record<string, number>;
+  onUpdateSessionOverride?: (studentId: string, sessions: number) => void;
   onDelete?: (id: string) => void;
   onEdit: (student: Student) => void;
   onToggleConfirm?: (id: string) => void;
   onToggleLockSchedule?: (id: string) => void;
 }
 
-export default function StudentList({ students, schedule, warnings, branches, contracts = [], onDelete, onEdit, onToggleConfirm, onToggleLockSchedule }: Props) {
+export default function StudentList({ students, schedule, warnings, branches, contracts = [], overriddenSessions = {}, onUpdateSessionOverride, onDelete, onEdit, onToggleConfirm, onToggleLockSchedule }: Props) {
   const getStudentSchedule = (studentId: string) => {
     const slots: string[] = [];
     Object.entries(schedule).forEach(([slotId, entries]) => {
@@ -147,6 +149,8 @@ export default function StudentList({ students, schedule, warnings, branches, co
               const hasLowSlots = (student.availableSlots?.length || 0) < 5;
               
               const warning = warnings.find(w => w.studentId === student.id);
+              const customSessions = overriddenSessions[student.id];
+              const displaySessions = customSessions !== undefined ? customSessions : student.sessionsPerWeek;
               const isUnderScheduled = warning && warning.scheduled < warning.requested;
               const isOverScheduled = warning && warning.scheduled > warning.requested;
               
@@ -162,11 +166,25 @@ export default function StudentList({ students, schedule, warnings, branches, co
                           <AlertCircle size={18} className="text-red-500" />
                         )}
                       </h3>
-                      <p className="text-sm text-zinc-400 mt-1 font-medium">
-                        Đăng ký: <span className="text-pink-400">{student.sessionsPerWeek} buổi/tuần</span> | 
-                        Đã xếp: <span className={`${isUnderScheduled || isOverScheduled ? 'text-red-400 font-bold' : 'text-emerald-400'}`}>{warning?.scheduled || 0} buổi</span> | 
-                        Rảnh: <span className={`${hasLowSlots ? 'text-red-400 font-bold' : 'text-pink-400'}`}>{student.availableSlots?.length || 0} slots</span>
-                      </p>
+                      <div className="text-sm text-zinc-400 mt-1 font-medium flex flex-wrap items-center gap-1">
+                        <span>Đăng ký:</span> 
+                        <select 
+                          value={displaySessions || 3}
+                          onChange={(e) => onUpdateSessionOverride && onUpdateSessionOverride(student.id, parseInt(e.target.value))}
+                          className="bg-zinc-950 border border-zinc-800 text-pink-400 rounded-lg px-2 py-0.5 focus:outline-none focus:border-pink-500 appearance-none font-bold"
+                          title="Thay đổi số buổi tuần này"
+                        >
+                          {[1, 2, 3, 4, 5, 6, 7].map(n => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                        <span className="text-pink-400">buổi/tuần</span>
+                        {customSessions !== undefined && <span className="text-xs text-orange-400 ml-1" title="Đã thay đổi riêng cho tuần này">(Tạm thời)</span>}
+                        <span className="mx-1">|</span>
+                        <span>Đã xếp:</span> <span className={`${isUnderScheduled || isOverScheduled ? 'text-red-400 font-bold' : 'text-emerald-400'}`}>{warning?.scheduled || 0} buổi</span>
+                        <span className="mx-1">|</span>
+                        <span>Rảnh:</span> <span className={`${hasLowSlots ? 'text-red-400 font-bold' : 'text-pink-400'}`}>{student.availableSlots?.length || 0} slots</span>
+                      </div>
                       {showRedWarning && (
                         <div className="mt-2 text-xs font-medium text-red-400 flex flex-col gap-1">
                           {(hasNoBranch || hasBranchMismatch) && (

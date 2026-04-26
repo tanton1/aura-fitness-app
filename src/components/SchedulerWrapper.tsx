@@ -20,8 +20,8 @@ interface Props {
 
 export default function SchedulerWrapper({ user, profile }: Props) {
   const { 
-    students, trainers, branches, contracts, sessions, schedules, 
-    addStudent, updateStudent, updateScheduleData, updateScheduleSlot, updateScheduleSlots, addSession, updateContract, updateSession, deleteSession
+    students, trainers, branches, contracts, sessions, schedules, scheduleConfig,
+    addStudent, updateStudent, updateScheduleData, updateScheduleSlot, updateScheduleSlots, updateSessionOverrides, updateBulkSessionOverrides, addSession, updateContract, updateSession, deleteSession
   } = useDatabase();
   
   const [weekOffset, setWeekOffset] = useState(0);
@@ -31,6 +31,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const [selectedBranchId, setSelectedBranchId] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [studentSessionFilter, setStudentSessionFilter] = useState<'all' | 'this_week' | 'upcoming' | 'history'>('upcoming');
+  const [showBulkAdjustMenu, setShowBulkAdjustMenu] = useState(false);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [editFormData, setEditFormData] = useState({ date: '', hour: 0, trainerId: '' });
   const [isLoaded, setIsLoaded] = useState(false);
@@ -49,7 +50,20 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     return `schedule_${dates['T2'].full}`;
   }, [weekOffset]);
 
-  const schedule = schedules[weekId]?.schedule || {};
+  const activeScheduleConfig = useMemo(() => {
+    const dates = getDatesForWeek(weekOffset);
+    return {
+      ...scheduleConfig,
+      workingDays: scheduleConfig.workingDays.filter(day => {
+        const dateStr = dates[day].full;
+        return !(scheduleConfig.holidays || []).includes(dateStr);
+      })
+    };
+  }, [scheduleConfig, weekOffset]);
+
+  const scheduleData = schedules[weekId] || { schedule: {}, warnings: [], overriddenSessions: {} };
+  const schedule = scheduleData.schedule || {};
+  const overriddenSessions = scheduleData.overriddenSessions || {};
   
   const studentContracts = useMemo(() => {
     const map = new Map<string, StudentContract>();
@@ -73,8 +87,29 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     if (!isLoaded) return [];
     // Only calculate for students with active contracts
     const activeStudents = students.filter(s => studentContracts.has(s.id));
-    return calculateWarnings(activeStudents, trainers, schedule);
-  }, [isLoaded, students, trainers, schedule, studentContracts]);
+    return calculateWarnings(activeStudents, trainers, schedule, activeScheduleConfig, overriddenSessions);
+  }, [isLoaded, students, trainers, schedule, studentContracts, activeScheduleConfig, overriddenSessions]);
+
+  const handleBulkAdjustSessions = (adjustment: number) => {
+    const activeStudents = students.filter(s => studentContracts.has(s.id));
+    const newOverrides = { ...overriddenSessions };
+    let totalAdjusted = 0;
+    
+    activeStudents.forEach(student => {
+      const current = overriddenSessions[student.id] !== undefined ? overriddenSessions[student.id] : student.sessionsPerWeek;
+      const newValue = Math.max(1, current + adjustment);
+      if (newValue !== student.sessionsPerWeek) {
+        newOverrides[student.id] = newValue;
+      } else {
+        delete newOverrides[student.id]; // Reset to default if matches
+      }
+      totalAdjusted++;
+    });
+    
+    if (totalAdjusted > 0) {
+      updateBulkSessionOverrides(weekId, newOverrides);
+    }
+  };
 
   const handleCopyPreviousWeek = () => {
     if (!confirm('Bạn có chắc chắn muốn copy lịch từ tuần trước sang tuần này không? Lịch hiện tại (nếu có) sẽ bị ghi đè.')) return;
@@ -102,7 +137,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     }
     
     const activeStudents = students.filter(s => studentContracts.has(s.id));
-    const warnings = calculateWarnings(activeStudents, trainers, copiedSchedule);
+    const warnings = calculateWarnings(activeStudents, trainers, copiedSchedule, activeScheduleConfig, overriddenSessions);
     updateScheduleData(weekId, copiedSchedule, warnings);
   };
 
@@ -121,8 +156,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
       return;
     }
     const emptySchedule: Schedule = {};
-    for (const day of DAYS) {
-      for (const hour of HOURS) {
+    for (const day of activeScheduleConfig.workingDays) {
+      for (const hour of activeScheduleConfig.workingHours) {
         emptySchedule[`${day}-${hour}`] = [];
       }
     }
@@ -136,7 +171,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         return;
       }
     }
-    const result = generateSchedule(students, trainers, contracts, schedule);
+    const result = generateSchedule(students, trainers, contracts, activeScheduleConfig, schedule, overriddenSessions);
     updateScheduleData(weekId, result.schedule, result.warnings);
   };
 
@@ -321,6 +356,30 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           </div>
           
           <div className="flex gap-2">
+            <div className="relative">
+              <button 
+                onClick={() => setShowBulkAdjustMenu(!showBulkAdjustMenu)}
+                className="bg-zinc-800 text-zinc-300 px-4 py-2 text-sm rounded-xl font-bold hover:bg-zinc-700 hover:text-white transition-all flex items-center gap-2 border border-zinc-700"
+              >
+                Chỉnh buổi
+              </button>
+              {showBulkAdjustMenu && (
+                <div className="absolute top-full left-0 mt-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 w-48 overflow-hidden">
+                  <div className="p-2 border-b border-zinc-800 bg-zinc-800/50">
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Tuần này</span>
+                  </div>
+                  <button onClick={() => { handleBulkAdjustSessions(1); setShowBulkAdjustMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-zinc-800 text-sm text-zinc-300 hover:text-emerald-400 font-medium transition-colors border-b border-zinc-800/50 flex justify-between items-center">
+                    Cộng thêm 1 buổi <span className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded text-xs">+1</span>
+                  </button>
+                  <button onClick={() => { handleBulkAdjustSessions(-1); setShowBulkAdjustMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-zinc-800 text-sm text-zinc-300 hover:text-red-400 font-medium transition-colors border-b border-zinc-800/50 flex justify-between items-center">
+                    Trừ đi 1 buổi <span className="text-red-500 bg-red-500/10 px-2 py-0.5 rounded text-xs">-1</span>
+                  </button>
+                  <button onClick={() => { updateBulkSessionOverrides(weekId, {}); setShowBulkAdjustMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-zinc-800 text-sm text-zinc-300 hover:text-pink-400 font-medium transition-colors flex justify-between items-center">
+                    Reset về mặc định <RotateCcw className="w-3 h-3 text-pink-400" />
+                  </button>
+                </div>
+              )}
+            </div>
             {(!schedule || Object.keys(schedule).length === 0) && weekOffset > 0 && (
               <button onClick={handleCopyPreviousWeek} className="bg-zinc-800 text-zinc-300 px-4 py-2 text-sm rounded-xl font-bold hover:bg-zinc-700 hover:text-white transition-all flex items-center gap-2 border border-zinc-700">
                 <RotateCcw className="w-4 h-4" /> Copy tuần trước
@@ -374,6 +433,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                   initialData={editingStudent}
                   onCancelEdit={() => setEditingStudent(null)}
                   isAvailabilityOnly={true}
+                  scheduleConfig={activeScheduleConfig}
                 />
               )}
 
@@ -402,6 +462,10 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                 warnings={filteredWarnings}
                 branches={branches}
                 contracts={contracts}
+                overriddenSessions={overriddenSessions}
+                onUpdateSessionOverride={(studentId, sessions) => {
+                  updateSessionOverrides(weekId, studentId, sessions);
+                }}
                 onEdit={setEditingStudent}
                 onToggleConfirm={(id) => {
                   const student = students.find(s => s.id === id);
@@ -448,6 +512,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               contracts={contracts}
               weekOffset={weekOffset} 
               selectedBranchId={selectedBranchId}
+              scheduleConfig={activeScheduleConfig}
               onUpdateSlot={(slotId, updater) => {
                 updateScheduleSlot(weekId, slotId, updater);
               }}
@@ -596,6 +661,10 @@ export default function SchedulerWrapper({ user, profile }: Props) {
               warnings={trainerWarnings}
               branches={branches}
               contracts={contracts}
+              overriddenSessions={overriddenSessions}
+              onUpdateSessionOverride={(studentId, sessions) => {
+                updateSessionOverrides(weekId, studentId, sessions);
+              }}
               onEdit={setEditingStudent}
               onToggleConfirm={(id) => {
                 const student = students.find(s => s.id === id);
@@ -644,6 +713,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
             currentTrainerId={actualTrainerId} 
             selectedBranchId={profile?.branchId || 'all'}
             weekOffset={weekOffset}
+            scheduleConfig={activeScheduleConfig}
             onUpdateSlot={(slotId, updater) => {
               updateScheduleSlot(weekId, slotId, updater);
             }}
@@ -778,6 +848,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           <StudentForm 
             onSave={handleUserSaveStudent}
             initialData={{ id: user?.uid || '', name: profile?.name || '', sessionsPerWeek: 3, availableSlots: [] }}
+            scheduleConfig={activeScheduleConfig}
           />
         </div>
       ) : (
@@ -1056,6 +1127,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                         }}
                         initialData={currentUserStudent}
                         onCancelEdit={currentUserStudent.isScheduleConfirmed ? () => setEditingStudent(null) : undefined}
+                        scheduleConfig={activeScheduleConfig}
                       />
                     </div>
                   ) : (

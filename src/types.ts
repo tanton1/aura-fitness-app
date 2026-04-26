@@ -146,6 +146,19 @@ export interface Installment {
   status: 'pending' | 'paid';
 }
 
+export interface LeaveRequest {
+  id: string;
+  studentId: string;
+  contractId: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  adminNote?: string;
+  createdAt: string;
+  approvedAt?: string;
+}
+
 export interface StudentContract {
   id: string;
   studentId: string;
@@ -219,6 +232,15 @@ export interface Warning {
 export interface SchedulerResult {
   schedule: Schedule;
   warnings: Warning[];
+}
+
+export interface ScheduleConfig {
+  workingDays: Day[];
+  workingHours: number[];
+  isAutoLockEnabled?: boolean;
+  lockDayOfWeek?: number; // 0-6 (Sunday-Saturday) deadline to lock
+  lockHour?: number; // 0-23
+  holidays?: string[]; // Array of YYYY-MM-DD
 }
 
 export interface Session {

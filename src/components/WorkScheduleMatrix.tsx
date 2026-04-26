@@ -1,19 +1,20 @@
 import React from 'react';
-import { Trainer, Schedule, DAYS, HOURS } from '../types';
+import { Trainer, Schedule, ScheduleConfig } from '../types';
 
 interface WorkScheduleMatrixProps {
   trainers: Trainer[];
   schedule: Schedule;
+  scheduleConfig: ScheduleConfig;
 }
 
-export const WorkScheduleMatrix: React.FC<WorkScheduleMatrixProps> = ({ trainers, schedule }) => {
+export const WorkScheduleMatrix: React.FC<WorkScheduleMatrixProps> = ({ trainers, schedule, scheduleConfig }) => {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm text-zinc-300">
         <thead className="bg-zinc-900">
           <tr>
             <th className="p-3 text-left">Nhân viên</th>
-            {DAYS.map(day => (
+            {scheduleConfig.workingDays.map(day => (
               <th key={day} className="p-3 text-center">{day}</th>
             ))}
           </tr>
@@ -22,9 +23,9 @@ export const WorkScheduleMatrix: React.FC<WorkScheduleMatrixProps> = ({ trainers
           {trainers.map(trainer => (
             <tr key={trainer.id} className="hover:bg-zinc-800/50">
               <td className="p-3 font-bold text-white">{trainer.name}</td>
-              {DAYS.map(day => (
+              {scheduleConfig.workingDays.map(day => (
                 <td key={day} className="p-3 text-center">
-                  {HOURS.map(hour => {
+                  {scheduleConfig.workingHours.map(hour => {
                     const slotId = `${day}-${hour}`;
                     const entries = schedule[slotId] || [];
                     const trainerEntry = entries.find(e => e.trainerId === trainer.id);

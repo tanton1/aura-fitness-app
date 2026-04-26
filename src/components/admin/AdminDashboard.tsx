@@ -6,6 +6,7 @@ import FinanceManagement from './FinanceManagement';
 import HRManagement from './HRManagement';
 import TrainerPayroll from './TrainerPayroll';
 import PackageSettings from './PackageSettings';
+import ScheduleSettings from './ScheduleSettings';
 import { useDatabase } from '../../contexts/DatabaseContext';
 
 import AdminReportDashboard from './AdminReportDashboard';
@@ -13,7 +14,7 @@ import AdminReportDashboard from './AdminReportDashboard';
 interface Props {
   user: User | null;
   profile: UserProfile | null;
-  activeTab: 'overview' | 'students' | 'finance' | 'hr' | 'payroll' | 'packages';
+  activeTab: 'overview' | 'students' | 'finance' | 'hr' | 'payroll' | 'packages' | 'settings';
   onNavigate?: (screen: string) => void;
 }
 
@@ -55,6 +56,7 @@ export default function AdminDashboard({ user, profile, activeTab, onNavigate }:
         {activeTab === 'packages' && <PackageSettings user={user} />}
         {activeTab === 'hr' && <HRManagement user={user} />}
         {activeTab === 'payroll' && <TrainerPayroll user={user} profile={profile} />}
+        {activeTab === 'settings' && <ScheduleSettings />}
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default function TrainerPayroll({ user, profile }: Props) {
-  const { trainers, sessions, students, branches, contracts, updateSession, deleteSession, addSession, updateContract } = useDatabase();
+  const { trainers, sessions, students, branches, contracts, scheduleConfig, updateSession, deleteSession, addSession, updateContract } = useDatabase();
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<number | 'all'>('all');
   const [sessionSearch, setSessionSearch] = useState('');
@@ -132,8 +132,8 @@ export default function TrainerPayroll({ user, profile }: Props) {
   };
 
   const availableHours = useMemo(() => {
-    if (!editFormData.date || !editFormData.trainerId) return HOURS.map(h => ({ hour: h, count: 0, sessions: [] as Session[] }));
-    return HOURS.map(h => {
+    if (!editFormData.date || !editFormData.trainerId) return scheduleConfig.workingHours.map(h => ({ hour: h, count: 0, sessions: [] as Session[] }));
+    return scheduleConfig.workingHours.map(h => {
       const hourSessions = sessions.filter(s => 
         s.trainerId === editFormData.trainerId && 
         s.date === editFormData.date && 

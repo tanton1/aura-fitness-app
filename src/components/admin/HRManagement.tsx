@@ -5,11 +5,12 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import firebaseConfig from '../../../firebase-applet-config.json';
 // Force reload: 2026-03-29
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { User as UserIcon, Building, Plus, Trash2, Edit2, ShieldCheck, Users, Package, AlertCircle } from 'lucide-react';
+import { User as UserIcon, Building, Plus, Trash2, Edit2, ShieldCheck, Users, Package, AlertCircle, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Trainer, Branch, StaffMember } from '../../types';
 import PackageSettings from './PackageSettings';
+import ScheduleSettings from './ScheduleSettings';
 import { LOGO_URL } from '../../constants';
 import { useDatabase } from '../../contexts/DatabaseContext';
 
@@ -34,7 +35,7 @@ export default function HRManagement({ user }: Props) {
     updateUserProfile
   } = useDatabase();
 
-  const [activeSubTab, setActiveSubTab] = useState<'trainers' | 'branches' | 'staff' | 'packages'>('trainers');
+  const [activeSubTab, setActiveSubTab] = useState<'trainers' | 'branches' | 'staff' | 'packages' | 'scheduler'>('trainers');
   const [isAdding, setIsAdding] = useState(false);
   const [editingItem, setEditingItem] = useState<Partial<Trainer | Branch | StaffMember> | null>(null);
   const [formData, setFormData] = useState<Partial<Trainer | Branch | StaffMember>>({});
@@ -349,6 +350,15 @@ export default function HRManagement({ user }: Props) {
           <Package className="w-4 h-4" />
           Gói tập
         </button>
+        <button
+          onClick={() => setActiveSubTab('scheduler')}
+          className={`flex-1 min-w-max flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            activeSubTab === 'scheduler' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          Cấu hình Lịch
+        </button>
       </div>
 
       <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 mb-6">
@@ -368,6 +378,8 @@ export default function HRManagement({ user }: Props) {
 
       {activeSubTab === 'packages' ? (
         <PackageSettings user={user} />
+      ) : activeSubTab === 'scheduler' ? (
+        <ScheduleSettings />
       ) : (
         <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
           <div className="flex justify-between items-center mb-6">

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDoc, runTransaction, updateDoc, getDocs, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { Student, StudentContract, PaymentRecord, Session, Trainer, Branch, TrainingPackage, StaffMember, DailyCheckin, Schedule, Warning, ScheduleEntry } from '../types';
+import { Student, StudentContract, PaymentRecord, Session, Trainer, Branch, TrainingPackage, StaffMember, DailyCheckin, Schedule, Warning, ScheduleEntry, LeaveRequest, ScheduleConfig } from '../types';
 import { onAuthStateChanged } from 'firebase/auth';
 
 interface DatabaseContextType {
@@ -14,6 +14,9 @@ interface DatabaseContextType {
   packages: TrainingPackage[];
   staff: StaffMember[];
   dailyCheckins: DailyCheckin[];
+  leaveRequests: LeaveRequest[];
+  schedules: { [weekId: string]: { schedule: Schedule, warnings: Warning[], overriddenSessions?: Record<string, number> } };
+  scheduleConfig: ScheduleConfig;
   
   addStudent: (student: Student) => Promise<void>;
   updateStudent: (id: string, updates: Partial<Student>) => Promise<void>;
@@ -49,10 +52,17 @@ interface DatabaseContextType {
   addDailyCheckin: (checkin: DailyCheckin) => Promise<void>;
   updateDailyCheckin: (checkin: DailyCheckin) => Promise<void>;
   deleteDailyCheckin: (id: string) => Promise<void>;
+
+  addLeaveRequest: (request: LeaveRequest) => Promise<void>;
+  updateLeaveRequest: (request: LeaveRequest) => Promise<void>;
+  deleteLeaveRequest: (id: string) => Promise<void>;
   
   updateScheduleData: (weekId: string, schedule: Schedule, warnings: Warning[]) => Promise<void>;
   updateScheduleSlot: (weekId: string, slotId: string, updater: (currentEntries: ScheduleEntry[]) => ScheduleEntry[]) => Promise<void>;
   updateScheduleSlots: (weekId: string, updater: (currentSchedule: Schedule) => { [slotId: string]: ScheduleEntry[] }) => Promise<void>;
+  updateSessionOverrides: (weekId: string, studentId: string, sessions: number) => Promise<void>;
+  updateBulkSessionOverrides: (weekId: string, overrides: Record<string, number>) => Promise<void>;
+  updateScheduleConfig: (config: ScheduleConfig) => Promise<void>;
   updateUserProfile: (uid: string, data: any) => Promise<void>;
   
   refreshData: () => Promise<void>;
@@ -80,7 +90,14 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
   const [packages, setPackages] = useState<TrainingPackage[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [dailyCheckins, setDailyCheckins] = useState<DailyCheckin[]>([]);
-  const [schedules, setSchedules] = useState<{ [weekId: string]: { schedule: Schedule, warnings: Warning[] } }>({});
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [schedules, setSchedules] = useState<{ [weekId: string]: { schedule: Schedule, warnings: Warning[], overriddenSessions?: Record<string, number> } }>({});
+  const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
+    workingDays: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7'],
+    workingHours: [6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20],
+    lockDayOfWeek: 6, // 6 means Saturday (CN is 0)
+    lockHour: 12
+  });
   const [isMigrating, setIsMigrating] = useState(false);
   const [isMigrated, setIsMigrated] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -131,6 +148,20 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       setSessions(snapshot.docs.map(doc => doc.data() as Session));
     }));
 
+    unsubs.push(onSnapshot(collection(db, 'leaveRequests'), (snapshot) => {
+      setLeaveRequests(snapshot.docs.map(doc => doc.data() as LeaveRequest));
+    }));
+
+    unsubs.push(onSnapshot(doc(db, 'settings', 'scheduleConfig'), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data() as Partial<ScheduleConfig>;
+        setScheduleConfig(prev => ({
+          ...prev,
+          ...data
+        }));
+      }
+    }));
+
     // Fetch trainers once instead of real-time
     const fetchTrainers = async () => {
       const trainersSnapshot = await getDocs(collection(db, 'trainers'));
@@ -140,13 +171,14 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
     // Set up real-time listener for schedules
     unsubs.push(onSnapshot(collection(db, 'schedules'), (snapshot) => {
-      const newSchedules: { [weekId: string]: { schedule: Schedule, warnings: Warning[] } } = {};
+      const newSchedules: { [weekId: string]: { schedule: Schedule, warnings: Warning[], overriddenSessions?: Record<string, number> } } = {};
       snapshot.docs.forEach(doc => {
         if (doc.id === 'global_schedule') return; // Handled separately
         const data = doc.data();
         newSchedules[doc.id] = {
           schedule: data.schedule || {},
-          warnings: data.warnings || []
+          warnings: data.warnings || [],
+          overriddenSessions: data.overriddenSessions || {}
         };
       });
       setSchedules(newSchedules);
@@ -298,6 +330,16 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
   };
   const deleteDailyCheckin = async (id: string) => {
     await deleteDoc(doc(db, 'dailyCheckins', id));
+  };
+
+  const addLeaveRequest = async (request: LeaveRequest) => {
+    await setDoc(doc(db, 'leaveRequests', request.id), sanitize(request));
+  };
+  const updateLeaveRequest = async (request: LeaveRequest) => {
+    await setDoc(doc(db, 'leaveRequests', request.id), sanitize(request), { merge: true });
+  };
+  const deleteLeaveRequest = async (id: string) => {
+    await deleteDoc(doc(db, 'leaveRequests', id));
   };
 
   const updateScheduleData = async (weekId: string, newSchedule: Schedule, newWarnings: Warning[]) => {
@@ -500,13 +542,33 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const updateSessionOverrides = async (weekId: string, studentId: string, sessions: number) => {
+    const docRef = doc(db, 'schedules', weekId);
+    await setDoc(docRef, {
+      overriddenSessions: {
+        [studentId]: sessions
+      }
+    }, { merge: true });
+  };
+
+  const updateBulkSessionOverrides = async (weekId: string, overrides: Record<string, number>) => {
+    const docRef = doc(db, 'schedules', weekId);
+    await setDoc(docRef, {
+      overriddenSessions: overrides
+    }, { merge: true });
+  };
+
+  const updateScheduleConfig = async (config: ScheduleConfig) => {
+    await setDoc(doc(db, 'settings', 'scheduleConfig'), sanitize(config));
+  };
+
   const updateUserProfile = async (uid: string, data: any) => {
     await setDoc(doc(db, 'users', uid), data, { merge: true });
   };
 
   return (
     <DatabaseContext.Provider value={{
-      students, contracts, payments, sessions, trainers, branches, packages, staff, dailyCheckins,
+      students, contracts, payments, sessions, trainers, branches, packages, staff, dailyCheckins, leaveRequests,
       addStudent, updateStudent, deleteStudent,
       addContract, updateContract, deleteContract,
       addPayment, deletePayment,
@@ -516,8 +578,9 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       addPackage, updatePackage, deletePackage,
       addStaff, updateStaff, deleteStaff,
       addDailyCheckin, updateDailyCheckin, deleteDailyCheckin,
-      schedules,
-      updateScheduleData, updateScheduleSlot, updateScheduleSlots,
+      addLeaveRequest, updateLeaveRequest, deleteLeaveRequest,
+      schedules, scheduleConfig,
+      updateScheduleData, updateScheduleSlot, updateScheduleSlots, updateSessionOverrides, updateBulkSessionOverrides, updateScheduleConfig,
       updateUserProfile,
       refreshData,
       migrateData, isMigrating, isMigrated
