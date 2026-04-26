@@ -97,7 +97,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     
     activeStudents.forEach(student => {
       const current = overriddenSessions[student.id] !== undefined ? overriddenSessions[student.id] : student.sessionsPerWeek;
-      const newValue = Math.max(1, current + adjustment);
+      const newValue = Math.max(0, current + adjustment);
       if (newValue !== student.sessionsPerWeek) {
         newOverrides[student.id] = newValue;
       } else {

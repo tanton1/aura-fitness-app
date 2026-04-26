@@ -169,12 +169,12 @@ export default function StudentList({ students, schedule, warnings, branches, co
                       <div className="text-sm text-zinc-400 mt-1 font-medium flex flex-wrap items-center gap-1">
                         <span>Đăng ký:</span> 
                         <select 
-                          value={displaySessions || 3}
+                          value={displaySessions}
                           onChange={(e) => onUpdateSessionOverride && onUpdateSessionOverride(student.id, parseInt(e.target.value))}
                           className="bg-zinc-950 border border-zinc-800 text-pink-400 rounded-lg px-2 py-0.5 focus:outline-none focus:border-pink-500 appearance-none font-bold"
                           title="Thay đổi số buổi tuần này"
                         >
-                          {[1, 2, 3, 4, 5, 6, 7].map(n => (
+                          {[0, 1, 2, 3, 4, 5, 6, 7].map(n => (
                             <option key={n} value={n}>{n}</option>
                           ))}
                         </select>
