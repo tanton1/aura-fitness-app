@@ -270,11 +270,11 @@ export default function TrainerPayroll({ user, profile }: Props) {
 
   const handleAutoConfirm = async () => {
     if (!user) return;
-    if (!confirm('Xác nhận TẤT CẢ các ca dạy chưa xác nhận (đã qua thời gian thực tế) trên danh sách hiển thị thành Đã hoàn thành?')) return;
+    if (!confirm('Xác nhận TẤT CẢ các ca dạy chưa xác nhận (đã qua thời gian thực tế) trên toàn hệ thống thành Đã hoàn thành?')) return;
     
     const now = new Date();
     
-    const toUpdate = filteredSessions.filter(s => {
+    const toUpdate = sessions.filter(s => {
       if (s.status !== 'scheduled') return false;
       const hour = parseInt(s.id.split('-')[1]) || 0;
       
