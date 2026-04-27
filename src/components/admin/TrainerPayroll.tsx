@@ -268,6 +268,38 @@ export default function TrainerPayroll({ user, profile }: Props) {
     return true;
   });
 
+  const handleAutoConfirm = async () => {
+    if (!user) return;
+    if (!confirm('Xác nhận TẤT CẢ các ca dạy chưa xác nhận (đã qua thời gian thực tế) trên danh sách hiển thị thành Đã hoàn thành?')) return;
+    
+    const now = new Date();
+    
+    const toUpdate = filteredSessions.filter(s => {
+      if (s.status !== 'scheduled') return false;
+      const hour = parseInt(s.id.split('-')[1]) || 0;
+      
+      const [year, month, day] = s.date.split('-').map(Number);
+      // Giả sử 1 ca kéo dài 1 tiếng. Xác nhận nếu thời gian hiện tại đã qua thời gian kết thúc ca.
+      const sessionTime = new Date(year, month - 1, day, hour + 1, 0, 0); 
+      
+      return sessionTime < now;
+    });
+
+    if (toUpdate.length === 0) {
+      alert('Không có ca dạy nào chưa xác nhận đã qua thời gian thực tế.');
+      return;
+    }
+
+    try {
+      for (const session of toUpdate) {
+        await updateSession({ ...session, status: 'completed' });
+      }
+      alert(`Đã tự động xác nhận ${toUpdate.length} học viên / ca tập thành công!`);
+    } catch (e) {
+      alert('Có lỗi xảy ra: ' + (e as Error).message);
+    }
+  };
+
   const groupedSessions = React.useMemo(() => {
     const groups: Record<string, Session[]> = {};
     filteredSessions.forEach(s => {
@@ -423,10 +455,19 @@ export default function TrainerPayroll({ user, profile }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Lịch dạy */}
         <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-pink-500" />
-            Lịch dạy ({Array.from(new Set(filteredSessions.map(s => `${s.date}-${s.id.split('-')[1]}`))).length} ca)
-          </h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-pink-500" />
+              Lịch dạy ({Array.from(new Set(filteredSessions.map(s => `${s.date}-${s.id.split('-')[1]}`))).length} ca)
+            </h3>
+            <button
+              onClick={handleAutoConfirm}
+              className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
+            >
+              <CheckCircle className="w-4 h-4" />
+              Chốt ca tự động
+            </button>
+          </div>
           <div className="space-y-6">
             {groupedSessions.map(group => {
               const dateObj = new Date(group.date);
