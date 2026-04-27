@@ -86,7 +86,8 @@ export default function HRManagement({ user }: Props) {
           id: Date.now().toString(),
           status: 'active',
           commissionRate: 5,
-          commissionPerSession: 50000,
+          commissionPerSession: 20000,
+          baseSalary: 0,
           ...formData
         } as Trainer;
         try {
@@ -203,7 +204,8 @@ export default function HRManagement({ user }: Props) {
               status: newMember.status,
               // Preserve commission fields and employee code if they exist
               commissionRate: (formData as any).commissionRate ?? existingTrainer.commissionRate ?? 5,
-              commissionPerSession: (formData as any).commissionPerSession ?? existingTrainer.commissionPerSession ?? 50000,
+              commissionPerSession: (formData as any).commissionPerSession ?? existingTrainer.commissionPerSession ?? 20000,
+              baseSalary: (formData as any).baseSalary ?? existingTrainer.baseSalary ?? 0,
               employeeCode: (formData as any).employeeCode ?? existingTrainer.employeeCode ?? ''
             });
           } else if (role === 'trainer') {
@@ -216,7 +218,8 @@ export default function HRManagement({ user }: Props) {
               branchId: newMember.branchId,
               status: newMember.status,
               commissionRate: (formData as any).commissionRate ?? 5,
-              commissionPerSession: (formData as any).commissionPerSession ?? 50000,
+              commissionPerSession: (formData as any).commissionPerSession ?? 20000,
+              baseSalary: (formData as any).baseSalary ?? 0,
               employeeCode: (formData as any).employeeCode ?? ''
             });
           }
@@ -492,11 +495,14 @@ export default function HRManagement({ user }: Props) {
                   <label className="block text-sm font-medium text-zinc-400 mb-1 mt-3">Độ ưu tiên (PT1, PT2...)</label>
                   <input type="number" placeholder="Độ ưu tiên" value={formData.priority || ''} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, priority: Number(e.target.value)})} min="1" />
 
-                  <label className="block text-sm font-medium text-zinc-400 mb-1 mt-3">Hoa hồng giới thiệu (%)</label>
-                  <input type="number" placeholder="Hoa hồng giới thiệu (%)" value={formData.commissionRate || ''} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, commissionRate: Number(e.target.value)})} />
+                  <label className="block text-sm font-medium text-zinc-400 mb-1 mt-3">Lương cơ bản (VNĐ)</label>
+                  <input type="number" placeholder="Lương cơ bản (VNĐ)" value={(formData as any).baseSalary || 0} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, baseSalary: Number(e.target.value)})} />
                   
-                  <label className="block text-sm font-medium text-zinc-400 mb-1 mt-3">Hoa hồng/buổi (VNĐ)</label>
-                  <input type="number" placeholder="Hoa hồng/buổi (VNĐ)" value={formData.commissionPerSession || ''} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, commissionPerSession: Number(e.target.value)})} />
+                  <label className="block text-sm font-medium text-zinc-400 mb-1 mt-3">Hoa hồng giới thiệu (%)</label>
+                  <input type="number" placeholder="Hoa hồng giới thiệu (%)" value={formData.commissionRate || 0} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, commissionRate: Number(e.target.value)})} />
+                  
+                  <label className="block text-sm font-medium text-zinc-400 mb-1 mt-3">Hoa hồng/buổi (VNĐ) (Thường)</label>
+                  <input type="number" placeholder="Hoa hồng/buổi (VNĐ)" value={formData.commissionPerSession || 0} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, commissionPerSession: Number(e.target.value)})} />
                 </>
               ) : activeSubTab === 'staff' ? (
                 <>

@@ -19,7 +19,8 @@ export function generateSchedule(
   contracts: StudentContract[],
   config: ScheduleConfig,
   existingSchedule?: Schedule,
-  overriddenSessions?: Record<string, number>
+  overriddenSessions?: Record<string, number>,
+  targetDate: Date = new Date()
 ): SchedulerResult {
   const schedule: Schedule = {};
   const warnings: Warning[] = [];
@@ -66,8 +67,8 @@ export function generateSchedule(
 
   // Map students to their active contracts
   const studentContracts = new Map<string, StudentContract>();
-  const now = new Date();
-  now.setHours(0, 0, 0, 0); // Start of today
+  const now = new Date(targetDate);
+  now.setHours(0, 0, 0, 0); // Start of target week
   contracts.forEach(c => {
     if (c.status === 'active') {
       const endDate = new Date(c.endDate);

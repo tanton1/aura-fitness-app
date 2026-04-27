@@ -67,8 +67,9 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   
   const studentContracts = useMemo(() => {
     const map = new Map<string, StudentContract>();
-    const now = new Date();
-    now.setHours(0, 0, 0, 0); // Start of today
+    const { start: targetDate } = getWeekRange(weekOffset);
+    const now = new Date(targetDate);
+    now.setHours(0, 0, 0, 0); // Start of target week
     contracts.forEach(c => {
       if (c.status === 'active') {
         const endDate = new Date(c.endDate);
@@ -183,7 +184,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
       }
     }
 
-    const result = generateSchedule(students, trainers, contracts, activeScheduleConfig, preservedSchedule, overriddenSessions);
+    const { start: targetDate } = getWeekRange(weekOffset);
+    const result = generateSchedule(students, trainers, contracts, activeScheduleConfig, preservedSchedule, overriddenSessions, targetDate);
     
     // Check if any slots were effectively generated
     let generatedCount = 0;

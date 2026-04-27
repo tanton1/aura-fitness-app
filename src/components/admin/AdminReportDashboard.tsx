@@ -87,6 +87,11 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
       currentStart.setDate(now.getDate() - 30);
       prevEnd = new Date(currentStart);
       prevStart.setDate(prevEnd.getDate() - 30);
+    } else if (timeRange === 'thisMonth') {
+      currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      currentEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      prevEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
     } else if (timeRange === 'lastMonth') {
       currentStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       currentEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
@@ -161,21 +166,57 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
   // PT Sessions Report
   const ptSessions = filteredTrainers.map(t => {
     const sessionsInTimeRange = filteredSessions.filter(s => {
-      if (s.trainerId !== t.id || s.status !== 'completed' || !s.verifiedByStudent) return false;
+      if (s.trainerId !== t.id || s.status !== 'completed') return false;
       const sDate = new Date(s.date);
       return sDate >= currentStartDate && sDate <= currentEndDate;
     });
-    return { name: t.name, count: sessionsInTimeRange.length };
+    
+    // Group by date to calculate unique sessions per hour
+    let uniqueSessionsCount = 0;
+    const sessionsByDate: Record<string, Session[]> = {};
+    sessionsInTimeRange.forEach(s => {
+      if (!sessionsByDate[s.date]) sessionsByDate[s.date] = [];
+      sessionsByDate[s.date].push(s);
+    });
+    
+    Object.values(sessionsByDate).forEach(daySessions => {
+      const uniqueHours = new Set(daySessions.map(s => parseInt(s.id.split('-')[1]) || 0));
+      uniqueSessionsCount += uniqueHours.size;
+    });
+
+    return { name: t.name, count: uniqueSessionsCount };
   });
 
   // PT Commission Report
   const ptCommissions = filteredTrainers.map(t => {
     const sessionsInTimeRange = filteredSessions.filter(s => {
-      if (s.trainerId !== t.id || s.status !== 'completed' || !s.verifiedByStudent) return false;
+      if (s.trainerId !== t.id || s.status !== 'completed') return false;
       const sDate = new Date(s.date);
       return sDate >= currentStartDate && sDate <= currentEndDate;
     });
-    const sessionComm = sessionsInTimeRange.length * (t.commissionPerSession || 0);
+    
+    const sessionsByDate: Record<string, Session[]> = {};
+    sessionsInTimeRange.forEach(s => {
+      if (!sessionsByDate[s.date]) sessionsByDate[s.date] = [];
+      sessionsByDate[s.date].push(s);
+    });
+
+    let sessionComm = 0;
+    Object.values(sessionsByDate).forEach(daySessions => {
+      // Get unique hours taught in this day
+      const uniqueHours = Array.from(new Set(daySessions.map(s => parseInt(s.id.split('-')[1]) || 0))).sort((a, b) => a - b);
+      
+      let count = 0;
+      uniqueHours.forEach(hour => {
+        count++;
+        if (count > 8) {
+          if (hour >= 20) sessionComm += 80000;
+          else sessionComm += 70000;
+        } else {
+          sessionComm += t.commissionPerSession || 20000;
+        }
+      });
+    });
     
     const referralContractsInTimeRange = filteredContracts.filter(c => {
       if (c.referralCode !== t.employeeCode) return false;
@@ -183,8 +224,9 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
       return cDate >= currentStartDate && cDate <= currentEndDate;
     });
     const referralComm = referralContractsInTimeRange.reduce((s, c) => s + (c.referralCommission || 0), 0);
+    const baseSalary = t.baseSalary || 0;
     
-    return { name: t.name, total: sessionComm + referralComm };
+    return { name: t.name, total: baseSalary + sessionComm + referralComm };
   });
 
   // Customer Debt Report
@@ -218,14 +260,20 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
         }).reduce((sum, p) => sum + p.amount, 0);
         return { name: `T${month + 1}`, total };
       });
-    } else if (timeRange === 'lastMonth') {
-      const lastMonth = now.getMonth() - 1;
-      const year = lastMonth < 0 ? now.getFullYear() - 1 : now.getFullYear();
-      const month = lastMonth < 0 ? 11 : lastMonth;
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
+    } else if (timeRange === 'lastMonth' || timeRange === 'thisMonth') {
+      let focusMonth = now.getMonth();
+      let focusYear = now.getFullYear();
+      if (timeRange === 'lastMonth') {
+        focusMonth = now.getMonth() - 1;
+        if (focusMonth < 0) {
+          focusYear = now.getFullYear() - 1;
+          focusMonth = 11;
+        }
+      }
+      const daysInMonth = new Date(focusYear, focusMonth + 1, 0).getDate();
       
       return Array.from({ length: daysInMonth }).map((_, i) => {
-        const d = new Date(year, month, i + 1);
+        const d = new Date(focusYear, focusMonth, i + 1);
         const dateStr = d.toISOString().split('T')[0];
         const total = filteredPayments
           .filter(p => {
@@ -339,7 +387,7 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
             <option value="none">Chưa phân chi nhánh</option>
             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
-          {['7days', '30days', 'lastMonth', 'year'].map((range) => (
+          {['7days', '30days', 'thisMonth', 'lastMonth', 'year'].map((range) => (
             <button
               key={range}
               onClick={() => setTimeRange(range)}
@@ -349,7 +397,7 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
                   : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              {range === '7days' ? '7 Ngày' : range === '30days' ? '30 Ngày' : range === 'lastMonth' ? 'Tháng trước' : 'Năm nay'}
+              {range === '7days' ? '7 Ngày' : range === '30days' ? '30 Ngày' : range === 'thisMonth' ? 'Tháng này' : range === 'lastMonth' ? 'Tháng trước' : 'Năm nay'}
             </button>
           ))}
         </div>

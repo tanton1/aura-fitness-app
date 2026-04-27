@@ -425,7 +425,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
         <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-pink-500" />
-            Lịch dạy ({filteredSessions.length})
+            Lịch dạy ({Array.from(new Set(filteredSessions.map(s => `${s.date}-${s.id.split('-')[1]}`))).length} ca)
           </h3>
           <div className="space-y-6">
             {groupedSessions.map(group => {
@@ -439,7 +439,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
                   <div className="flex items-center gap-2 pb-2 border-b border-zinc-800">
                     <Calendar className="w-4 h-4 text-pink-500" />
                     <h4 className="font-bold text-white">{dayName}, {isValidDate ? dateObj.toLocaleDateString('vi-VN') : 'N/A'}</h4>
-                    <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">{group.sessions.length} ca</span>
+                    <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">{new Set(group.sessions.map(s => parseInt(s.id.split('-')[1]) || 0)).size} ca</span>
                   </div>
                   
                   <div className="grid grid-cols-1 gap-3">
@@ -469,8 +469,8 @@ export default function TrainerPayroll({ user, profile }: Props) {
                                   {s.status === 'completed' ? 'Đã dạy' : s.status === 'cancelled' ? 'Đã hủy' : 'Chưa dạy'}
                                 </span>
                                 {s.status === 'completed' && (
-                                  <span className={`text-[9px] font-bold uppercase tracking-tight ${s.verifiedByStudent ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                    {s.verifiedByStudent ? '✓ HV đã xác nhận' : '⚠ Chờ xác nhận'}
+                                  <span className={`text-[9px] font-bold uppercase tracking-tight text-emerald-500`}>
+                                    ✓ Đã ghi nhận
                                   </span>
                                 )}
                               </div>
@@ -519,11 +519,50 @@ export default function TrainerPayroll({ user, profile }: Props) {
                 {trainers
                   .filter(t => selectedTrainerId === 'all' || t.id === selectedTrainerId)
                   .reduce((sum, t) => {
-                    const completed = sessions.filter(s => s.trainerId === t.id && s.status === 'completed' && s.verifiedByStudent);
-                    const sessionComm = completed.length * (t.commissionPerSession || 0);
-                    const referralContracts = contracts.filter(c => c.referralCode === t.employeeCode);
+                    const completed = sessions.filter(s => {
+                      if (s.trainerId !== t.id || s.status !== 'completed') return false;
+                      if (dateRange) {
+                        const sDate = new Date(s.date);
+                        if (sDate < dateRange.start || sDate > dateRange.end) return false;
+                      }
+                      return true;
+                    });
+                    
+                    const sessionsByDate: Record<string, Session[]> = {};
+                    completed.forEach(s => {
+                      if (!sessionsByDate[s.date]) sessionsByDate[s.date] = [];
+                      sessionsByDate[s.date].push(s);
+                    });
+                    
+                    let sessionComm = 0;
+                    Object.values(sessionsByDate).forEach(daySessions => {
+                      // Get unique hours taught in this day
+                      const uniqueHours = Array.from(new Set(daySessions.map(s => parseInt(s.id.split('-')[1]) || 0))).sort((a, b) => a - b);
+                      
+                      let count = 0;
+                      uniqueHours.forEach(hour => {
+                        count++;
+                        if (count > 8) {
+                          if (hour >= 20) sessionComm += 80000;
+                          else sessionComm += 70000;
+                        } else {
+                          sessionComm += t.commissionPerSession || 20000;
+                        }
+                      });
+                    });
+
+                    const baseSalary = t.baseSalary || 0;
+                    const referralContracts = contracts.filter(c => {
+                      if (c.referralCode !== t.employeeCode) return false;
+                      if (dateRange) {
+                        const cDate = new Date(c.startDate || new Date());
+                        if (cDate < dateRange.start || cDate > dateRange.end) return false;
+                      }
+                      return true;
+                    });
                     const referralComm = referralContracts.reduce((s, c) => s + (c.referralCommission || 0), 0);
-                    return sum + sessionComm + referralComm;
+                    
+                    return sum + baseSalary + sessionComm + referralComm;
                   }, 0).toLocaleString()}đ
               </p>
             </div>
@@ -532,28 +571,98 @@ export default function TrainerPayroll({ user, profile }: Props) {
             {trainers
               .filter(t => selectedTrainerId === 'all' || t.id === selectedTrainerId)
               .map(t => {
-                const completedSessions = sessions.filter(s => s.trainerId === t.id && s.status === 'completed' && s.verifiedByStudent);
-              const sessionCommission = completedSessions.length * (t.commissionPerSession || 0);
-              
+                const completedSessions = sessions.filter(s => {
+                  if (s.trainerId !== t.id || s.status !== 'completed') return false;
+                  if (dateRange) {
+                    const sDate = new Date(s.date);
+                    if (sDate < dateRange.start || sDate > dateRange.end) return false;
+                  }
+                  return true;
+                });
+                
+                // Group by date to calculate overtime
+                const sessionsByDate: Record<string, Session[]> = {};
+                completedSessions.forEach(s => {
+                  if (!sessionsByDate[s.date]) sessionsByDate[s.date] = [];
+                  sessionsByDate[s.date].push(s);
+                });
+                
+                let sessionCommission = 0;
+                let normalCount = 0;
+                let totalNormalCommission = 0;
+                let overtimeCount = 0;
+                let totalOvertimeCommission = 0;
+                let eveningCount = 0;
+                let totalEveningCommission = 0;
+
+                Object.values(sessionsByDate).forEach(daySessions => {
+                  // Get unique hours taught in this day
+                  const uniqueHours = Array.from(new Set(daySessions.map(s => parseInt(s.id.split('-')[1]) || 0))).sort((a, b) => a - b);
+                  
+                  let count = 0;
+                  uniqueHours.forEach(hour => {
+                    count++;
+                    if (count > 8) {
+                      if (hour >= 20) {
+                        eveningCount++;
+                        totalEveningCommission += 80000;
+                        sessionCommission += 80000;
+                      } else {
+                        overtimeCount++;
+                        totalOvertimeCommission += 70000;
+                        sessionCommission += 70000;
+                      }
+                    } else {
+                      normalCount++;
+                      const normalPay = t.commissionPerSession || 20000;
+                      totalNormalCommission += normalPay;
+                      sessionCommission += normalPay;
+                    }
+                  });
+                });
+                
+                const baseSalary = t.baseSalary || 0;
+
               // Referral commissions: find contracts where this PT's employeeCode was used
-              const referralContracts = contracts.filter(c => c.referralCode === t.employeeCode);
+              const referralContracts = contracts.filter(c => {
+                if (c.referralCode !== t.employeeCode) return false;
+                if (dateRange) {
+                  const cDate = new Date(c.startDate || new Date());
+                  if (cDate < dateRange.start || cDate > dateRange.end) return false;
+                }
+                return true;
+              });
               const referralCommission = referralContracts.reduce((sum, c) => sum + (c.referralCommission || 0), 0);
               
-              const totalCommission = sessionCommission + referralCommission;
+              const totalCommission = baseSalary + sessionCommission + referralCommission;
 
               return (
-                <div key={t.id} className="p-4 bg-zinc-950 rounded-xl border border-zinc-800 flex justify-between items-center">
-                  <div>
-                    <p className="text-white font-medium">{t.name} {t.employeeCode && <span className="text-zinc-500 text-xs">({t.employeeCode})</span>}</p>
-                    <div className="flex flex-col gap-0.5 mt-1">
-                      <p className="text-zinc-500 text-[10px] uppercase tracking-wider">Dạy: <span className="text-zinc-300">{sessionCommission.toLocaleString()}đ</span> ({completedSessions.length} buổi)</p>
-                      {referralCommission > 0 && (
-                        <p className="text-zinc-500 text-[10px] uppercase tracking-wider">Giới thiệu: <span className="text-zinc-300">{referralCommission.toLocaleString()}đ</span> ({referralContracts.length} HĐ)</p>
-                      )}
+                <div key={t.id} className="p-4 bg-zinc-950 rounded-xl border border-zinc-800 flex justify-between items-center sm:items-start flex-col sm:flex-row gap-4">
+                  <div className="w-full">
+                    <p className="text-white font-bold">{t.name} {t.employeeCode && <span className="text-zinc-500 font-normal">({t.employeeCode})</span>}</p>
+                    
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
+                      <div className="bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1">Cơ bản</p>
+                        <p className="text-zinc-200 font-medium text-sm">{baseSalary.toLocaleString()}đ</p>
+                      </div>
+                      <div className="bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1">Giới thiệu ({referralContracts.length})</p>
+                        <p className="text-zinc-200 font-medium text-sm">{referralCommission.toLocaleString()}đ</p>
+                      </div>
+                      <div className="bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1">Ca Thường ({normalCount})</p>
+                        <p className="text-pink-400 font-medium text-sm">{totalNormalCommission.toLocaleString()}đ</p>
+                      </div>
+                      <div className="bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1">Ngoài giờ ({overtimeCount}) & Tối ({eveningCount})</p>
+                        <p className="text-orange-400 font-medium text-sm">{(totalOvertimeCommission + totalEveningCommission).toLocaleString()}đ</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-green-400 font-bold text-lg">{totalCommission.toLocaleString()}đ</p>
+                  <div className="text-right whitespace-nowrap self-end sm:self-center mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-0 border-zinc-800 w-full sm:w-auto flex sm:block justify-between items-center">
+                    <span className="sm:hidden text-zinc-400 font-medium">Tổng nhận:</span>
+                    <p className="text-green-400 font-black text-xl">{totalCommission.toLocaleString()}đ</p>
                   </div>
                 </div>
               );

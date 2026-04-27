@@ -106,6 +106,7 @@ export interface Trainer {
   branchId?: string;
   commissionRate: number; // Percentage for referral
   commissionPerSession?: number; // Fixed amount per session
+  baseSalary?: number; // Lương cơ bản
   status: 'active' | 'inactive';
   priority?: number; // Add this
 }
