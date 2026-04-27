@@ -29,17 +29,29 @@ export default function TrainerPayroll({ user, profile }: Props) {
     const session = sessions.find(s => s.id === sessionId);
     if (!session) return;
 
-    let contractToUpdate = null;
+    let contractToUpdate: any = null;
+    const classId = `${session.id.split('-').slice(0, 2).join('-')}-${session.date}`;
+    
     if (session.verifiedByStudent && status !== 'completed') {
-      const classIdToRemove = `${session.id.split('-').slice(0, 2).join('-')}-${session.date}`;
-      const contract = contracts.find(c => c.studentId === session.studentId && c.attendedClasses?.includes(classIdToRemove));
+      const contract = contracts.find(c => c.studentId === session.studentId && c.attendedClasses?.includes(classId));
       if (contract) {
         const newUsedSessions = Math.max(0, contract.usedSessions - 1);
         contractToUpdate = { 
           ...contract, 
           usedSessions: newUsedSessions,
           status: newUsedSessions < contract.totalSessions ? 'active' : contract.status,
-          attendedClasses: contract.attendedClasses.filter(id => id !== classIdToRemove)
+          attendedClasses: contract.attendedClasses.filter(id => id !== classId)
+        };
+      }
+    } else if (!session.verifiedByStudent && status === 'completed') {
+      const contract = contracts.find(c => c.studentId === session.studentId && c.status === 'active');
+      if (contract && !contract.attendedClasses?.includes(classId)) {
+        const newUsedSessions = contract.usedSessions + 1;
+        contractToUpdate = {
+          ...contract,
+          usedSessions: newUsedSessions,
+          status: newUsedSessions >= contract.totalSessions ? 'expired' : 'active',
+          attendedClasses: [...(contract.attendedClasses || []), classId]
         };
       }
     }
@@ -47,7 +59,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
     const updatedSession: Session = { 
       ...session, 
       status, 
-      verifiedByStudent: status === 'scheduled' || status === 'canceled_by_student' ? false : session.verifiedByStudent 
+      verifiedByStudent: status === 'completed' ? true : (status === 'scheduled' || status === 'canceled_by_student' ? false : session.verifiedByStudent)
     };
     
     try {
@@ -270,19 +282,25 @@ export default function TrainerPayroll({ user, profile }: Props) {
 
   const handleAutoConfirm = async () => {
     if (!user) return;
-    if (!confirm('Xác nhận TẤT CẢ các ca dạy chưa xác nhận (đã qua thời gian thực tế) trên toàn hệ thống thành Đã hoàn thành?')) return;
+    if (!confirm('Xác nhận TẤT CẢ các ca dạy (đã qua thời gian thực tế) trên toàn hệ thống thành Đã hoàn thành và ĐỒNG BỘ trừ các buổi tập vào hợp đồng học viên?')) return;
     
     const now = new Date();
     
     const toUpdate = sessions.filter(s => {
-      if (s.status !== 'scheduled') return false;
-      const hour = parseInt(s.id.split('-')[1]) || 0;
+      // 1. Chốt các ca 'scheduled' đã qua giờ
+      if (s.status === 'scheduled') {
+        const hour = parseInt(s.id.split('-')[1]) || 0;
+        const [year, month, day] = s.date.split('-').map(Number);
+        const sessionTime = new Date(year, month - 1, day, hour + 1, 0, 0); 
+        if (sessionTime < now) return true;
+      }
       
-      const [year, month, day] = s.date.split('-').map(Number);
-      // Giả sử 1 ca kéo dài 1 tiếng. Xác nhận nếu thời gian hiện tại đã qua thời gian kết thúc ca.
-      const sessionTime = new Date(year, month - 1, day, hour + 1, 0, 0); 
+      // 2. Đồng bộ các ca đã click hoàn thành trước đó nhưng chưa được trừ điểm danh (chưa verified)
+      if (s.status === 'completed' && !s.verifiedByStudent) {
+        return true;
+      }
       
-      return sessionTime < now;
+      return false;
     });
 
     if (toUpdate.length === 0) {
@@ -291,9 +309,30 @@ export default function TrainerPayroll({ user, profile }: Props) {
     }
 
     try {
+      const contractsMap = new Map();
+
       for (const session of toUpdate) {
-        await updateSession({ ...session, status: 'completed' });
+        const classId = `${session.id.split('-').slice(0, 2).join('-')}-${session.date}`;
+        let contract = contractsMap.get(session.studentId) || contracts.find(c => c.studentId === session.studentId && c.status === 'active');
+        
+        if (!session.verifiedByStudent && contract && !contract.attendedClasses?.includes(classId)) {
+          const newUsedSessions = contract.usedSessions + 1;
+          contract = {
+            ...contract,
+            usedSessions: newUsedSessions,
+            status: newUsedSessions >= contract.totalSessions ? 'expired' : 'active',
+            attendedClasses: [...(contract.attendedClasses || []), classId]
+          };
+          contractsMap.set(session.studentId, contract);
+        }
+        
+        await updateSession({ ...session, status: 'completed', verifiedByStudent: true });
       }
+
+      for (const contract of Array.from(contractsMap.values())) {
+        await updateContract(contract);
+      }
+
       alert(`Đã tự động xác nhận ${toUpdate.length} học viên / ca tập thành công!`);
     } catch (e) {
       alert('Có lỗi xảy ra: ' + (e as Error).message);
