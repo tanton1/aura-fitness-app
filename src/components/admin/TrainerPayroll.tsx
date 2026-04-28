@@ -19,6 +19,17 @@ export default function TrainerPayroll({ user, profile }: Props) {
   const [sessionSearch, setSessionSearch] = useState('');
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   
+  const isPTUser = profile?.role === 'trainer';
+  const currentTrainer = useMemo(() => {
+    return trainers.find(t => t.email?.toLowerCase() === user?.email?.toLowerCase());
+  }, [trainers, user]);
+
+  useEffect(() => {
+    if (isPTUser && currentTrainer) {
+      setSelectedTrainerId(currentTrainer.id);
+    }
+  }, [isPTUser, currentTrainer]);
+
   // Edit Session State
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [editFormData, setEditFormData] = useState({ date: '', hour: 0, trainerId: '' });
@@ -392,6 +403,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
       </div>
 
       {/* PT Subtabs */}
+      {!isPTUser && (
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         <button
           onClick={() => setSelectedTrainerId('all')}
@@ -417,6 +429,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
           </button>
         ))}
       </div>
+      )}
 
       {/* Day Subtabs */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -568,7 +581,9 @@ export default function TrainerPayroll({ user, profile }: Props) {
                             ) : (
                               <button onClick={() => markSession(s.id, 'scheduled')} className="p-2 text-zinc-400 hover:text-white bg-zinc-800 rounded-lg transition-colors" title="Hoàn tác"><RotateCcw className="w-4 h-4" /></button>
                             )}
-                            <button onClick={() => handleDeleteSession(s.id)} className="p-2 text-zinc-600 hover:text-red-400 transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-4 h-4" /></button>
+                            {!isPTUser && (
+                              <button onClick={() => handleDeleteSession(s.id)} className="p-2 text-zinc-600 hover:text-red-400 transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-4 h-4" /></button>
+                            )}
                           </div>
                         </div>
                       );
@@ -791,7 +806,8 @@ export default function TrainerPayroll({ user, profile }: Props) {
                 <select
                   value={editFormData.trainerId}
                   onChange={e => setEditFormData({...editFormData, trainerId: e.target.value})}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500"
+                  disabled={isPTUser}
+                  className="w-full bg-zinc-950 border border-zinc-800 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {trainers.map(t => (
                     <option key={t.id} value={t.id}>{t.name}</option>
