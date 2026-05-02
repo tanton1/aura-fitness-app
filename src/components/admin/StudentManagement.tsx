@@ -33,6 +33,7 @@ export default function StudentManagement({ user, profile }: Props) {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+  const [selectedTrainerId, setSelectedTrainerId] = useState<string>('all');
   const [contractFilter, setContractFilter] = useState<'active' | 'expiring_week' | 'expiring_month' | 'expired' | 'paused' | 'all'>('all');
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -54,21 +55,52 @@ export default function StudentManagement({ user, profile }: Props) {
     branchId: '',
   });
 
+  const allowedStudents = useMemo(() => {
+    let allowed = [...students];
+
+    // Restrict what PTs can see globally
+    if (profile?.role === 'trainer') {
+      const currentTrainer = trainers.find(t => t.email?.toLowerCase() === user?.email?.toLowerCase());
+      if (currentTrainer) {
+        allowed = allowed.filter(s => {
+          const studentContracts = contracts.filter(c => c.studentId === s.id);
+          const activeContracts = studentContracts.filter(c => c.status === 'active');
+          
+          let isAssignedToMe = false;
+          if (activeContracts.length > 0) {
+            isAssignedToMe = activeContracts.some(c => c.trainerId === currentTrainer.id);
+          } else if (studentContracts.length > 0) {
+            studentContracts.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+            isAssignedToMe = studentContracts[0].trainerId === currentTrainer.id;
+          }
+
+          const isUnassigned = activeContracts.length === 0 || activeContracts.every(c => !c.trainerId);
+          const isSameBranch = currentTrainer.branchId ? s.branchId === currentTrainer.branchId : false;
+
+          return isAssignedToMe || (isUnassigned && isSameBranch);
+        });
+      }
+    } else if (profile?.branchId && profile.role !== 'admin' && profile.role !== 'trainer') {
+      // Restrict other roles by branch globally
+      allowed = allowed.filter(s => s.branchId === profile.branchId || !s.branchId);
+    }
+
+    return allowed;
+  }, [students, profile, trainers, user, contracts]);
+
   const filteredStudents = useMemo(() => {
-    let filtered = students.filter(s => 
+    let filtered = allowedStudents.filter(s => 
       (s.name && s.name.toLowerCase().includes(searchTerm.toLowerCase())) || 
       (s.phone && s.phone.includes(searchTerm))
     );
 
-    // Filter by branch
+    // Filter by branch (on top of allowed)
     if (selectedBranchId !== 'all') {
       if (selectedBranchId === 'none') {
         filtered = filtered.filter(s => !s.branchId || s.branchId === '');
       } else {
         filtered = filtered.filter(s => s.branchId === selectedBranchId);
       }
-    } else if (profile?.branchId && profile.role !== 'admin' && profile.role !== 'trainer') {
-      filtered = filtered.filter(s => s.branchId === profile.branchId || !s.branchId);
     }
 
     if (dateRange) {
@@ -80,6 +112,31 @@ export default function StudentManagement({ user, profile }: Props) {
         const joinDate = new Date(s.joinDate);
         return joinDate >= dateRange.start && joinDate <= dateRange.end;
       });
+    }
+
+    // Filter by trainer dropdown
+    if (selectedTrainerId !== 'all') {
+      if (selectedTrainerId === 'none') {
+        filtered = filtered.filter(s => {
+          const studentContracts = contracts.filter(c => c.studentId === s.id && c.status === 'active');
+          return studentContracts.length === 0 || studentContracts.every(c => !c.trainerId);
+        });
+      } else {
+        filtered = filtered.filter(s => {
+          const studentContracts = contracts.filter(c => c.studentId === s.id);
+          // If no contracts, they aren't assigned to this trainer
+          if (studentContracts.length === 0) return false;
+          // Check if any active contract is assigned to this trainer
+          // Or if no active contracts, check the latest contract
+          studentContracts.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+          const activeContracts = studentContracts.filter(c => c.status === 'active');
+          if (activeContracts.length > 0) {
+            return activeContracts.some(c => c.trainerId === selectedTrainerId);
+          } else {
+            return studentContracts[0].trainerId === selectedTrainerId;
+          }
+        });
+      }
     }
 
     if (contractFilter !== 'all') {
@@ -135,7 +192,7 @@ export default function StudentManagement({ user, profile }: Props) {
     }
 
     return filtered;
-  }, [students, searchTerm, dateRange, selectedBranchId, profile, contracts, contractFilter]);
+  }, [students, searchTerm, dateRange, selectedBranchId, profile, contracts, contractFilter, selectedTrainerId, trainers, user]);
 
   const handleSaveContract = async (newContract: StudentContract) => {
     try {
@@ -440,34 +497,62 @@ export default function StudentManagement({ user, profile }: Props) {
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="mb-8 flex items-center justify-between gap-3">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <img src={LOGO_URL} alt="Aura" className="h-10 w-10 object-contain" />
           <div>
             <h1 className="text-3xl md:text-4xl font-serif font-medium text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.8)] tracking-tight border-b-4 border-pink-500/30 pb-2 inline-block shadow-[0_6px_0_rgba(236,72,153,0.2)] rounded-2xl">
               Học viên ({filteredStudents.length})
             </h1>
-            <p className="text-zinc-400 mt-2">Quản lý danh sách học viên và hợp đồng</p>
+            <p className="text-zinc-400 mt-2 text-sm">Quản lý danh sách học viên và hợp đồng</p>
           </div>
         </div>
+        <button
+          onClick={() => {
+            if (profile?.role !== 'admin') {
+              setAlertMessage("Bạn không có quyền thực hiện thao tác này.");
+              return;
+            }
+            setEditingStudent(null);
+            setFormData({ name: '', phone: '', email: '', dob: '', sessionsPerWeek: 3, availableSlots: [], status: 'active', branchId: '' });
+            setError(null);
+            setIsAdding(true);
+          }}
+          className={`bg-pink-500 text-white px-5 py-2.5 rounded-xl transition-colors flex items-center justify-center shadow-[0_0_15px_rgba(255,0,127,0.4)] ${profile?.role !== 'admin' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-pink-600'}`}
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          <span className="font-medium">Thêm học viên</span>
+        </button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-            <input
-              type="text"
-              placeholder="Tìm tên, SĐT học viên..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-pink-500"
-            />
-          </div>
+      <div className="bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800 space-y-4 mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+          <input
+            type="text"
+            placeholder="Tìm tên, SĐT học viên..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-pink-500 transition-colors"
+          />
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {profile?.role !== 'trainer' && (
+            <select 
+              value={selectedTrainerId}
+              onChange={(e) => setSelectedTrainerId(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500 transition-colors text-sm"
+            >
+              <option value="all">Tất cả PT</option>
+              <option value="none">Chưa có PT</option>
+              {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
           <select 
             value={selectedBranchId}
             onChange={(e) => setSelectedBranchId(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-3 rounded-xl focus:outline-none focus:border-pink-500"
+            className="w-full bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500 transition-colors text-sm"
           >
             <option value="all">Tất cả chi nhánh</option>
             <option value="none">Chưa xác định</option>
@@ -476,38 +561,22 @@ export default function StudentManagement({ user, profile }: Props) {
           <select 
             value={contractFilter}
             onChange={(e) => setContractFilter(e.target.value as any)}
-            className="bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-3 rounded-xl focus:outline-none focus:border-pink-500"
+            className="w-full bg-zinc-900 border border-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500 transition-colors text-sm"
           >
             <option value="active">Đang tập (Ẩn hết hạn)</option>
             <option value="expiring_week">Sắp hết trong tuần</option>
             <option value="expiring_month">Sắp hết trong tháng</option>
             <option value="expired">Đã hết hạn</option>
             <option value="paused">Khách bảo lưu</option>
-            <option value="all">Tất cả</option>
+            <option value="all">Tất cả trạng thái</option>
           </select>
-          <button
-            onClick={() => {
-              if (profile?.role !== 'admin') {
-                setAlertMessage("Bạn không có quyền thực hiện thao tác này.");
-                return;
-              }
-              setEditingStudent(null);
-              setFormData({ name: '', phone: '', email: '', dob: '', sessionsPerWeek: 3, availableSlots: [], status: 'active', branchId: '' });
-              setError(null);
-              setIsAdding(true);
-            }}
-            className={`bg-pink-500 text-white px-4 py-3 rounded-xl transition-colors flex items-center justify-center shadow-[0_0_15px_rgba(255,0,127,0.4)] ${profile?.role !== 'admin' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-pink-600'}`}
-          >
-            <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline ml-2 font-medium">Thêm mới</span>
-          </button>
+          <DateRangeFilter onFilter={(start, end) => setDateRange({ start, end })} />
         </div>
-        <DateRangeFilter onFilter={(start, end) => setDateRange({ start, end })} />
       </div>
 
       <LeaveApprovals 
         leaveRequests={leaveRequests || []} 
-        students={students} 
+        students={allowedStudents} 
         contracts={contracts} 
       />
 

@@ -72,10 +72,13 @@ export default function DateRangeFilter({ onFilter, excludeFuture }: Props) {
   }
 
   return (
-    <div className="relative">
-      <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-zinc-400 hover:text-white text-sm shrink-0 whitespace-nowrap">
-        <Calendar className="w-4 h-4" />
-        {range}
+    <div className="relative w-full">
+      <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors whitespace-nowrap">
+        <div className="flex items-center gap-2 truncate">
+          <Calendar className="w-4 h-4 shrink-0" />
+          <span className="truncate text-sm">{range}</span>
+        </div>
+        <div className="shrink-0 text-xs text-zinc-500">▾</div>
       </button>
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 bg-zinc-900 border border-zinc-800 rounded-xl p-2 shadow-xl z-[60] w-64 sm:w-48">

@@ -13,7 +13,7 @@ export default function LeaveApprovals({ leaveRequests, students, contracts }: P
   const { updateLeaveRequest, updateContract, deleteSession, sessions } = useDatabase();
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const pendingRequests = leaveRequests.filter(r => r.status === 'pending');
+  const pendingRequests = leaveRequests.filter(r => r.status === 'pending' && students.some(s => s.id === r.studentId));
 
   if (pendingRequests.length === 0) return null;
 
