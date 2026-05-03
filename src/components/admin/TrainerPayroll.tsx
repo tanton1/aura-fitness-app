@@ -415,7 +415,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
         >
           Tất cả PT
         </button>
-        {trainers.map(t => (
+        {trainers.filter(t => t.status === 'active').map(t => (
           <button
             key={t.id}
             onClick={() => setSelectedTrainerId(t.id)}
@@ -612,7 +612,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
               <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Tổng chi trả</p>
               <p className="text-xl font-black text-white">
                 {trainers
-                  .filter(t => selectedTrainerId === 'all' || t.id === selectedTrainerId)
+                  .filter(t => t.status === 'active' && (selectedTrainerId === 'all' || t.id === selectedTrainerId))
                   .reduce((sum, t) => {
                     const completed = sessions.filter(s => {
                       if (s.trainerId !== t.id || s.status !== 'completed') return false;
@@ -664,7 +664,7 @@ export default function TrainerPayroll({ user, profile }: Props) {
           </div>
           <div className="space-y-3">
             {trainers
-              .filter(t => selectedTrainerId === 'all' || t.id === selectedTrainerId)
+              .filter(t => t.status === 'active' && (selectedTrainerId === 'all' || t.id === selectedTrainerId))
               .map(t => {
                 const completedSessions = sessions.filter(s => {
                   if (s.trainerId !== t.id || s.status !== 'completed') return false;

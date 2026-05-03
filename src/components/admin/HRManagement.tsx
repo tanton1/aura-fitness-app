@@ -411,10 +411,24 @@ export default function HRManagement({ user }: Props) {
             trainers.length > 0 ? trainers.map(t => (
               <div key={t.id} className="p-4 bg-zinc-950 rounded-xl border border-zinc-800 flex justify-between items-center">
                 <div>
-                  <h3 className="text-white font-medium">{t.name} {t.employeeCode && <span className="text-zinc-500 text-xs">({t.employeeCode})</span>}</h3>
+                  <h3 className="text-white font-medium">{t.name} {t.employeeCode && <span className="text-zinc-500 text-xs">({t.employeeCode})</span>} {t.status === 'inactive' && <span className="text-red-500 text-xs ml-2">(Ngưng HĐ)</span>}</h3>
                   <p className="text-zinc-500 text-sm">{t.email} - {t.commissionRate}% - {(t.commissionPerSession || 0).toLocaleString()}đ/buổi</p>
                 </div>
-                <div className="flex gap-2">
+                 <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      const newStatus = t.status === 'inactive' ? 'active' : 'inactive';
+                      updateTrainer({ ...t, status: newStatus });
+                      const staffMember = staff.find(s => s.id === t.id);
+                      if (staffMember) {
+                        updateStaff({ ...staffMember, status: newStatus });
+                      }
+                    }}
+                    className={`p-2 rounded-lg ${t.status === 'inactive' ? 'text-green-400 hover:text-green-300' : 'text-yellow-400 hover:text-yellow-300'}`}
+                    title={t.status === 'inactive' ? 'Kích hoạt' : 'Ngưng HĐ'}
+                  >
+                    {t.status === 'inactive' ? <ShieldCheck className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  </button>
                   <button onClick={() => { setEditingItem(t); setFormData(t); setError(null); setIsAdding(true); }} className="p-2 text-zinc-400 hover:text-white"><Edit2 className="w-4 h-4" /></button>
                   <button onClick={() => handleDelete(t.id)} className="p-2 text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
                 </div>

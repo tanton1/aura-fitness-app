@@ -546,7 +546,7 @@ export default function StudentManagement({ user, profile }: Props) {
             >
               <option value="all">Tất cả PT</option>
               <option value="none">Chưa có PT</option>
-              {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {trainers.filter(t => t.status === 'active').map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           )}
           <select 

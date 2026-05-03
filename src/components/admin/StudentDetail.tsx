@@ -789,7 +789,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                     className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500"
                   >
                     <option value="">-- Bất kỳ PT nào --</option>
-                    {trainers.map(t => (
+                    {trainers.filter(t => t.status === 'active').map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                   </select>
