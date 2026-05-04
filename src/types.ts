@@ -164,6 +164,7 @@ export interface StudentContract {
   id: string;
   studentId: string;
   trainerId?: string;
+  trainerIds?: string[];
   branchId?: string;
   packageId: string;
   packageName: string;

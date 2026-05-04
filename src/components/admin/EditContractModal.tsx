@@ -92,15 +92,33 @@ export default function EditContractModal({ contract, packages, trainers, branch
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-1">PT</label>
-            <select 
-              value={formData.trainerId || ''}
-              onChange={e => setFormData({ ...formData, trainerId: e.target.value })}
-              className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500"
-            >
-              <option value="">-- Bất kỳ PT nào --</option>
-              {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <label className="block text-sm font-medium text-zinc-400 mb-2">Huấn luyện viên (Có thể chọn nhiều hơn 1)</label>
+            <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 border border-zinc-800 rounded-xl bg-zinc-950">
+              {trainers.map(t => (
+                <label key={t.id} className="flex items-center gap-2 text-white cursor-pointer hover:bg-zinc-900 p-2 rounded-lg">
+                  <input
+                    type="checkbox"
+                    checked={formData.trainerIds?.includes(t.id) || (formData.trainerIds === undefined && formData.trainerId === t.id) || false}
+                    onChange={e => {
+                      const currentTrainerIds = formData.trainerIds || (formData.trainerId ? [formData.trainerId] : []);
+                      let nextTrainerIds: string[];
+                      if (e.target.checked) {
+                        nextTrainerIds = [...currentTrainerIds, t.id];
+                      } else {
+                        nextTrainerIds = currentTrainerIds.filter(id => id !== t.id);
+                      }
+                      setFormData({ 
+                        ...formData, 
+                        trainerIds: nextTrainerIds,
+                        trainerId: nextTrainerIds[0] || undefined
+                      });
+                    }}
+                    className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-pink-500 focus:ring-pink-500 focus:ring-offset-zinc-900"
+                  />
+                  <span className="text-sm truncate">{t.name}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

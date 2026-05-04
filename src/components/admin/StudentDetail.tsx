@@ -26,7 +26,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   const { dailyCheckins: allDailyCheckins, payments, addPayment, deletePayment } = useDatabase();
   const [isAddingPackage, setIsAddingPackage] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState('');
-  const [selectedTrainerId, setSelectedTrainerId] = useState('');
+  const [selectedTrainerIds, setSelectedTrainerIds] = useState<string[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
@@ -192,7 +192,8 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     const newContract: StudentContract = {
       id: Date.now().toString(),
       studentId: student.id,
-      trainerId: selectedTrainerId,
+      trainerId: selectedTrainerIds[0] || undefined,
+      trainerIds: selectedTrainerIds,
       branchId: selectedBranchId,
       packageId: pkg.id,
       packageName: pkg.name,
@@ -217,7 +218,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     onSaveContract(newContract);
     setIsAddingPackage(false);
     setSelectedPackageId('');
-    setSelectedTrainerId('');
+    setSelectedTrainerIds([]);
     setSelectedBranchId('');
     setReferralCode('');
     setStartDate(new Date().toISOString().split('T')[0]);
@@ -782,17 +783,26 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">Chọn PT (Không bắt buộc)</label>
-                  <select 
-                    value={selectedTrainerId}
-                    onChange={e => setSelectedTrainerId(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500"
-                  >
-                    <option value="">-- Bất kỳ PT nào --</option>
+                  <label className="block text-sm font-medium text-zinc-400 mb-2">Chọn PT (Có thể chọn nhiều hơn 1)</label>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border border-zinc-800 rounded-xl bg-zinc-950">
                     {trainers.filter(t => t.status === 'active').map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
+                      <label key={t.id} className="flex items-center gap-2 text-white cursor-pointer hover:bg-zinc-900 p-2 rounded-lg">
+                        <input
+                          type="checkbox"
+                          checked={selectedTrainerIds.includes(t.id)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedTrainerIds(prev => [...prev, t.id]);
+                            } else {
+                              setSelectedTrainerIds(prev => prev.filter(id => id !== t.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-pink-500 focus:ring-pink-500 focus:ring-offset-zinc-900"
+                        />
+                        <span className="text-sm truncate">{t.name}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div>

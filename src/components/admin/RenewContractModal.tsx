@@ -21,7 +21,7 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
   const [installmentCount, setInstallmentCount] = useState(1);
   const [installments, setInstallments] = useState<{date: string, amount: number}[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card'>('transfer');
-  const [trainerId, setTrainerId] = useState(latestContract.trainerId || '');
+  const [trainerIds, setTrainerIds] = useState<string[]>(latestContract.trainerIds || (latestContract.trainerId ? [latestContract.trainerId] : []));
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -49,7 +49,7 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
       setInstallmentCount(1);
       setInstallments([]);
       setPaymentMethod('transfer');
-      setTrainerId(latestContract.trainerId || '');
+      setTrainerIds(latestContract.trainerIds || (latestContract.trainerId ? [latestContract.trainerId] : []));
       setNote('');
       setCarryOver(remainingSessions > 0);
     }
@@ -138,7 +138,8 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
         totalPrice: finalPrice,
         paidAmount: initialPaid,
         status: 'active',
-        trainerId: trainerId || undefined,
+        trainerId: trainerIds[0] || undefined,
+        trainerIds: trainerIds,
         installments: [
           ...(initialPaid > 0 ? [{
             id: Date.now().toString() + '-inst-init',
@@ -252,17 +253,26 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm text-zinc-400">Huấn luyện viên</label>
-                  <select
-                    value={trainerId}
-                    onChange={(e) => setTrainerId(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500"
-                  >
-                    <option value="">-- Không chọn --</option>
-                    {trainers.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
+                  <label className="block text-sm text-zinc-400">Huấn luyện viên (Có thể chọn nhiều hơn 1)</label>
+                  <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 border border-zinc-800 rounded-xl bg-zinc-950">
+                    {trainers.filter(t => t.status === 'active').map(t => (
+                      <label key={t.id} className="flex items-center gap-2 text-white cursor-pointer hover:bg-zinc-900 p-2 rounded-lg">
+                        <input
+                          type="checkbox"
+                          checked={trainerIds.includes(t.id)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setTrainerIds(prev => [...prev, t.id]);
+                            } else {
+                              setTrainerIds(prev => prev.filter(id => id !== t.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-pink-500 focus:ring-pink-500 focus:ring-offset-zinc-900"
+                        />
+                        <span className="text-sm truncate">{t.name}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div className="space-y-2">

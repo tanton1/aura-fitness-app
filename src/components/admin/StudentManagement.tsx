@@ -68,16 +68,15 @@ export default function StudentManagement({ user, profile }: Props) {
           
           let isAssignedToMe = false;
           if (activeContracts.length > 0) {
-            isAssignedToMe = activeContracts.some(c => c.trainerId === currentTrainer.id);
+            isAssignedToMe = activeContracts.some(c => c.trainerId === currentTrainer.id || c.trainerIds?.includes(currentTrainer.id));
           } else if (studentContracts.length > 0) {
             studentContracts.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-            isAssignedToMe = studentContracts[0].trainerId === currentTrainer.id;
+            isAssignedToMe = studentContracts[0].trainerId === currentTrainer.id || studentContracts[0].trainerIds?.includes(currentTrainer.id) || false;
           }
 
-          const isUnassigned = activeContracts.length === 0 || activeContracts.every(c => !c.trainerId);
           const isSameBranch = currentTrainer.branchId ? s.branchId === currentTrainer.branchId : false;
 
-          return isAssignedToMe || (isUnassigned && isSameBranch);
+          return isAssignedToMe || isSameBranch;
         });
       }
     } else if (profile?.branchId && profile.role !== 'admin' && profile.role !== 'trainer') {
@@ -119,7 +118,7 @@ export default function StudentManagement({ user, profile }: Props) {
       if (selectedTrainerId === 'none') {
         filtered = filtered.filter(s => {
           const studentContracts = contracts.filter(c => c.studentId === s.id && c.status === 'active');
-          return studentContracts.length === 0 || studentContracts.every(c => !c.trainerId);
+          return studentContracts.length === 0 || studentContracts.every(c => !c.trainerId && (!c.trainerIds || c.trainerIds.length === 0));
         });
       } else {
         filtered = filtered.filter(s => {
@@ -131,9 +130,9 @@ export default function StudentManagement({ user, profile }: Props) {
           studentContracts.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
           const activeContracts = studentContracts.filter(c => c.status === 'active');
           if (activeContracts.length > 0) {
-            return activeContracts.some(c => c.trainerId === selectedTrainerId);
+            return activeContracts.some(c => c.trainerId === selectedTrainerId || c.trainerIds?.includes(selectedTrainerId));
           } else {
-            return studentContracts[0].trainerId === selectedTrainerId;
+            return studentContracts[0].trainerId === selectedTrainerId || studentContracts[0].trainerIds?.includes(selectedTrainerId);
           }
         });
       }
