@@ -107,7 +107,7 @@ export default function Dashboard({ profile, onUpdateProfile }: Props) {
     
     const newEatenMeals = {
       ...(profile.eaten_meals || {}),
-      [todayDateStr]: [...rawEatenMeals, nextMeal]
+      [localTodayStr]: [...rawEatenMeals, nextMeal]
     };
     
     onUpdateProfile({

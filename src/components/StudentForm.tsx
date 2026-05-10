@@ -9,9 +9,10 @@ interface Props {
   onCancelEdit?: () => void;
   isAvailabilityOnly?: boolean;
   scheduleConfig: ScheduleConfig;
+  isAdmin?: boolean;
 }
 
-export default function StudentForm({ onSave, initialData, onCancelEdit, isAvailabilityOnly, scheduleConfig }: Props) {
+export default function StudentForm({ onSave, initialData, onCancelEdit, isAvailabilityOnly, scheduleConfig, isAdmin }: Props) {
   const [name, setName] = useState('');
   const [sessions, setSessions] = useState(3);
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
@@ -106,12 +107,20 @@ export default function StudentForm({ onSave, initialData, onCancelEdit, isAvail
                   max="6"
                   value={sessions || ''}
                   onChange={(e) => setSessions(parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none text-white transition-all appearance-none"
+                  disabled={!isAdmin}
+                  className={`w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none text-white transition-all appearance-none ${!isAdmin ? 'opacity-60 cursor-not-allowed hidden' : ''}`}
                   required={!isAvailabilityOnly}
                 />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none font-medium">
-                  buổi
-                </div>
+                {!isAdmin && (
+                  <div className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-white">
+                    {sessions} <span className="text-zinc-500">buổi/tuần</span>
+                  </div>
+                )}
+                {isAdmin && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none font-medium">
+                    buổi
+                  </div>
+                )}
               </div>
             </div>
           </div>

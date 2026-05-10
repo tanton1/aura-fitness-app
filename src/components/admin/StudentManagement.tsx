@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Student, UserProfile, StudentContract, TrainingPackage, Trainer, Branch, Session, PaymentRecord } from '../../types';
 import { User } from 'firebase/auth';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import firebaseConfig from '../../../firebase-applet-config.json';
@@ -79,7 +79,7 @@ export default function StudentManagement({ user, profile }: Props) {
           return isAssignedToMe || isSameBranch;
         });
       }
-    } else if (profile?.branchId && profile.role !== 'admin' && profile.role !== 'trainer') {
+    } else if (profile?.branchId && profile.role !== 'admin') {
       // Restrict other roles by branch globally
       allowed = allowed.filter(s => s.branchId === profile.branchId || !s.branchId);
     }
@@ -211,6 +211,7 @@ export default function StudentManagement({ user, profile }: Props) {
       await addContract(newContract);
 
       if (newContract.paidAmount > 0) {
+        const initInst = newContract.installments?.find(i => i.status === 'paid');
         const payment: PaymentRecord = {
           id: Date.now().toString() + '-p',
           contractId: newContract.id,
@@ -218,7 +219,8 @@ export default function StudentManagement({ user, profile }: Props) {
           amount: newContract.paidAmount,
           date: new Date().toISOString(),
           method: 'transfer',
-          note: 'Thanh toán lần đầu khi đăng ký gói'
+          note: 'Thanh toán lần đầu khi đăng ký gói',
+          installmentId: initInst ? initInst.id : undefined
         };
         await addPayment(payment);
       }
@@ -439,32 +441,35 @@ export default function StudentManagement({ user, profile }: Props) {
     const id = studentToDelete;
     
     try {
-      await deleteStudent(id);
-      
-      // Delete associated contracts
-      const studentContracts = contracts.filter(c => c.studentId === id);
-      for (const c of studentContracts) {
-        await deleteContract(c.id);
+      const batch = writeBatch(db);
+
+      // Delete associated sessions
+      const studentSessions = sessions.filter(s => s.studentId === id);
+      for (const s of studentSessions) {
+        batch.delete(doc(db, 'sessions', s.id));
       }
 
       // Delete associated payments
       const studentPayments = payments.filter(p => p.studentId === id);
       for (const p of studentPayments) {
-        await deletePayment(p.id);
+        batch.delete(doc(db, 'payments', p.id));
       }
 
-      // Delete associated sessions
-      const studentSessions = sessions.filter(s => s.studentId === id);
-      for (const s of studentSessions) {
-        await deleteSession(s.id);
+      // Delete associated contracts
+      const studentContracts = contracts.filter(c => c.studentId === id);
+      for (const c of studentContracts) {
+        batch.delete(doc(db, 'contracts', c.id));
       }
+
+      // Delete auth user doc (if exists in 'users' collection)
+      batch.delete(doc(db, 'users', id));
+
+      // Finally, delete the student document
+      batch.delete(doc(db, 'students', id));
       
-      try {
-        await deleteDoc(doc(db, 'users', id));
-      } catch (e) {
-        console.error("Error deleting user doc:", e);
-      }
-      
+      // Commit the batch atomically
+      await batch.commit();
+
       setAlertMessage("Đã xóa học viên thành công!");
     } catch (e) {
       console.error("Error deleting student data:", e);

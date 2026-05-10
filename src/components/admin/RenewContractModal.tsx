@@ -170,6 +170,7 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
 
       // 5. Create Payment Record if paid
       if (initialPaid > 0) {
+        const initInst = newContract.installments?.find(i => i.status === 'paid');
         const paymentRecord: PaymentRecord = {
           id: Date.now().toString() + '-pay',
           contractId: newContractId,
@@ -177,7 +178,8 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
           amount: initialPaid,
           date: new Date().toISOString(),
           method: paymentMethod as 'cash' | 'transfer',
-          note: `Thanh toán gia hạn gói ${selectedPackage.name}`
+          note: `Thanh toán gia hạn gói ${selectedPackage.name}`,
+          installmentId: initInst ? initInst.id : undefined
         };
         await addPayment(paymentRecord);
       }

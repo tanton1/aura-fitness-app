@@ -107,7 +107,6 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     
     // Fetch static data that doesn't need real-time updates
     const staticCollections = [
-      { name: 'payments', setter: setPayments },
       { name: 'branches', setter: setBranches },
       { name: 'packages', setter: setPackages },
       { name: 'staff', setter: setStaff },
@@ -146,6 +145,10 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
     unsubs.push(onSnapshot(collection(db, 'sessions'), (snapshot) => {
       setSessions(snapshot.docs.map(doc => doc.data() as Session));
+    }));
+
+    unsubs.push(onSnapshot(collection(db, 'payments'), (snapshot) => {
+      setPayments(snapshot.docs.map(doc => doc.data() as PaymentRecord));
     }));
 
     unsubs.push(onSnapshot(collection(db, 'leaveRequests'), (snapshot) => {

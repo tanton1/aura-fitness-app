@@ -463,6 +463,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                   onCancelEdit={() => setEditingStudent(null)}
                   isAvailabilityOnly={true}
                   scheduleConfig={activeScheduleConfig}
+                  isAdmin={profile?.role === 'admin'}
                 />
               )}
 
@@ -876,8 +877,9 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           <p className="text-zinc-400 mb-6">Vui lòng điền thông tin để Admin xếp lịch cho bạn.</p>
           <StudentForm 
             onSave={handleUserSaveStudent}
-            initialData={{ id: user?.uid || '', name: profile?.name || '', sessionsPerWeek: 3, availableSlots: [] }}
+            initialData={{ id: user?.uid || '', name: profile?.name || '', sessionsPerWeek: currentUserStudent?.sessionsPerWeek || 3, availableSlots: [] }}
             scheduleConfig={activeScheduleConfig}
+            isAdmin={profile?.role === 'admin'}
           />
         </div>
       ) : (
@@ -1157,6 +1159,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
                         initialData={currentUserStudent}
                         onCancelEdit={currentUserStudent.isScheduleConfirmed ? () => setEditingStudent(null) : undefined}
                         scheduleConfig={activeScheduleConfig}
+                        isAdmin={profile?.role === 'admin'}
                       />
                     </div>
                   ) : (
