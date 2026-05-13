@@ -31,6 +31,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const [selectedBranchId, setSelectedBranchId] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [studentSessionFilter, setStudentSessionFilter] = useState<'all' | 'this_week' | 'upcoming' | 'history'>('upcoming');
+  const [schedulingBranchId, setSchedulingBranchId] = useState<string>('');
   const [showBulkAdjustMenu, setShowBulkAdjustMenu] = useState(false);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [editFormData, setEditFormData] = useState({ date: '', hour: 0, trainerId: '' });
@@ -168,24 +169,45 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   };
 
   const handleGenerate = () => {
-    const activeStudentList = students.filter(s => studentContracts.has(s.id));
+    // 1. Filter students to schedule based on branch
+    const branchStudents = schedulingBranchId 
+      ? students.filter(s => {
+          const c = contracts.find(ct => ct.studentId === s.id && ct.status === 'active');
+          return (c?.branchId || s.branchId) === schedulingBranchId;
+        })
+      : students;
+
+    const activeStudentList = branchStudents.filter(s => studentContracts.has(s.id));
     const unconfirmedStudents = activeStudentList.filter(s => !s.isScheduleConfirmed);
     if (unconfirmedStudents.length > 0) {
-      if (!confirm(`Có ${unconfirmedStudents.length} học viên đang active chưa chốt lịch rảnh. Bạn có chắc chắn muốn chạy xếp lịch không?`)) {
+      if (!confirm(`Có ${unconfirmedStudents.length} học viên đang active chưa chốt lịch rảnh trong tập dữ liệu này. Bạn có chắc chắn muốn chạy xếp lịch không?`)) {
         return;
       }
     }
-    // Only preserve locked and 'off' entries before generating
+    // Only preserve locked, 'off', and OTHER branches' entries
     const preservedSchedule: Schedule = {};
     for (const day of activeScheduleConfig.workingDays) {
       for (const hour of activeScheduleConfig.workingHours) {
         const slotId = `${day}-${hour}`;
-        preservedSchedule[slotId] = (schedule[slotId] || []).filter(e => e.isLocked || e.type === 'off');
+        preservedSchedule[slotId] = (schedule[slotId] || []).filter(e => {
+          if (e.isLocked || e.type === 'off') return true;
+          
+          if (schedulingBranchId) {
+            const student = students.find(s => s.id === e.studentId);
+            const contract = student ? contracts.find(c => c.studentId === student.id && c.status === 'active') : null;
+            const entryBranchId = contract?.branchId || student?.branchId || trainers.find(t => t.id === e.trainerId)?.branchId;
+            
+            // If the entry belongs to a DIFFERENT branch, keep it
+            if (entryBranchId && entryBranchId !== schedulingBranchId) return true;
+          }
+          
+          return false;
+        });
       }
     }
 
     const { start: targetDate } = getWeekRange(weekOffset);
-    const result = generateSchedule(students, trainers, contracts, activeScheduleConfig, preservedSchedule, overriddenSessions, targetDate);
+    const result = generateSchedule(branchStudents, trainers, contracts, activeScheduleConfig, preservedSchedule, overriddenSessions, targetDate);
     
     // Check if any slots were effectively generated
     let generatedCount = 0;
@@ -385,35 +407,16 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           </div>
           
           <div className="flex gap-2">
-            <div className="relative">
-              <button 
-                onClick={() => setShowBulkAdjustMenu(!showBulkAdjustMenu)}
-                className="bg-zinc-800 text-zinc-300 px-4 py-2 text-sm rounded-xl font-bold hover:bg-zinc-700 hover:text-white transition-all flex items-center gap-2 border border-zinc-700"
-              >
-                Chỉnh buổi
-              </button>
-              {showBulkAdjustMenu && (
-                <div className="absolute top-full left-0 mt-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 w-48 overflow-hidden">
-                  <div className="p-2 border-b border-zinc-800 bg-zinc-800/50">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Tuần này</span>
-                  </div>
-                  <button onClick={() => { handleBulkAdjustSessions(1); setShowBulkAdjustMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-zinc-800 text-sm text-zinc-300 hover:text-emerald-400 font-medium transition-colors border-b border-zinc-800/50 flex justify-between items-center">
-                    Cộng thêm 1 buổi <span className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded text-xs">+1</span>
-                  </button>
-                  <button onClick={() => { handleBulkAdjustSessions(-1); setShowBulkAdjustMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-zinc-800 text-sm text-zinc-300 hover:text-red-400 font-medium transition-colors border-b border-zinc-800/50 flex justify-between items-center">
-                    Trừ đi 1 buổi <span className="text-red-500 bg-red-500/10 px-2 py-0.5 rounded text-xs">-1</span>
-                  </button>
-                  <button onClick={() => { updateBulkSessionOverrides(weekId, {}); setShowBulkAdjustMenu(false); }} className="w-full text-left px-4 py-3 hover:bg-zinc-800 text-sm text-zinc-300 hover:text-pink-400 font-medium transition-colors flex justify-between items-center">
-                    Reset về mặc định <RotateCcw className="w-3 h-3 text-pink-400" />
-                  </button>
-                </div>
-              )}
-            </div>
-            {(!schedule || Object.keys(schedule).length === 0) && weekOffset > 0 && (
-              <button onClick={handleCopyPreviousWeek} className="bg-zinc-800 text-zinc-300 px-4 py-2 text-sm rounded-xl font-bold hover:bg-zinc-700 hover:text-white transition-all flex items-center gap-2 border border-zinc-700">
-                <RotateCcw className="w-4 h-4" /> Copy tuần trước
-              </button>
-            )}
+            <select
+              value={schedulingBranchId}
+              onChange={e => setSchedulingBranchId(e.target.value)}
+              className="bg-zinc-800 text-white px-3 py-2 text-sm rounded-xl font-medium border border-zinc-700 focus:outline-none focus:border-pink-500 max-w-[120px] md:max-w-[150px]"
+            >
+              <option value="">Tất cả cơ sở</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
             <button onClick={handleResetSchedule} className="bg-zinc-800 text-zinc-300 px-4 py-2 text-sm rounded-xl font-bold hover:bg-zinc-700 hover:text-white transition-all flex items-center gap-2 border border-zinc-700">
               <RotateCcw className="w-4 h-4" /> Reset Lịch
             </button>

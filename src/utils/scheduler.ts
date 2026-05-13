@@ -166,22 +166,40 @@ export function calculateWarnings(
   }
 
   for (const student of students) {
-    const scheduled = studentScheduledSlots[student.id].length;
+    const slots = studentScheduledSlots[student.id] || [];
+    const scheduled = slots.length;
     const requested = getStudentSessionsPerWeek(student, config, overriddenSessions);
+    
+    const dayCounts: Record<string, number> = {};
+    const slotCounts: Record<string, number> = {};
+    
+    slots.forEach(slot => {
+      const day = slot.split('-')[0];
+      dayCounts[day] = (dayCounts[day] || 0) + 1;
+      slotCounts[slot] = (slotCounts[slot] || 0) + 1;
+    });
+
+    const multipleSessionsDays = Object.keys(dayCounts).filter(day => dayCounts[day] > 1);
+    const overlappingSlots = Object.keys(slotCounts).filter(slot => slotCounts[slot] > 1);
+
     if (scheduled < requested) {
       const suggestions = getSuggestions(student, schedule, trainers, studentScheduledSlots[student.id], config);
       warnings.push({
         studentId: student.id,
         scheduled,
         requested,
-        suggestions
+        suggestions,
+        multipleSessionsDays: multipleSessionsDays.length > 0 ? multipleSessionsDays : undefined,
+        overlappingSlots: overlappingSlots.length > 0 ? overlappingSlots : undefined
       });
-    } else if (scheduled > requested) {
+    } else if (scheduled > requested || multipleSessionsDays.length > 0 || overlappingSlots.length > 0) {
       warnings.push({
         studentId: student.id,
         scheduled,
         requested,
-        suggestions: []
+        suggestions: [],
+        multipleSessionsDays: multipleSessionsDays.length > 0 ? multipleSessionsDays : undefined,
+        overlappingSlots: overlappingSlots.length > 0 ? overlappingSlots : undefined
       });
     }
   }

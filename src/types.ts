@@ -229,6 +229,8 @@ export interface Warning {
   scheduled: number;
   requested: number;
   suggestions: string[];
+  overlappingSlots?: string[];
+  multipleSessionsDays?: string[];
 }
 
 export interface SchedulerResult {
