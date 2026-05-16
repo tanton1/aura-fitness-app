@@ -12,6 +12,7 @@ import { doc, setDoc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getDatesForCurrentWeek, getDatesForWeek, getWeekRange, getMonthRange, isSameDayOrAfter } from '../utils/dateUtils';
 import { useDatabase } from '../contexts/DatabaseContext';
+import DebugInfo from './DebugInfo';
 
 interface Props {
   user: User | null;
@@ -24,6 +25,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     addStudent, updateStudent, updateScheduleData, updateScheduleSlot, updateScheduleSlots, updateSessionOverrides, updateBulkSessionOverrides, addSession, updateContract, updateSession, deleteSession
   } = useDatabase();
   
+  const [debugData, setDebugData] = useState<any>(null);
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeSubTab, setActiveSubTab] = useState<'schedule' | 'students'>('schedule');
   const [studentTab, setStudentTab] = useState<'overview' | 'schedule' | 'profile'>('overview');
@@ -224,7 +226,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     });
     
     if (generatedCount === previousCount) {
-      console.error("DEBUG SCHEDULER: generatedCount === previousCount", {
+      setDebugData({
         branchStudents,
         activeStudentList,
         unconfirmedStudents,
@@ -233,8 +235,10 @@ export default function SchedulerWrapper({ user, profile }: Props) {
         weekOffset,
         targetDate
       });
+      console.error("DEBUG SCHEDULER: generatedCount === previousCount");
       alert("Hệ thống không thể xếp thêm được lịch nào. Vui lòng kiểm tra lại:\n- Học viên đã chọn giờ rảnh chưa?\n- PT có trống lịch vào giờ học viên rảnh không?\n- Học viên đã có đủ số buổi tuần này chưa?\n- PT có bị khoá lịch vào giờ đó không?");
     } else {
+      setDebugData({ success: true, generatedCount, previousCount });
       updateScheduleData(weekId, result.schedule, result.warnings);
     }
   };
@@ -1315,6 +1319,8 @@ export default function SchedulerWrapper({ user, profile }: Props) {
           </div>
         </div>
       )}
+      
+      {debugData && <DebugInfo data={debugData} />}
     </div>
   );
 }

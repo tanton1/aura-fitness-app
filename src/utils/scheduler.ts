@@ -75,13 +75,18 @@ export function generateSchedule(
   
   sortedContracts.forEach(c => {
     if (c.status === 'active' && !studentContracts.has(c.studentId)) {
+      const startDate = new Date(c.startDate);
+      const endOfTargetWeek = new Date(now);
+      endOfTargetWeek.setDate(now.getDate() + 6);
+      endOfTargetWeek.setHours(23, 59, 59, 999);
+      
       const endDate = new Date(c.endDate);
       endDate.setHours(23, 59, 59, 999);
       const timeDiff = endDate.getTime() - now.getTime();
       const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
       const sessionsLeft = c.totalSessions - (c.usedSessions || 0);
       
-      if (daysLeft >= 0 && sessionsLeft > 0) {
+      if (daysLeft >= 0 && sessionsLeft > 0 && startDate.getTime() <= endOfTargetWeek.getTime()) {
         studentContracts.set(c.studentId, c);
       }
     }
@@ -92,11 +97,17 @@ export function generateSchedule(
 
   // Sort students by least available slots first
   const sortedStudents = [...activeStudents].sort(
-    (a, b) => (a.availableSlots?.length || 0) - (b.availableSlots?.length || 0)
+    (a, b) => {
+      const aLen = Array.isArray(a.availableSlots) ? a.availableSlots.length : 0;
+      const bLen = Array.isArray(b.availableSlots) ? b.availableSlots.length : 0;
+      return aLen - bLen;
+    }
   );
 
   // Scheduling logic: Group by branch
-  const branches = Array.from(new Set(trainers.map(t => t.branchId).filter(Boolean))) as string[];
+  const trainerBranches = trainers.map(t => t.branchId).filter(Boolean) as string[];
+  const studentBranches = activeStudents.map(s => studentContracts.get(s.id)?.branchId || s.branchId).filter(Boolean) as string[];
+  const branches = Array.from(new Set([...trainerBranches, ...studentBranches]));
   // If no branches are defined, run at least once for the "empty" branch
   const allBranchIds = branches.length > 0 ? branches : [""];
   
@@ -111,7 +122,7 @@ export function generateSchedule(
 
     // Students for this branch: those assigned to it PLUS those with no assignment (floating)
     const branchStudents = sortedStudents.filter(s => {
-      const sBranchId = studentContracts.get(s.id)?.branchId || "";
+      const sBranchId = studentContracts.get(s.id)?.branchId || s.branchId || "";
       return sBranchId === branchId || sBranchId === "";
     });
 
@@ -232,7 +243,8 @@ function scheduleStudentWithTrainer(
 
   // Find available slots for THIS specific trainer
   const slotsByDay: Record<string, string[]> = {};
-  for (const slot of student.availableSlots || []) {
+  const availableSlotsArray = Array.isArray(student.availableSlots) ? student.availableSlots : [];
+  for (const slot of availableSlotsArray) {
     const [day, hourStr] = slot.split('-');
     const hour = parseInt(hourStr, 10);
     
