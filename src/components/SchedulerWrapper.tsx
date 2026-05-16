@@ -71,8 +71,12 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     const { start: targetDate } = getWeekRange(weekOffset);
     const now = new Date(targetDate);
     now.setHours(0, 0, 0, 0); // Start of target week
-    contracts.forEach(c => {
-      if (c.status === 'active') {
+    
+    // Sort contracts by start date descending to ensure we get the latest
+    const sortedContracts = [...contracts].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+    
+    sortedContracts.forEach(c => {
+      if (c.status === 'active' && !map.has(c.studentId)) {
         const endDate = new Date(c.endDate);
         endDate.setHours(23, 59, 59, 999);
         const timeDiff = endDate.getTime() - now.getTime();
@@ -220,6 +224,15 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     });
     
     if (generatedCount === previousCount) {
+      console.error("DEBUG SCHEDULER: generatedCount === previousCount", {
+        branchStudents,
+        activeStudentList,
+        unconfirmedStudents,
+        preservedSchedule,
+        result,
+        weekOffset,
+        targetDate
+      });
       alert("Hệ thống không thể xếp thêm được lịch nào. Vui lòng kiểm tra lại:\n- Học viên đã chọn giờ rảnh chưa?\n- PT có trống lịch vào giờ học viên rảnh không?\n- Học viên đã có đủ số buổi tuần này chưa?\n- PT có bị khoá lịch vào giờ đó không?");
     } else {
       updateScheduleData(weekId, result.schedule, result.warnings);

@@ -69,8 +69,12 @@ export function generateSchedule(
   const studentContracts = new Map<string, StudentContract>();
   const now = new Date(targetDate);
   now.setHours(0, 0, 0, 0); // Start of target week
-  contracts.forEach(c => {
-    if (c.status === 'active') {
+  
+  // Sort contracts by start date descending to ensure we get the latest
+  const sortedContracts = [...contracts].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  
+  sortedContracts.forEach(c => {
+    if (c.status === 'active' && !studentContracts.has(c.studentId)) {
       const endDate = new Date(c.endDate);
       endDate.setHours(23, 59, 59, 999);
       const timeDiff = endDate.getTime() - now.getTime();
@@ -119,7 +123,10 @@ export function generateSchedule(
         if (studentNeeds[student.id] > 0) {
           // If student has a specific trainer assigned in contract, only schedule with that trainer
           const assignedTrainerId = studentContracts.get(student.id)?.trainerId;
+          const assignedTrainerIds = studentContracts.get(student.id)?.trainerIds || [];
+          
           if (assignedTrainerId && assignedTrainerId !== trainer.id) continue;
+          if (assignedTrainerIds.length > 0 && !assignedTrainerIds.includes(trainer.id)) continue;
 
           scheduleStudentWithTrainer(
             student, 
