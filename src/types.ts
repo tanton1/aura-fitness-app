@@ -236,6 +236,7 @@ export interface Warning {
 export interface SchedulerResult {
   schedule: Schedule;
   warnings: Warning[];
+  debugSteps?: string[];
 }
 
 export interface ScheduleConfig {

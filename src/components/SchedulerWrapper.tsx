@@ -154,7 +154,7 @@ export default function SchedulerWrapper({ user, profile }: Props) {
   const filteredStudents = (students || []).filter(s => 
     (selectedBranchId === 'all' || (selectedBranchId === 'none' ? !s.branchId : s.branchId === selectedBranchId)) &&
     (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone?.includes(searchTerm)) &&
-    studentContracts.has(s.id)
+    s.status !== 'inactive'
   );
 
   const filteredWarnings = (warnings || []).filter(w => 
@@ -227,16 +227,13 @@ export default function SchedulerWrapper({ user, profile }: Props) {
     
     if (generatedCount === previousCount) {
       setDebugData({
-        branchStudents,
-        activeStudentList,
-        unconfirmedStudents,
-        preservedSchedule,
-        result,
-        weekOffset,
-        targetDate
+        message: "Hệ thống không thể xếp thêm được lịch nào. Hãy xem debugSteps.",
+        activeStudentsLength: activeStudentList.length,
+        branchStudentsLength: branchStudents.length,
+        debugSteps: result.debugSteps
       });
-      console.error("DEBUG SCHEDULER: generatedCount === previousCount");
-      alert("Hệ thống không thể xếp thêm được lịch nào. Vui lòng kiểm tra lại:\n- Học viên đã chọn giờ rảnh chưa?\n- PT có trống lịch vào giờ học viên rảnh không?\n- Học viên đã có đủ số buổi tuần này chưa?\n- PT có bị khoá lịch vào giờ đó không?");
+      alert(`Hệ thống không thể xếp thêm được lịch nào.\n- Số học viên thỏa mãn: ${activeStudentList.length}\n${result.debugSteps ? '- Xem chi tiết trong Debug log (F12 hoặc khung bên dưới)' : ''}`);
+      console.error("DEBUG SCHEDULER: generatedCount === previousCount", result.debugSteps);
     } else {
       setDebugData({ success: true, generatedCount, previousCount });
       updateScheduleData(weekId, result.schedule, result.warnings);

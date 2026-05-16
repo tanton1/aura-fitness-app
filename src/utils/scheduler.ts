@@ -24,8 +24,9 @@ export function generateSchedule(
 ): SchedulerResult {
   const schedule: Schedule = {};
   const warnings: Warning[] = [];
+  const debugSteps: string[] = [];
 
-  if (trainers.length === 0) return { schedule, warnings };
+  if (trainers.length === 0) return { schedule, warnings, debugSteps };
 
   // Initialize schedule
   for (const day of config.workingDays) {
@@ -75,25 +76,34 @@ export function generateSchedule(
   
   sortedContracts.forEach(c => {
     if (c.status === 'active' && !studentContracts.has(c.studentId)) {
-      const startDate = new Date(c.startDate);
+      const startDate = c.startDate ? new Date(c.startDate) : new Date(0); // Fallback to epoch so it's always <= endOfTargetWeek
       const endOfTargetWeek = new Date(now);
       endOfTargetWeek.setDate(now.getDate() + 6);
       endOfTargetWeek.setHours(23, 59, 59, 999);
       
-      const endDate = new Date(c.endDate);
+      const endDate = c.endDate ? new Date(c.endDate) : new Date(now.getTime() + 1000 * 3600 * 24 * 365); // Fallback to 1 year in future
       endDate.setHours(23, 59, 59, 999);
       const timeDiff = endDate.getTime() - now.getTime();
       const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
-      const sessionsLeft = c.totalSessions - (c.usedSessions || 0);
+      
+      // Fallback for old data where totalSessions might be undefined
+      const totalSess = c.totalSessions !== undefined ? c.totalSessions : 999;
+      const sessionsLeft = totalSess - (c.usedSessions || 0);
       
       if (daysLeft >= 0 && sessionsLeft > 0 && startDate.getTime() <= endOfTargetWeek.getTime()) {
         studentContracts.set(c.studentId, c);
+      } else {
+        console.log(`Contract skip debug: studentId=${c.studentId}, daysLeft=${daysLeft}, sessionsLeft=${sessionsLeft}, startDate=${startDate.getTime()}, endOfTargetWeek=${endOfTargetWeek.getTime()}`);
       }
     }
   });
 
   // Only schedule students with active contracts
   const activeStudents = students.filter(s => studentContracts.has(s.id));
+  
+  if (activeStudents.length === 0) {
+    debugSteps.push(`No active students found in students array.`);
+  }
 
   // Sort students by least available slots first
   const sortedStudents = [...activeStudents].sort(
@@ -104,57 +114,51 @@ export function generateSchedule(
     }
   );
 
-  // Scheduling logic: Group by branch
-  const trainerBranches = trainers.map(t => t.branchId).filter(Boolean) as string[];
-  const studentBranches = activeStudents.map(s => studentContracts.get(s.id)?.branchId || s.branchId).filter(Boolean) as string[];
-  const branches = Array.from(new Set([...trainerBranches, ...studentBranches]));
-  // If no branches are defined, run at least once for the "empty" branch
-  const allBranchIds = branches.length > 0 ? branches : [""];
-  
-  for (const branchId of allBranchIds) {
-    // Trainers for this branch: those assigned to it PLUS those with no assignment (floating)
-    const branchTrainers = trainers.filter(t => {
-      const tBranchId = t.branchId || "";
-      return tBranchId === branchId || tBranchId === "";
-    }).sort((a, b) => (a.priority || 999) - (b.priority || 999));
-    
-    if (branchTrainers.length === 0) continue;
+  const sortedTrainers = [...trainers].sort((a, b) => (a.priority || 999) - (b.priority || 999));
 
-    // Students for this branch: those assigned to it PLUS those with no assignment (floating)
-    const branchStudents = sortedStudents.filter(s => {
-      const sBranchId = studentContracts.get(s.id)?.branchId || s.branchId || "";
-      return sBranchId === branchId || sBranchId === "";
-    });
+  for (let i = 0; i < sortedTrainers.length; i++) {
+    const trainer = sortedTrainers[i];
+    const tBranchId = trainer.branchId || "";
 
-    for (let i = 0; i < branchTrainers.length; i++) {
-      const trainer = branchTrainers[i];
-      const isPT2AndBeyond = i >= 1;
-
-      for (const student of branchStudents) {
-        if (studentNeeds[student.id] > 0) {
-          // If student has a specific trainer assigned in contract, only schedule with that trainer
-          const assignedTrainerId = studentContracts.get(student.id)?.trainerId;
-          const assignedTrainerIds = studentContracts.get(student.id)?.trainerIds || [];
-          
-          if (assignedTrainerId && assignedTrainerId !== trainer.id) continue;
-          if (assignedTrainerIds.length > 0 && !assignedTrainerIds.includes(trainer.id)) continue;
-
-          scheduleStudentWithTrainer(
-            student, 
-            trainer, 
-            isPT2AndBeyond, 
-            schedule, 
-            studentNeeds, 
-            studentScheduledDays, 
-            studentScheduledSlots,
-            config
-          );
+    for (const student of sortedStudents) {
+      if (studentNeeds[student.id] > 0) {
+        const sBranchId = studentContracts.get(student.id)?.branchId || student.branchId || "";
+        
+        // If neither is floating and they are in different branches, skip.
+        if (tBranchId !== "" && sBranchId !== "" && tBranchId !== sBranchId) {
+          debugSteps.push(`Student ${student.name} skipped Trainer ${trainer.name} because branches mismatch (${sBranchId} vs ${tBranchId})`);
+          continue;
         }
+
+        // If student has a specific trainer assigned in contract, only schedule with that trainer
+        const assignedTrainerId = studentContracts.get(student.id)?.trainerId;
+        const assignedTrainerIds = studentContracts.get(student.id)?.trainerIds || [];
+        
+        if (assignedTrainerId && assignedTrainerId !== trainer.id) {
+          debugSteps.push(`Student ${student.name} skipped Trainer ${trainer.name} because assignedTrainerId is ${assignedTrainerId}`);
+          continue;
+        }
+        if (assignedTrainerIds.length > 0 && !assignedTrainerIds.includes(trainer.id)) {
+          debugSteps.push(`Student ${student.name} skipped Trainer ${trainer.name} because assignedTrainerIds doesn't include it. (${assignedTrainerIds.join(',')})`);
+          continue;
+        }
+
+        scheduleStudentWithTrainer(
+          student, 
+          trainer, 
+          false, 
+          schedule, 
+          studentNeeds, 
+          studentScheduledDays, 
+          studentScheduledSlots,
+          config,
+          debugSteps
+        );
       }
     }
   }
 
-  return { schedule, warnings: calculateWarnings(activeStudents, trainers, schedule, config, overriddenSessions) };
+  return { schedule, warnings: calculateWarnings(activeStudents, trainers, schedule, config, overriddenSessions), debugSteps };
 }
 
 export function calculateWarnings(
@@ -233,10 +237,14 @@ function scheduleStudentWithTrainer(
   studentNeeds: Record<string, number>,
   studentScheduledDays: Record<string, Set<string>>,
   studentScheduledSlots: Record<string, string[]>,
-  config: ScheduleConfig
+  config: ScheduleConfig,
+  debugSteps?: string[]
 ) {
   let needed = studentNeeds[student.id];
-  if (needed <= 0) return;
+  if (needed <= 0) {
+    debugSteps?.push(`Student ${student.name} needs <= 0`);
+    return;
+  }
 
   const scheduledDays = studentScheduledDays[student.id];
   const scheduledSlots = studentScheduledSlots[student.id];
@@ -263,7 +271,10 @@ function scheduleStudentWithTrainer(
   }
 
   const availableDays = Object.keys(slotsByDay).sort((a, b) => getDayIndex(a, config) - getDayIndex(b, config));
-  if (availableDays.length === 0) return;
+  if (availableDays.length === 0) {
+    debugSteps?.push(`Student ${student.name} + Trainer ${trainer.name}: NO available days. availableSlots=${JSON.stringify(student.availableSlots)} slotsByDay=${JSON.stringify(slotsByDay)}`);
+    return;
+  }
 
   const findDayCombinations = (days: string[], k: number): string[][] => {
     const result: string[][] = [];
@@ -377,12 +388,15 @@ function scheduleStudentWithTrainer(
   if (bestSlotCombination) {
     for (const slot of bestSlotCombination) {
       const day = slot.split('-')[0];
-      schedule[slot].push({ studentId: student.id, trainerId: trainer.id });
+      schedule[slot].push({ studentId: student.id, trainerId: trainer.id, type: 'training' });
       scheduledDays.add(day);
       scheduledSlots.push(slot);
       needed--;
     }
     studentNeeds[student.id] = needed;
+    debugSteps?.push(`Student ${student.name} + Trainer ${trainer.name}: Best combo found: ${bestSlotCombination.join(', ')}`);
+  } else {
+    debugSteps?.push(`Student ${student.name} + Trainer ${trainer.name}: FAILED to find any combination for needed ${needed} sessions out of ${availableDays.length} available days`);
   }
 }
 
