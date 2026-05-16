@@ -58,6 +58,8 @@ export default function StudentList({ students, schedule, warnings, branches, co
     return `${day} (${hour}h)`;
   };
 
+  const [warningBranchTab, setWarningBranchTab] = React.useState<string>('all');
+
   const warningsByBranch = React.useMemo(() => {
     const grouped: Record<string, Warning[]> = {};
     (warnings || []).forEach(w => {
@@ -114,12 +116,42 @@ export default function StudentList({ students, schedule, warnings, branches, co
             Cảnh báo xếp lịch ({warnings.length})
           </h3>
           <div className="space-y-4">
-            {Object.entries(warningsByBranch).map(([branchId, branchWarnings]: [string, Warning[]]) => (
-              <div key={branchId} className="space-y-2">
-                <h4 className="text-amber-500/80 text-xs font-bold uppercase tracking-wider flex items-center gap-1">
-                  <MapPin size={12} />
-                  {getBranchName(branchId)}
-                </h4>
+            <div className="flex overflow-x-auto gap-2 pb-2 -mx-2 px-2 hide-scrollbar">
+              <button
+                onClick={() => setWarningBranchTab('all')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap flex-shrink-0 ${
+                  warningBranchTab === 'all'
+                    ? 'bg-amber-600/80 text-white shadow-lg shadow-amber-600/20'
+                    : 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/20'
+                }`}
+              >
+                Tất cả cơ sở
+              </button>
+              {Object.keys(warningsByBranch).map(branchId => (
+                <button
+                  key={branchId}
+                  onClick={() => setWarningBranchTab(branchId)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap flex-shrink-0 ${
+                    warningBranchTab === branchId
+                      ? 'bg-amber-600/80 text-white shadow-lg shadow-amber-600/20'
+                      : 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/20'
+                  }`}
+                >
+                  {getBranchName(branchId)} ({warningsByBranch[branchId].length})
+                </button>
+              ))}
+            </div>
+
+            {Object.entries(warningsByBranch).map(([branchId, branchWarnings]: [string, Warning[]]) => {
+              if (warningBranchTab !== 'all' && warningBranchTab !== branchId) return null;
+              return (
+              <div key={branchId} className="space-y-4">
+                {warningBranchTab === 'all' && (
+                  <h4 className="text-amber-500/80 text-xs font-bold uppercase tracking-wider flex items-center gap-1 border-b border-amber-500/10 pb-2">
+                    <MapPin size={14} />
+                    {getBranchName(branchId)} ({branchWarnings.length})
+                  </h4>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {branchWarnings.map((warning, idx) => {
                     const student = students.find(s => s.id === warning.studentId);
@@ -211,7 +243,8 @@ export default function StudentList({ students, schedule, warnings, branches, co
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -239,7 +272,7 @@ export default function StudentList({ students, schedule, warnings, branches, co
             )}
           </div>
           
-          <div className="flex overflow-x-auto gap-2 pb-2 -mx-2 px-2 scrollbar-hide">
+          <div className="flex overflow-x-auto gap-2 pb-2 -mx-2 px-2 hide-scrollbar">
             <button
               onClick={() => setFilterTab('all')}
               className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap flex-shrink-0 ${
