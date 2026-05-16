@@ -91,16 +91,6 @@ export default function StudentList({ students, schedule, warnings, branches, co
                           <p className="font-medium text-zinc-200 text-sm">
                             <span className="text-amber-400 font-bold">{student?.name}</span>: {warning.scheduled}/{warning.requested} buổi
                           </p>
-                          {warning.multipleSessionsDays && warning.multipleSessionsDays.length > 0 && (
-                            <p className="text-xs text-red-400 mt-1">
-                              Trùng ngày: {warning.multipleSessionsDays.join(', ')}
-                            </p>
-                          )}
-                          {warning.overlappingSlots && warning.overlappingSlots.length > 0 && (
-                            <p className="text-xs text-red-400 mt-1">
-                              Trùng ca: {warning.overlappingSlots.join(', ')}
-                            </p>
-                          )}
                           {warning.suggestions.length > 0 && (
                             <div className="mt-2 text-xs">
                               <span className="text-zinc-500">Gợi ý thêm giờ rảnh: </span>
@@ -163,10 +153,8 @@ export default function StudentList({ students, schedule, warnings, branches, co
               const displaySessions = customSessions !== undefined ? customSessions : student.sessionsPerWeek;
               const isUnderScheduled = warning && warning.scheduled < warning.requested;
               const isOverScheduled = warning && warning.scheduled > warning.requested;
-              const hasMultipleSessions = warning && warning.multipleSessionsDays && warning.multipleSessionsDays.length > 0;
-              const hasOverlappingSlots = warning && warning.overlappingSlots && warning.overlappingSlots.length > 0;
               
-              const showRedWarning = hasBranchMismatch || hasNoBranch || hasLowSlots || isUnderScheduled || isOverScheduled || hasMultipleSessions || hasOverlappingSlots;
+              const showRedWarning = hasBranchMismatch || hasNoBranch || hasLowSlots || isUnderScheduled || isOverScheduled;
               
               return (
                 <div key={student.id} className={`p-6 hover:bg-zinc-800/30 transition-colors ${showRedWarning ? 'bg-red-500/5 border-l-4 border-l-red-500' : ''}`}>
@@ -210,12 +198,6 @@ export default function StudentList({ students, schedule, warnings, branches, co
                           )}
                           {isOverScheduled && (
                             <p>• Xếp quá số buổi ({warning.scheduled}/{warning.requested})</p>
-                          )}
-                          {hasMultipleSessions && (
-                            <p>• Xếp quá 1 ca trong các ngày: {warning.multipleSessionsDays?.join(', ')}</p>
-                          )}
-                          {hasOverlappingSlots && (
-                            <p>• Trùng ca tập (1 khung giờ xếp nhiều ca): {warning.overlappingSlots?.join(', ')}</p>
                           )}
                         </div>
                       )}

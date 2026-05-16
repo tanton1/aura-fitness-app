@@ -229,14 +229,11 @@ export interface Warning {
   scheduled: number;
   requested: number;
   suggestions: string[];
-  overlappingSlots?: string[];
-  multipleSessionsDays?: string[];
 }
 
 export interface SchedulerResult {
   schedule: Schedule;
   warnings: Warning[];
-  debugSteps?: string[];
 }
 
 export interface ScheduleConfig {

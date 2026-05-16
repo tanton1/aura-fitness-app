@@ -608,33 +608,19 @@ export default function AdminReportDashboard({ onNavigate }: Props) {
           onClick={() => {
             let errors = [];
             const studentsNoBranch = students.filter(s => !s.branchId);
-            if (studentsNoBranch.length > 0) {
-              errors.push(`- ${studentsNoBranch.length} học viên thiếu chi nhánh (branchId):\n  ${studentsNoBranch.map(s => s.name).join(', ')}`);
-            }
+            if (studentsNoBranch.length > 0) errors.push(`- ${studentsNoBranch.length} học viên thiếu chi nhánh (branchId)`);
             
             const contractsNoBranch = contracts.filter(c => !c.branchId);
-            if (contractsNoBranch.length > 0) {
-              const details = contractsNoBranch.map(c => `${students.find(s => s.id === c.studentId)?.name || 'Unknown'} (HĐ: ${c.id})`).join(', ');
-              errors.push(`- ${contractsNoBranch.length} hợp đồng thiếu chi nhánh (branchId):\n  ${details}`);
-            }
+            if (contractsNoBranch.length > 0) errors.push(`- ${contractsNoBranch.length} hợp đồng thiếu chi nhánh (branchId)`);
             
             const contractsOverused = contracts.filter(c => c.usedSessions > c.totalSessions);
-            if (contractsOverused.length > 0) {
-              const details = contractsOverused.map(c => `${students.find(s => s.id === c.studentId)?.name || 'Unknown'} (${c.usedSessions}/${c.totalSessions} buổi)`).join(', ');
-              errors.push(`- ${contractsOverused.length} hợp đồng có số buổi đã tập > tổng số buổi:\n  ${details}`);
-            }
+            if (contractsOverused.length > 0) errors.push(`- ${contractsOverused.length} hợp đồng có số buổi đã tập > tổng số buổi`);
             
             const sessionsNoTrainer = sessions.filter(s => !s.trainerId);
-            if (sessionsNoTrainer.length > 0) {
-              const details = sessionsNoTrainer.map(s => `${s.date} ${s.hour}h - HV: ${students.find(st => st.id === s.studentId)?.name || 'Unknown'}`).join(', ');
-              errors.push(`- ${sessionsNoTrainer.length} buổi tập thiếu PT (trainerId):\n  ${details}`);
-            }
+            if (sessionsNoTrainer.length > 0) errors.push(`- ${sessionsNoTrainer.length} buổi tập thiếu PT (trainerId)`);
             
             const sessionsNoStudent = sessions.filter(s => !s.studentId);
-            if (sessionsNoStudent.length > 0) {
-              const details = sessionsNoStudent.map(s => `${s.date} ${s.hour}h`).join(', ');
-              errors.push(`- ${sessionsNoStudent.length} buổi tập thiếu học viên (studentId):\n  ${details}`);
-            }
+            if (sessionsNoStudent.length > 0) errors.push(`- ${sessionsNoStudent.length} buổi tập thiếu học viên (studentId)`);
             
             // Financial consistency check
             const financialErrors = [];
