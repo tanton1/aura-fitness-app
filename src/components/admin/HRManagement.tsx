@@ -3,7 +3,7 @@ import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import firebaseConfig from '../../../firebase-applet-config.json';
-// Force reload: 2026-03-29
+import { getDatesForWeek } from '../../utils/dateUtils';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { User as UserIcon, Building, Plus, Trash2, Edit2, ShieldCheck, Users, Package, AlertCircle, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,6 +23,7 @@ export default function HRManagement({ user }: Props) {
     trainers,
     branches,
     staff,
+    scheduleConfig,
     addTrainer,
     updateTrainer,
     deleteTrainer,
@@ -39,11 +40,23 @@ export default function HRManagement({ user }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingItem, setEditingItem] = useState<Partial<Trainer | Branch | StaffMember> | null>(null);
   const [formData, setFormData] = useState<Partial<Trainer | Branch | StaffMember>>({});
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  const [weekOffset, setWeekOffset] = useState(0);
+  const currentWeekDates = getDatesForWeek(weekOffset);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'staff' | 'branch'} | null>(null);
   const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  const toggleSlot = (slotId: string) => {
+    setSelectedSlots(prev => {
+      const next = new Set(prev);
+      if (next.has(slotId)) next.delete(slotId);
+      else next.add(slotId);
+      return next;
+    });
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -51,7 +64,11 @@ export default function HRManagement({ user }: Props) {
     
     if (activeSubTab === 'trainers') {
       if (editingItem?.id) {
-        const updatedTrainer = { ...editingItem, ...formData } as Trainer;
+        const updatedTrainer = { 
+          ...editingItem, 
+          ...formData,
+          availableSlots: Array.from(selectedSlots)
+        } as Trainer;
         
         // Sync with staff array
         const staffMember = staff.find(s => s.id === editingItem.id);
@@ -88,6 +105,7 @@ export default function HRManagement({ user }: Props) {
           commissionRate: 5,
           commissionPerSession: 20000,
           baseSalary: 0,
+          availableSlots: Array.from(selectedSlots),
           ...formData
         } as Trainer;
         try {
@@ -395,6 +413,7 @@ export default function HRManagement({ user }: Props) {
               onClick={() => {
                 setEditingItem(null);
                 setFormData({});
+                setSelectedSlots(new Set());
                 setError(null);
                 setIsAdding(true);
               }}
@@ -429,7 +448,7 @@ export default function HRManagement({ user }: Props) {
                   >
                     {t.status === 'inactive' ? <ShieldCheck className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                   </button>
-                  <button onClick={() => { setEditingItem(t); setFormData(t); setError(null); setIsAdding(true); }} className="p-2 text-zinc-400 hover:text-white"><Edit2 className="w-4 h-4" /></button>
+                  <button onClick={() => { setEditingItem(t); setFormData(t); setSelectedSlots(new Set(t.availableSlots || [])); setError(null); setIsAdding(true); }} className="p-2 text-zinc-400 hover:text-white"><Edit2 className="w-4 h-4" /></button>
                   <button onClick={() => handleDelete(t.id)} className="p-2 text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
@@ -517,6 +536,81 @@ export default function HRManagement({ user }: Props) {
                   
                   <label className="block text-sm font-medium text-zinc-400 mb-1 mt-3">Hoa hồng/buổi (VNĐ) (Thường)</label>
                   <input type="number" placeholder="Hoa hồng/buổi (VNĐ)" value={formData.commissionPerSession || 0} className="w-full p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white" onChange={e => setFormData({...formData, commissionPerSession: Number(e.target.value)})} />
+
+                  <div className="mt-6 border-t border-zinc-800 pt-6">
+                    <div className="flex justify-between items-end mb-4">
+                      <label className="block text-sm font-bold text-zinc-300 uppercase tracking-wider">
+                        Ma trận thời gian rảnh
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          type="button"
+                          onClick={() => setWeekOffset(prev => prev - 1)}
+                          className="p-1 rounded bg-zinc-800 text-zinc-400 hover:text-white"
+                        >
+                          &lt;
+                        </button>
+                        <span className="text-xs text-zinc-400 font-medium">Tuần {weekOffset === 0 ? 'này' : weekOffset}</span>
+                        <button 
+                          type="button"
+                          onClick={() => setWeekOffset(prev => prev + 1)}
+                          className="p-1 rounded bg-zinc-800 text-zinc-400 hover:text-white"
+                        >
+                          &gt;
+                        </button>
+                      </div>
+                      <span className="text-xs text-pink-400 font-medium bg-pink-500/10 px-3 py-1 rounded-full border border-pink-500/20">
+                        Đã chọn: {selectedSlots.size} slots
+                      </span>
+                    </div>
+                    
+                    <div className="overflow-hidden hide-scrollbar rounded-xl border border-zinc-800 bg-zinc-950 w-full">
+                      <table className="w-full text-xs text-left border-collapse table-fixed">
+                        <thead>
+                          <tr>
+                            <th className="border-b border-r border-zinc-800 p-1 bg-zinc-900 w-12 text-center font-bold text-zinc-400 uppercase">Giờ</th>
+                            {scheduleConfig.workingDays.map(day => (
+                              <th key={day} className="border-b border-r border-zinc-800 p-1 bg-zinc-900 text-center font-bold text-zinc-300 uppercase tracking-wider">
+                                <div className="flex flex-col items-center justify-center">
+                                  <span>{day}</span>
+                                  <span className="text-[9px] text-zinc-500 font-normal mt-0.5">{currentWeekDates[day]?.display}</span>
+                                </div>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {scheduleConfig.workingHours.map(hour => (
+                            <tr key={hour} className="group">
+                              <td className="border-b border-r border-zinc-800 p-1 text-center font-mono font-bold bg-zinc-900 text-zinc-400 group-hover:text-zinc-200 transition-colors">
+                                {hour}h
+                              </td>
+                              {scheduleConfig.workingDays.map(day => {
+                                const slotId = `${day}-${hour}`;
+                                const isSelected = selectedSlots.has(slotId);
+                                return (
+                                  <td 
+                                    key={slotId}
+                                    onClick={() => toggleSlot(slotId)}
+                                    className={`border-b border-r border-zinc-800 p-1 text-center text-sm font-bold cursor-pointer transition-all duration-200 relative ${
+                                      isSelected 
+                                        ? 'bg-pink-600/20 text-pink-400 font-bold shadow-[inset_0_0_15px_rgba(236,72,153,0.3)]' 
+                                        : 'hover:bg-zinc-800 text-transparent hover:text-zinc-600'
+                                    }`}
+                                  >
+                                    {isSelected && (
+                                      <div className="absolute inset-0 border-2 border-pink-500 rounded-sm m-[1px] shadow-[0_0_10px_rgba(236,72,153,0.5)]"></div>
+                                    )}
+                                    {isSelected ? '✓' : '+'}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </>
               ) : activeSubTab === 'staff' ? (
                 <>

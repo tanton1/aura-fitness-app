@@ -249,7 +249,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addStudent = async (student: Student) => {
-    await setDoc(doc(db, 'students', student.id), sanitize(student));
+    await setDoc(doc(db, 'students', student.id), sanitize(student), { merge: true });
   };
   const updateStudent = async (id: string, updates: Partial<Student>) => {
     await updateDoc(doc(db, 'students', id), sanitize(updates));

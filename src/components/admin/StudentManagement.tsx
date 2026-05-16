@@ -34,7 +34,7 @@ export default function StudentManagement({ user, profile }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
   const [selectedTrainerId, setSelectedTrainerId] = useState<string>('all');
-  const [contractFilter, setContractFilter] = useState<'active' | 'expiring_week' | 'expiring_month' | 'expired' | 'paused' | 'all'>('all');
+  const [contractFilter, setContractFilter] = useState<'active' | 'expiring_week' | 'expiring_month' | 'expired' | 'paused' | 'inactive' | 'all'>('all');
   const [dateRange, setDateRange] = useState<{ start: Date, end: Date } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -88,10 +88,12 @@ export default function StudentManagement({ user, profile }: Props) {
   }, [students, profile, trainers, user, contracts]);
 
   const filteredStudents = useMemo(() => {
-    let filtered = allowedStudents.filter(s => 
-      (s.name && s.name.toLowerCase().includes(searchTerm.toLowerCase())) || 
-      (s.phone && s.phone.includes(searchTerm))
-    );
+    let filtered = allowedStudents.filter(s => {
+      if (!searchTerm) return true;
+      const matchName = s.name && s.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchPhone = s.phone && s.phone.includes(searchTerm);
+      return matchName || matchPhone;
+    });
 
     // Filter by branch (on top of allowed)
     if (selectedBranchId !== 'all') {
@@ -176,17 +178,20 @@ export default function StudentManagement({ user, profile }: Props) {
           }
         }
         
+        if (contractFilter === 'inactive') {
+          return s.status === 'inactive';
+        }
         if (contractFilter === 'active') {
-          return status === 'active' || status === 'expiring_month' || status === 'expiring_week';
+          return s.status !== 'inactive' && (status === 'active' || status === 'expiring_month' || status === 'expiring_week');
         }
         if (contractFilter === 'expiring_month') {
-          return status === 'expiring_month' || status === 'expiring_week';
+          return s.status !== 'inactive' && (status === 'expiring_month' || status === 'expiring_week');
         }
         if (contractFilter === 'paused') {
           const latestContract = studentContracts.length > 0 ? studentContracts[0] : null;
           return latestContract?.status === 'frozen';
         }
-        return status === contractFilter;
+        return s.status !== 'inactive' && status === contractFilter;
       });
     }
 
@@ -572,6 +577,7 @@ export default function StudentManagement({ user, profile }: Props) {
             <option value="expiring_month">Sắp hết trong tháng</option>
             <option value="expired">Đã hết hạn</option>
             <option value="paused">Khách bảo lưu</option>
+            <option value="inactive">Đã nghỉ</option>
             <option value="all">Tất cả trạng thái</option>
           </select>
           <DateRangeFilter onFilter={(start, end) => setDateRange({ start, end })} />

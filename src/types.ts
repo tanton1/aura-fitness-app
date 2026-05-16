@@ -109,6 +109,7 @@ export interface Trainer {
   baseSalary?: number; // Lương cơ bản
   status: 'active' | 'inactive';
   priority?: number; // Add this
+  availableSlots?: string[]; // Format: "T2-6", "T3-14"
 }
 
 export interface Branch {
@@ -229,11 +230,14 @@ export interface Warning {
   scheduled: number;
   requested: number;
   suggestions: string[];
+  overlappingSlots?: string[];
+  multipleSessionsDays?: string[];
 }
 
 export interface SchedulerResult {
   schedule: Schedule;
   warnings: Warning[];
+  debugSteps?: string[];
 }
 
 export interface ScheduleConfig {

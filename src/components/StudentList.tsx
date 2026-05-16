@@ -1,5 +1,5 @@
 import React from 'react';
-import { Student, Schedule, Warning, Branch, StudentContract } from '../types';
+import { Student, Schedule, Warning, Branch, StudentContract, Trainer } from '../types';
 import { AlertTriangle, MessageSquare, Trash2, Edit2, CheckCircle2, Circle, MapPin, Lock, Unlock, AlertCircle } from 'lucide-react';
 
 interface Props {
@@ -8,6 +8,8 @@ interface Props {
   warnings: Warning[];
   branches?: Branch[];
   contracts?: StudentContract[];
+  trainers?: Trainer[];
+  activeStudentIds?: Set<string>;
   overriddenSessions?: Record<string, number>;
   onUpdateSessionOverride?: (studentId: string, sessions: number) => void;
   onDelete?: (id: string) => void;
@@ -16,7 +18,14 @@ interface Props {
   onToggleLockSchedule?: (id: string) => void;
 }
 
-export default function StudentList({ students, schedule, warnings, branches, contracts = [], overriddenSessions = {}, onUpdateSessionOverride, onDelete, onEdit, onToggleConfirm, onToggleLockSchedule }: Props) {
+export default function StudentList({ students, schedule, warnings, branches, contracts = [], trainers = [], activeStudentIds, overriddenSessions = {}, onUpdateSessionOverride, onDelete, onEdit, onToggleConfirm, onToggleLockSchedule }: Props) {
+  const [expandedStudentId, setExpandedStudentId] = React.useState<string | null>(null);
+  const [filterTab, setFilterTab] = React.useState<'all' | 'no_slots' | 'not_enough_days' | 'low_slots'>('all');
+  const [filterBranch, setFilterBranch] = React.useState<string>('all');
+
+  const toggleExpand = (id: string) => {
+    setExpandedStudentId(prev => (prev === id ? null : id));
+  };
   const getStudentSchedule = (studentId: string) => {
     const slots: string[] = [];
     Object.entries(schedule).forEach(([slotId, entries]) => {
@@ -67,6 +76,35 @@ export default function StudentList({ students, schedule, warnings, branches, co
     return branches?.find(b => b.id === branchId)?.name || 'Chưa xác định';
   };
 
+  const filteredStudents = React.useMemo(() => {
+    let result = students || [];
+    
+    if (filterBranch !== 'all') {
+      if (filterBranch === 'none') {
+        result = result.filter(s => !s.branchId);
+      } else {
+        result = result.filter(s => s.branchId === filterBranch);
+      }
+    }
+
+    switch (filterTab) {
+      case 'no_slots':
+        return result.filter(s => !s.availableSlots || s.availableSlots.length === 0);
+      case 'not_enough_days':
+        return result.filter(s => {
+          if (!s.availableSlots || s.availableSlots.length === 0) return false;
+          const uniqueDays = new Set(s.availableSlots.map(slot => slot.split('-')[0])).size;
+          const sessionsNum = overriddenSessions[s.id] !== undefined ? overriddenSessions[s.id] : s.sessionsPerWeek;
+          return uniqueDays < sessionsNum;
+        });
+      case 'low_slots':
+        return result.filter(s => s.availableSlots && s.availableSlots.length > 0 && s.availableSlots.length < 5);
+      case 'all':
+      default:
+        return result.filter(s => activeStudentIds ? activeStudentIds.has(s.id) : true);
+    }
+  }, [students, filterTab, filterBranch, activeStudentIds, overriddenSessions]);
+
   return (
     <div className="space-y-6">
       {warnings.length > 0 && (
@@ -88,9 +126,26 @@ export default function StudentList({ students, schedule, warnings, branches, co
                     return (
                       <div key={idx} className="bg-zinc-950/50 p-3 rounded-xl border border-amber-500/20 shadow-sm flex flex-col justify-between">
                         <div>
-                          <p className="font-medium text-zinc-200 text-sm">
-                            <span className="text-amber-400 font-bold">{student?.name}</span>: {warning.scheduled}/{warning.requested} buổi
+                          <p className="font-medium text-zinc-200 text-sm flex items-center gap-1">
+                            <span 
+                              className="text-amber-400 font-bold cursor-pointer hover:text-amber-300 transition-colors underline decoration-amber-400/30 underline-offset-4"
+                              title="Bấm để xem nhanh lịch rảnh và PT"
+                              onClick={() => student && toggleExpand(`warning-${student.id}`)}
+                            >
+                              {student?.name}
+                            </span>
+                            <span className="text-zinc-400 ml-1">: {warning.scheduled}/{warning.requested} buổi</span>
                           </p>
+                          {warning.multipleSessionsDays && warning.multipleSessionsDays.length > 0 && (
+                            <p className="text-xs text-red-400 mt-1">
+                              Trùng ngày: {warning.multipleSessionsDays.join(', ')}
+                            </p>
+                          )}
+                          {warning.overlappingSlots && warning.overlappingSlots.length > 0 && (
+                            <p className="text-xs text-red-400 mt-1">
+                              Trùng ca: {warning.overlappingSlots.join(', ')}
+                            </p>
+                          )}
                           {warning.suggestions.length > 0 && (
                             <div className="mt-2 text-xs">
                               <span className="text-zinc-500">Gợi ý thêm giờ rảnh: </span>
@@ -103,6 +158,50 @@ export default function StudentList({ students, schedule, warnings, branches, co
                                 {warning.suggestions.length > 3 && (
                                   <span className="text-[10px] text-zinc-500 px-1 py-0.5">+{warning.suggestions.length - 3}</span>
                                 )}
+                              </div>
+                            </div>
+                          )}
+
+                          {student && expandedStudentId === `warning-${student.id}` && (
+                            <div className="mt-3 bg-zinc-900 border border-zinc-800 p-3 rounded-lg animate-in fade-in slide-in-from-top-2 duration-200">
+                              <div className="space-y-3">
+                                <div>
+                                  <span className="text-[10px] text-zinc-500 uppercase font-bold block mb-1">PT Phụ trách</span>
+                                  {contracts.filter(c => c.studentId === student.id && c.status === 'active').length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {contracts.filter(c => c.studentId === student.id && c.status === 'active').flatMap(c => {
+                                        const ptIds = new Set<string>();
+                                        if (c.trainerId) ptIds.add(c.trainerId);
+                                        if (c.trainerIds) c.trainerIds.forEach(id => ptIds.add(id));
+                                        
+                                        return Array.from(ptIds).map(ptId => {
+                                          const pt = trainers.find(t => t.id === ptId);
+                                          return (
+                                            <span key={`${c.id}-${ptId}`} className="text-[11px] font-medium bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded text-emerald-400">
+                                              {pt?.name || 'PT Không xác định'}
+                                            </span>
+                                          );
+                                        });
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-zinc-500 italic">Chưa có hợp đồng/PT</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-zinc-500 uppercase font-bold block mb-1">Khung giờ rảnh ({student.availableSlots?.length || 0})</span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {student.availableSlots && student.availableSlots.length > 0 ? (
+                                      student.availableSlots.map(slot => (
+                                        <span key={slot} className="text-[10px] px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-400 border border-pink-500/20">
+                                          {formatSlot(slot)}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="text-[11px] text-zinc-500 italic">Chưa nhập lịch rảnh</span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -119,18 +218,77 @@ export default function StudentList({ students, schedule, warnings, branches, co
 
       <div className="bg-zinc-900 rounded-2xl shadow-xl border border-zinc-800 overflow-hidden">
         <div className="p-6 border-b border-zinc-800 bg-zinc-900/50">
-          <h2 className="text-xl font-black text-white uppercase tracking-wide flex items-center gap-3">
-            <span className="w-2 h-6 bg-pink-500 rounded-full shadow-[0_0_10px_rgba(236,72,153,0.8)]"></span>
-            Danh sách Học viên ({(students || []).length})
-          </h2>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+            <h2 className="text-xl font-black text-white uppercase tracking-wide flex items-center gap-3">
+              <span className="w-2 h-6 bg-pink-500 rounded-full shadow-[0_0_10px_rgba(236,72,153,0.8)]"></span>
+              Danh sách Học viên ({filteredStudents.length}/{students?.length || 0})
+            </h2>
+            
+            {branches && branches.length > 0 && (
+              <select
+                value={filterBranch}
+                onChange={(e) => setFilterBranch(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 text-zinc-300 px-3 py-1.5 rounded-xl text-sm font-medium focus:outline-none focus:border-pink-500"
+              >
+                <option value="all">Tất cả chi nhánh</option>
+                <option value="none">Chưa xếp chi nhánh</option>
+                {branches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setFilterTab('all')}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                filterTab === 'all'
+                  ? 'bg-pink-600 text-white shadow-lg'
+                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+              }`}
+            >
+              Đang xếp lịch
+            </button>
+            <button
+              onClick={() => setFilterTab('no_slots')}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                filterTab === 'no_slots'
+                  ? 'bg-red-600/80 text-white shadow-lg shadow-red-600/20'
+                  : 'bg-zinc-800 text-red-500 hover:bg-zinc-700'
+              }`}
+            >
+              Chưa đky lịch rảnh
+            </button>
+            <button
+              onClick={() => setFilterTab('not_enough_days')}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                filterTab === 'not_enough_days'
+                  ? 'bg-amber-600/80 text-white shadow-lg shadow-amber-600/20'
+                  : 'bg-zinc-800 text-amber-500 hover:bg-zinc-700'
+              }`}
+            >
+              Thiếu ngày rảnh
+            </button>
+            <button
+              onClick={() => setFilterTab('low_slots')}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+                filterTab === 'low_slots'
+                  ? 'bg-orange-600/80 text-white shadow-lg shadow-orange-600/20'
+                  : 'bg-zinc-800 text-orange-500 hover:bg-zinc-700'
+              }`}
+            >
+              Cần thêm slot rảnh (&lt;5)
+            </button>
+          </div>
         </div>
         <div className="divide-y divide-zinc-800/50">
-          {(students || []).length === 0 ? (
+          {filteredStudents.length === 0 ? (
             <div className="p-8 text-center text-zinc-500 font-medium">
-              Chưa có học viên nào. Hãy thêm học viên ở tab Đăng ký.
+              Không tìm thấy học viên nào trong mục này.
             </div>
           ) : (
-            (students || []).map(student => {
+            filteredStudents.map(student => {
               const studentSchedule = getStudentSchedule(student.id);
               const message = `Chào ${student.name}, lịch tập tuần này của bạn là: ${studentSchedule.map(formatSlot).join(', ')}.`;
               
@@ -153,17 +311,29 @@ export default function StudentList({ students, schedule, warnings, branches, co
               const displaySessions = customSessions !== undefined ? customSessions : student.sessionsPerWeek;
               const isUnderScheduled = warning && warning.scheduled < warning.requested;
               const isOverScheduled = warning && warning.scheduled > warning.requested;
+              const hasMultipleSessions = warning && warning.multipleSessionsDays && warning.multipleSessionsDays.length > 0;
+              const hasOverlappingSlots = warning && warning.overlappingSlots && warning.overlappingSlots.length > 0;
               
-              const showRedWarning = hasBranchMismatch || hasNoBranch || hasLowSlots || isUnderScheduled || isOverScheduled;
+              const showRedWarning = hasBranchMismatch || hasNoBranch || hasLowSlots || isUnderScheduled || isOverScheduled || hasMultipleSessions || hasOverlappingSlots;
+              const noContract = activeStudentIds ? !activeStudentIds.has(student.id) : false;
               
               return (
-                <div key={student.id} className={`p-6 hover:bg-zinc-800/30 transition-colors ${showRedWarning ? 'bg-red-500/5 border-l-4 border-l-red-500' : ''}`}>
+                <div key={student.id} className={`p-6 hover:bg-zinc-800/30 transition-colors ${showRedWarning ? 'bg-red-500/5 border-l-4 border-l-red-500' : ''} ${noContract ? 'opacity-80 bg-zinc-900/50' : ''}`}>
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <h3 className="font-black text-zinc-100 text-xl flex items-center gap-2">
+                      <h3 
+                        className="font-black text-zinc-100 text-xl flex items-center gap-2 cursor-pointer hover:text-pink-400 transition-colors"
+                        onClick={() => toggleExpand(student.id)}
+                        title="Bấm để xem nhanh lịch rảnh và PT"
+                      >
                         {student.name}
                         {showRedWarning && (
                           <AlertCircle size={18} className="text-red-500" />
+                        )}
+                        {noContract && (
+                          <span className="text-[10px] font-bold bg-purple-500/10 text-purple-400 py-0.5 px-2 rounded-full border border-purple-500/20 whitespace-nowrap ml-2">
+                            Không đủ đk xếp lịch
+                          </span>
                         )}
                       </h3>
                       <div className="text-sm text-zinc-400 mt-1 font-medium flex flex-wrap items-center gap-1">
@@ -198,6 +368,12 @@ export default function StudentList({ students, schedule, warnings, branches, co
                           )}
                           {isOverScheduled && (
                             <p>• Xếp quá số buổi ({warning.scheduled}/{warning.requested})</p>
+                          )}
+                          {hasMultipleSessions && (
+                            <p>• Xếp quá 1 ca trong các ngày: {warning.multipleSessionsDays?.join(', ')}</p>
+                          )}
+                          {hasOverlappingSlots && (
+                            <p>• Trùng ca tập (1 khung giờ xếp nhiều ca): {warning.overlappingSlots?.join(', ')}</p>
                           )}
                         </div>
                       )}
@@ -250,6 +426,52 @@ export default function StudentList({ students, schedule, warnings, branches, co
                   ) : (
                     <p className="text-sm text-zinc-600 italic font-medium">Chưa được xếp lịch</p>
                   )}
+
+                  {expandedStudentId === student.id && (
+                    <div className="mt-4 bg-zinc-950 p-4 rounded-xl border border-zinc-800 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <h4 className="text-sm font-bold text-zinc-300 mb-2 border-b border-zinc-800 pb-2">Thông tin chi tiết ({student.availableSlots?.length || 0} slots rảnh)</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-xs text-zinc-500 uppercase font-bold block mb-1">PT Phụ trách</span>
+                          {contracts.filter(c => c.studentId === student.id && c.status === 'active').length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {contracts.filter(c => c.studentId === student.id && c.status === 'active').flatMap(c => {
+                                const ptIds = new Set<string>();
+                                if (c.trainerId) ptIds.add(c.trainerId);
+                                if (c.trainerIds) c.trainerIds.forEach(id => ptIds.add(id));
+                                
+                                return Array.from(ptIds).map(ptId => {
+                                  const pt = trainers.find(t => t.id === ptId);
+                                  return (
+                                    <span key={`${c.id}-${ptId}`} className="text-sm font-medium bg-zinc-900 border border-zinc-700 px-2 py-1 rounded-lg text-emerald-400">
+                                      {pt?.name || 'PT Không xác định'}
+                                    </span>
+                                  );
+                                });
+                              })}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-zinc-500 italic">Chưa có hợp đồng/PT</span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-xs text-zinc-500 uppercase font-bold block mb-1">Khung giờ rảnh</span>
+                          <div className="flex flex-wrap gap-1">
+                            {student.availableSlots && student.availableSlots.length > 0 ? (
+                              student.availableSlots.map(slot => (
+                                <span key={slot} className="text-xs px-2 py-0.5 rounded bg-pink-500/10 text-pink-400 border border-pink-500/20">
+                                  {formatSlot(slot)}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-sm text-zinc-500 italic">Chưa nhập lịch rảnh</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               );
             })
