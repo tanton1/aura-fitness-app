@@ -120,11 +120,11 @@ export default function StudentList({ students, schedule, warnings, branches, co
                   <MapPin size={12} />
                   {getBranchName(branchId)}
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {branchWarnings.map((warning, idx) => {
                     const student = students.find(s => s.id === warning.studentId);
                     return (
-                      <div key={idx} className="bg-zinc-950/50 p-3 rounded-xl border border-amber-500/20 shadow-sm flex flex-col justify-between">
+                      <div key={idx} className="bg-zinc-950/50 p-4 rounded-xl border border-amber-500/20 shadow-sm flex flex-col justify-between">
                         <div>
                           <p className="font-medium text-zinc-200 text-sm flex items-center gap-1">
                             <span 
@@ -228,7 +228,7 @@ export default function StudentList({ students, schedule, warnings, branches, co
               <select
                 value={filterBranch}
                 onChange={(e) => setFilterBranch(e.target.value)}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-300 px-3 py-1.5 rounded-xl text-sm font-medium focus:outline-none focus:border-pink-500"
+                className="bg-zinc-800 border border-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-sm font-medium focus:outline-none focus:border-pink-500 w-full md:w-auto"
               >
                 <option value="all">Tất cả chi nhánh</option>
                 <option value="none">Chưa xếp chi nhánh</option>
@@ -239,10 +239,10 @@ export default function StudentList({ students, schedule, warnings, branches, co
             )}
           </div>
           
-          <div className="flex flex-wrap gap-2">
+          <div className="flex overflow-x-auto gap-2 pb-2 -mx-2 px-2 scrollbar-hide">
             <button
               onClick={() => setFilterTab('all')}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap flex-shrink-0 ${
                 filterTab === 'all'
                   ? 'bg-pink-600 text-white shadow-lg'
                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
@@ -252,7 +252,7 @@ export default function StudentList({ students, schedule, warnings, branches, co
             </button>
             <button
               onClick={() => setFilterTab('no_slots')}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap flex-shrink-0 ${
                 filterTab === 'no_slots'
                   ? 'bg-red-600/80 text-white shadow-lg shadow-red-600/20'
                   : 'bg-zinc-800 text-red-500 hover:bg-zinc-700'
@@ -262,7 +262,7 @@ export default function StudentList({ students, schedule, warnings, branches, co
             </button>
             <button
               onClick={() => setFilterTab('not_enough_days')}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap flex-shrink-0 ${
                 filterTab === 'not_enough_days'
                   ? 'bg-amber-600/80 text-white shadow-lg shadow-amber-600/20'
                   : 'bg-zinc-800 text-amber-500 hover:bg-zinc-700'
@@ -272,7 +272,7 @@ export default function StudentList({ students, schedule, warnings, branches, co
             </button>
             <button
               onClick={() => setFilterTab('low_slots')}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap flex-shrink-0 ${
                 filterTab === 'low_slots'
                   ? 'bg-orange-600/80 text-white shadow-lg shadow-orange-600/20'
                   : 'bg-zinc-800 text-orange-500 hover:bg-zinc-700'
@@ -319,70 +319,73 @@ export default function StudentList({ students, schedule, warnings, branches, co
               
               return (
                 <div key={student.id} className={`p-6 hover:bg-zinc-800/30 transition-colors ${showRedWarning ? 'bg-red-500/5 border-l-4 border-l-red-500' : ''} ${noContract ? 'opacity-80 bg-zinc-900/50' : ''}`}>
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                    <div className="w-full sm:w-auto flex-1">
                       <h3 
-                        className="font-black text-zinc-100 text-xl flex items-center gap-2 cursor-pointer hover:text-pink-400 transition-colors"
+                        className="font-black text-zinc-100 text-lg sm:text-xl flex flex-wrap items-center gap-2 cursor-pointer hover:text-pink-400 transition-colors"
                         onClick={() => toggleExpand(student.id)}
                         title="Bấm để xem nhanh lịch rảnh và PT"
                       >
                         {student.name}
                         {showRedWarning && (
-                          <AlertCircle size={18} className="text-red-500" />
+                          <AlertCircle size={18} className="text-red-500 shrink-0" />
                         )}
                         {noContract && (
-                          <span className="text-[10px] font-bold bg-purple-500/10 text-purple-400 py-0.5 px-2 rounded-full border border-purple-500/20 whitespace-nowrap ml-2">
+                          <span className="text-[10px] font-bold bg-purple-500/10 text-purple-400 py-0.5 px-2 rounded-full border border-purple-500/20 whitespace-nowrap">
                             Không đủ đk xếp lịch
                           </span>
                         )}
                       </h3>
-                      <div className="text-sm text-zinc-400 mt-1 font-medium flex flex-wrap items-center gap-1">
-                        <span>Đăng ký:</span> 
-                        <select 
-                          value={displaySessions}
-                          onChange={(e) => onUpdateSessionOverride && onUpdateSessionOverride(student.id, parseInt(e.target.value))}
-                          className="bg-zinc-950 border border-zinc-800 text-pink-400 rounded-lg px-2 py-0.5 focus:outline-none focus:border-pink-500 appearance-none font-bold"
-                          title="Thay đổi số buổi tuần này"
-                        >
-                          {[0, 1, 2, 3, 4, 5, 6, 7].map(n => (
-                            <option key={n} value={n}>{n}</option>
-                          ))}
-                        </select>
-                        <span className="text-pink-400">buổi/tuần</span>
-                        {customSessions !== undefined && <span className="text-xs text-orange-400 ml-1" title="Đã thay đổi riêng cho tuần này">(Tạm thời)</span>}
-                        <span className="mx-1">|</span>
-                        <span>Đã xếp:</span> <span className={`${isUnderScheduled || isOverScheduled ? 'text-red-400 font-bold' : 'text-emerald-400'}`}>{warning?.scheduled || 0} buổi</span>
-                        <span className="mx-1">|</span>
-                        <span>Rảnh:</span> <span className={`${hasLowSlots ? 'text-red-400 font-bold' : 'text-pink-400'}`}>{student.availableSlots?.length || 0} slots</span>
+                      <div className="text-sm text-zinc-400 mt-2 font-medium flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <div className="flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-800">
+                          <span>Đăng ký:</span> 
+                          <select 
+                            value={displaySessions}
+                            onChange={(e) => onUpdateSessionOverride && onUpdateSessionOverride(student.id, parseInt(e.target.value))}
+                            className="bg-zinc-950 border border-zinc-700 text-pink-400 rounded-md px-1 focus:outline-none focus:border-pink-500 appearance-none font-bold"
+                            title="Thay đổi số buổi tuần này"
+                          >
+                            {[0, 1, 2, 3, 4, 5, 6, 7].map(n => (
+                              <option key={n} value={n}>{n}</option>
+                            ))}
+                          </select>
+                          <span className="text-pink-400">buổi</span>
+                          {customSessions !== undefined && <span className="text-[10px] text-orange-400" title="Đã thay đổi riêng cho tuần này">(Tạm thời)</span>}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="flex items-center gap-1">Đã xếp: <span className={`${isUnderScheduled || isOverScheduled ? 'text-red-400 font-bold bg-red-500/10 px-1.5 rounded' : 'text-emerald-400 font-bold'}`}>{warning?.scheduled || 0}</span></span>
+                          <span className="w-1 h-1 rounded-full bg-zinc-700 hidden sm:block"></span>
+                          <span className="flex items-center gap-1">Rảnh: <span className={`${hasLowSlots ? 'text-red-400 font-bold bg-red-500/10 px-1.5 rounded' : 'text-pink-400 font-bold'}`}>{student.availableSlots?.length || 0} slots</span></span>
+                        </div>
                       </div>
                       {showRedWarning && (
-                        <div className="mt-2 text-xs font-medium text-red-400 flex flex-col gap-1">
+                        <div className="mt-3 bg-red-500/5 border border-red-500/20 p-3 rounded-xl text-xs font-medium text-red-400 flex flex-col gap-1.5">
                           {(hasNoBranch || hasBranchMismatch) && (
-                            <p>• Chi nhánh học viên: {getBranchName(student.branchId || 'none')} | Chi nhánh hợp đồng: {activeContract ? getBranchName(activeContract.branchId || 'none') : 'Không có'}</p>
+                            <p className="flex items-start gap-1.5"><strong className="mt-0.5">•</strong> <span>Chi nhánh học viên: {getBranchName(student.branchId || 'none')} <br className="sm:hidden" />(Hợp đồng: {activeContract ? getBranchName(activeContract.branchId || 'none') : 'Không có'})</span></p>
                           )}
                           {hasLowSlots && (
-                            <p>• Số khung giờ rảnh quá ít (dưới 5 slots)</p>
+                            <p className="flex items-center gap-1.5"><strong>•</strong> Khung giờ rảnh ít (&lt; 5 slots)</p>
                           )}
                           {isUnderScheduled && (
-                            <p>• Chưa xếp đủ lịch ({warning.scheduled}/{warning.requested})</p>
+                            <p className="flex items-center gap-1.5"><strong>•</strong> Thiếu lịch ({warning.scheduled}/{warning.requested})</p>
                           )}
                           {isOverScheduled && (
-                            <p>• Xếp quá số buổi ({warning.scheduled}/{warning.requested})</p>
+                            <p className="flex items-center gap-1.5"><strong>•</strong> Dư lịch ({warning.scheduled}/{warning.requested})</p>
                           )}
                           {hasMultipleSessions && (
-                            <p>• Xếp quá 1 ca trong các ngày: {warning.multipleSessionsDays?.join(', ')}</p>
+                            <p className="flex items-start gap-1.5"><strong className="mt-0.5">•</strong> <span>Trùng ngày: {warning.multipleSessionsDays?.join(', ')}</span></p>
                           )}
                           {hasOverlappingSlots && (
-                            <p>• Trùng ca tập (1 khung giờ xếp nhiều ca): {warning.overlappingSlots?.join(', ')}</p>
+                            <p className="flex items-start gap-1.5"><strong className="mt-0.5">•</strong> <span>Trùng ca: {warning.overlappingSlots?.join(', ')}</span></p>
                           )}
                         </div>
                       )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1 self-end sm:self-auto shrink-0 bg-zinc-900/80 p-1 sm:p-0 rounded-xl sm:bg-transparent border border-zinc-800 sm:border-none">
                       {onToggleLockSchedule && studentSchedule.length > 0 && (
                         <button 
                           onClick={() => onToggleLockSchedule(student.id)}
-                          className={`p-2 rounded-lg transition-colors ${isStudentLocked(student.id) ? 'text-pink-500 hover:bg-pink-500/10' : 'text-zinc-500 hover:text-pink-400 hover:bg-pink-500/10'}`}
+                          className={`p-2.5 rounded-lg transition-colors ${isStudentLocked(student.id) ? 'text-pink-500 bg-pink-500/10' : 'text-zinc-500 hover:text-pink-400 hover:bg-pink-500/10'}`}
                           title={isStudentLocked(student.id) ? "Mở khóa lịch tập" : "Khóa lịch tập (không bị đổi khi xếp lại)"}
                         >
                           {isStudentLocked(student.id) ? <Lock size={18} /> : <Unlock size={18} />}
@@ -391,7 +394,7 @@ export default function StudentList({ students, schedule, warnings, branches, co
                       {onToggleConfirm && (
                         <button 
                           onClick={() => onToggleConfirm(student.id)}
-                          className={`p-2 rounded-lg transition-colors ${student.isScheduleConfirmed ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10'}`}
+                          className={`p-2.5 rounded-lg transition-colors ${student.isScheduleConfirmed ? 'text-emerald-500 bg-emerald-500/10' : 'text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10'}`}
                           title={student.isScheduleConfirmed ? "Đã chốt lịch rảnh" : "Chưa chốt lịch rảnh"}
                         >
                           {student.isScheduleConfirmed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
@@ -399,7 +402,7 @@ export default function StudentList({ students, schedule, warnings, branches, co
                       )}
                       <button 
                         onClick={() => onEdit(student)}
-                        className="text-zinc-500 hover:text-pink-400 p-2 rounded-lg hover:bg-pink-500/10 transition-colors"
+                        className="text-zinc-500 hover:text-pink-400 p-2.5 rounded-lg hover:bg-pink-500/10 transition-colors"
                         title="Sửa học viên"
                       >
                         <Edit2 size={18} />
@@ -407,7 +410,7 @@ export default function StudentList({ students, schedule, warnings, branches, co
                       {onDelete && (
                         <button 
                           onClick={() => onDelete(student.id)}
-                          className="text-zinc-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                          className="text-zinc-500 hover:text-red-400 p-2.5 rounded-lg hover:bg-red-500/10 transition-colors"
                           title="Xóa học viên"
                         >
                           <Trash2 size={18} />
