@@ -20,7 +20,7 @@ interface Props {
 
 export default function StudentList({ students, schedule, warnings, branches, contracts = [], trainers = [], activeStudentIds, overriddenSessions = {}, onUpdateSessionOverride, onDelete, onEdit, onToggleConfirm, onToggleLockSchedule }: Props) {
   const [expandedStudentId, setExpandedStudentId] = React.useState<string | null>(null);
-  const [filterTab, setFilterTab] = React.useState<'all' | 'no_slots' | 'not_enough_days' | 'low_slots'>('all');
+  const [filterTab, setFilterTab] = React.useState<'all' | 'no_slots' | 'not_enough_days' | 'low_slots' | 'no_contract'>('all');
   const [filterBranch, setFilterBranch] = React.useState<string>('all');
 
   const toggleExpand = (id: string) => {
@@ -90,17 +90,20 @@ export default function StudentList({ students, schedule, warnings, branches, co
     }
 
     switch (filterTab) {
+      case 'no_contract':
+        return result.filter(s => activeStudentIds ? !activeStudentIds.has(s.id) : false);
       case 'no_slots':
-        return result.filter(s => !s.availableSlots || s.availableSlots.length === 0);
+        return result.filter(s => (activeStudentIds ? activeStudentIds.has(s.id) : true) && (!s.availableSlots || s.availableSlots.length === 0));
       case 'not_enough_days':
         return result.filter(s => {
+          if (activeStudentIds && !activeStudentIds.has(s.id)) return false;
           if (!s.availableSlots || s.availableSlots.length === 0) return false;
           const uniqueDays = new Set(s.availableSlots.map(slot => slot.split('-')[0])).size;
           const sessionsNum = overriddenSessions[s.id] !== undefined ? overriddenSessions[s.id] : s.sessionsPerWeek;
           return uniqueDays < sessionsNum;
         });
       case 'low_slots':
-        return result.filter(s => s.availableSlots && s.availableSlots.length > 0 && s.availableSlots.length < 5);
+        return result.filter(s => (activeStudentIds ? activeStudentIds.has(s.id) : true) && s.availableSlots && s.availableSlots.length > 0 && s.availableSlots.length < 5);
       case 'all':
       default:
         return result.filter(s => activeStudentIds ? activeStudentIds.has(s.id) : true);
@@ -312,6 +315,16 @@ export default function StudentList({ students, schedule, warnings, branches, co
               }`}
             >
               Cần thêm slot rảnh (&lt;5)
+            </button>
+            <button
+              onClick={() => setFilterTab('no_contract')}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors whitespace-nowrap flex-shrink-0 ${
+                filterTab === 'no_contract'
+                  ? 'bg-purple-600/80 text-white shadow-lg shadow-purple-600/20'
+                  : 'bg-zinc-800 text-purple-400 hover:bg-zinc-700'
+              }`}
+            >
+              Không đủ điều kiện
             </button>
           </div>
         </div>

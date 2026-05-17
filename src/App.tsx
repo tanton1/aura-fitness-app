@@ -187,7 +187,7 @@ export default function App() {
   const isFullWidth = ['scheduler', 'overview', 'students', 'finance', 'hr', 'payroll'].includes(currentScreen);
 
   return (
-    <div className={`bg-zinc-950 min-h-screen font-sans text-zinc-100 relative overflow-hidden shadow-2xl ${isFullWidth ? 'w-full' : 'max-w-md mx-auto'}`}>
+    <div className={`bg-zinc-950 min-h-[100dvh] font-sans text-zinc-100 relative shadow-2xl pb-24 ${isFullWidth ? 'w-full' : 'max-w-md mx-auto overflow-x-hidden'}`}>
       <div className="p-4 flex justify-center">
       </div>
       <AnimatePresence mode="wait">

@@ -47,7 +47,7 @@ export default function BottomNav({ currentScreen, onNavigate, profile, isFullWi
   }
 
   return (
-    <div className={`fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 px-4 py-4 flex justify-between items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] ${isFullWidth ? '' : 'max-w-md mx-auto'}`}>
+    <div className={`fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex justify-between items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] ${isFullWidth ? '' : 'max-w-md mx-auto'}`}>
       {navItems.map(item => {
         const Icon = item.icon;
         const isActive = currentScreen === item.id;
