@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle, Plus, Activity, History, FileText, CreditCard, 
 import { motion, AnimatePresence } from 'motion/react';
 import ContractInvoice from './ContractInvoice';
 import EditContractModal from './EditContractModal';
+import AddSessionsModal from './AddSessionsModal';
 import RenewContractModal from './RenewContractModal';
 import StudentProgressAdmin from './StudentProgressAdmin';
 import ConfirmationModal from '../ConfirmationModal';
@@ -30,6 +31,10 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
+  const [customPackageName, setCustomPackageName] = useState('Gói tuỳ chỉnh');
+  const [customTotalSessions, setCustomTotalSessions] = useState(0);
+  const [customDurationMonths, setCustomDurationMonths] = useState(1);
+  const [customPrice, setCustomPrice] = useState(0);
   const [paidAmount, setPaidAmount] = useState('');
   const [discount, setDiscount] = useState('');
   const [installmentCount, setInstallmentCount] = useState(1);
@@ -37,6 +42,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   const [viewingContract, setViewingContract] = useState<StudentContract | null>(null);
   const [editingContract, setEditingContract] = useState<StudentContract | null>(null);
   const [renewingContract, setRenewingContract] = useState<StudentContract | null>(null);
+  const [addingSessionsContract, setAddingSessionsContract] = useState<StudentContract | null>(null);
   const [isManagingDebt, setIsManagingDebt] = useState(false);
   const [payingInstallmentId, setPayingInstallmentId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{title: string, message: string, onConfirm: () => void} | null>(null);
@@ -69,6 +75,15 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   }, [activeTab, student.id, allDailyCheckins]);
 
   useEffect(() => {
+    if (selectedPackageId === 'custom') {
+      if (startDate) {
+        const start = new Date(startDate);
+        const end = new Date(start.getTime() + customDurationMonths * 30 * 24 * 60 * 60 * 1000);
+        setEndDate(end.toISOString().split('T')[0]);
+      }
+      return;
+    }
+
     const pkg = packages.find(p => p.id === selectedPackageId);
     if (!pkg) {
       setEndDate('');
@@ -80,9 +95,27 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
       const end = new Date(start.getTime() + pkg.durationMonths * 30 * 24 * 60 * 60 * 1000);
       setEndDate(end.toISOString().split('T')[0]);
     }
-  }, [selectedPackageId, packages, startDate]);
+  }, [selectedPackageId, packages, startDate, customDurationMonths]);
 
   useEffect(() => {
+    if (selectedPackageId === 'custom') {
+      const discountAmount = Number(discount) || 0;
+      const debt = Math.max(0, customPrice - discountAmount - (Number(paidAmount) || 0));
+      if (debt <= 0) {
+        setInstallments([]);
+      } else {
+        setInstallments(prev => {
+          const base = Math.floor(debt / installmentCount);
+          const rem = debt % installmentCount;
+          return Array.from({ length: installmentCount }).map((_, i) => ({
+            date: prev[i]?.date || '',
+            amount: i === 0 ? base + rem : base
+          }));
+        });
+      }
+      return;
+    }
+
     const pkg = packages.find(p => p.id === selectedPackageId);
     if (!pkg) {
       setInstallments([]);
@@ -139,15 +172,28 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
   };
 
   const handleRegisterPackage = () => {
-    const pkg = packages.find(p => p.id === selectedPackageId);
-    if (!pkg) {
-      alert('Vui lòng chọn gói tập!');
-      return;
+    let pkgPrice = 0;
+    let pkgTotalSessions = 0;
+    let pkgName = '';
+
+    if (selectedPackageId === 'custom') {
+      pkgPrice = customPrice;
+      pkgTotalSessions = customTotalSessions;
+      pkgName = customPackageName;
+    } else {
+      const pkg = packages.find(p => p.id === selectedPackageId);
+      if (!pkg) {
+        alert('Vui lòng chọn gói tập!');
+        return;
+      }
+      pkgPrice = pkg.price;
+      pkgTotalSessions = pkg.totalSessions;
+      pkgName = pkg.name;
     }
 
     const amountPaid = Number(paidAmount) || 0;
     const discountAmount = Number(discount) || 0;
-    const debt = (pkg.price - discountAmount) - amountPaid;
+    const debt = (pkgPrice - discountAmount) - amountPaid;
     let finalInstallments: Installment[] = [];
 
     // Calculate referral commission if code is valid
@@ -155,7 +201,8 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     if (referralCode) {
       const referringPT = trainers.find(t => t.employeeCode === referralCode);
       if (referringPT) {
-        referralCommissionAmount = pkg.price * (referringPT.commissionRate / 100);
+        // For custom package, we can only do this if there's a base commission rate
+        referralCommissionAmount = pkgPrice * (referringPT.commissionRate / 100);
       }
     }
 
@@ -171,7 +218,7 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
     if (debt > 0) {
       const sum = installments.reduce((a, b) => a + b.amount, 0);
       if (sum !== debt) {
-        alert('Tổng số tiền các kỳ phải bằng số tiền còn nợ!');
+        alert('Tổng số tiền các kỳ trả góp phải bằng số tiền còn nợ!');
         return;
       }
       if (installments.some(i => !i.date)) {
@@ -195,13 +242,13 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
       trainerId: selectedTrainerIds[0] || undefined,
       trainerIds: selectedTrainerIds,
       branchId: selectedBranchId,
-      packageId: pkg.id,
-      packageName: pkg.name,
+      packageId: selectedPackageId === 'custom' ? `custom-${Date.now()}` : selectedPackageId,
+      packageName: pkgName,
       startDate: startDate,
       endDate: endDate,
-      totalSessions: pkg.totalSessions,
+      totalSessions: pkgTotalSessions,
       usedSessions: 0,
-      totalPrice: pkg.price,
+      totalPrice: pkgPrice,
       paidAmount: amountPaid,
       discount: discountAmount,
       status: 'active',
@@ -509,6 +556,14 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
             )}
             {activeContract && (
               <button 
+                onClick={() => setAddingSessionsContract(activeContract)}
+                className="text-xs font-medium text-purple-500 hover:text-purple-400 flex items-center gap-1 bg-purple-500/10 px-2 py-1 rounded-lg"
+              >
+                <Plus className="w-3 h-3" /> Mua thêm buổi
+              </button>
+            )}
+            {activeContract && (
+              <button 
                 onClick={() => setViewingContract(activeContract)}
                 className="text-xs font-medium text-pink-500 hover:text-pink-400 flex items-center gap-1 bg-pink-500/10 px-2 py-1 rounded-lg"
               >
@@ -762,11 +817,58 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
                     className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500"
                   >
                     <option value="">-- Chọn gói --</option>
+                    <option value="custom">Gói tuỳ chỉnh (Nhập tay)</option>
                     {packages.map(p => (
                       <option key={p.id} value={p.id}>{p.name} ({p.totalSessions} buổi - {p.price.toLocaleString('vi-VN')}đ)</option>
                     ))}
                   </select>
                 </div>
+
+                {selectedPackageId === 'custom' && (
+                  <div className="bg-zinc-950/50 p-4 rounded-xl border border-zinc-800 space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">Tên gói tập</label>
+                      <input 
+                        type="text" 
+                        value={customPackageName}
+                        onChange={e => setCustomPackageName(e.target.value)}
+                        className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Số buổi</label>
+                        <input 
+                          type="number" 
+                          min="1"
+                          value={customTotalSessions}
+                          onChange={e => setCustomTotalSessions(Number(e.target.value))}
+                          className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Thời hạn (Tháng)</label>
+                        <input 
+                          type="number" 
+                          min="1"
+                          value={customDurationMonths}
+                          onChange={e => setCustomDurationMonths(Number(e.target.value))}
+                          className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">Giá gói (VNĐ)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={customPrice}
+                        onChange={e => setCustomPrice(Number(e.target.value))}
+                        className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-1">Chọn cơ sở (Không bắt buộc)</label>
@@ -960,6 +1062,18 @@ export default function StudentDetail({ student, contracts, packages, trainers, 
           onClose={() => setRenewingContract(null)}
           student={student}
           latestContract={renewingContract}
+        />
+      )}
+
+      {addingSessionsContract && (
+        <AddSessionsModal
+          isOpen={true}
+          onClose={() => setAddingSessionsContract(null)}
+          contract={addingSessionsContract}
+          onSave={(updatedContract, skipPayment) => {
+            onUpdateContract(updatedContract, skipPayment);
+            setAddingSessionsContract(null);
+          }}
         />
       )}
 

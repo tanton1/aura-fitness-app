@@ -14,6 +14,10 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
   const { packages, trainers, addContract, updateContract, addPayment } = useDatabase();
   
   const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [customPackageName, setCustomPackageName] = useState('Gói tuỳ chỉnh');
+  const [customTotalSessions, setCustomTotalSessions] = useState(0);
+  const [customDurationMonths, setCustomDurationMonths] = useState(1);
+  const [customPrice, setCustomPrice] = useState(0);
   const [startDate, setStartDate] = useState('');
   const [carryOver, setCarryOver] = useState(true);
   const [discount, setDiscount] = useState<number | ''>('');
@@ -55,7 +59,14 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
     }
   }, [isOpen, latestContract, remainingSessions]);
 
-  const selectedPackage = packages.find(p => p.id === selectedPackageId);
+  const selectedPackage = selectedPackageId === 'custom' ? {
+    id: `custom-${Date.now()}`,
+    name: customPackageName,
+    price: customPrice,
+    totalSessions: customTotalSessions,
+    durationMonths: customDurationMonths
+  } : packages.find(p => p.id === selectedPackageId);
+
   const finalPrice = selectedPackage ? Math.max(0, selectedPackage.price - (Number(discount) || 0)) : 0;
   const newTotalSessions = selectedPackage ? selectedPackage.totalSessions + (carryOver ? remainingSessions : 0) : 0;
 
@@ -84,7 +95,7 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
     } else {
       setInstallments([]);
     }
-  }, [installmentCount, paidAmount, discount, selectedPackageId, packages, selectedPackage]);
+  }, [installmentCount, paidAmount, discount, selectedPackageId, packages, selectedPackage?.price, customPrice]);
 
   if (!isOpen) return null;
 
@@ -248,11 +259,58 @@ export default function RenewContractModal({ isOpen, onClose, student, latestCon
                     className="w-full bg-zinc-950 border border-zinc-800 text-white px-4 py-2.5 rounded-xl focus:outline-none focus:border-pink-500"
                   >
                     <option value="">-- Chọn gói tập --</option>
+                    <option value="custom">Gói tuỳ chỉnh (Nhập tay)</option>
                     {packages.map(p => (
                       <option key={p.id} value={p.id}>{p.name} ({p.totalSessions} buổi - {p.price.toLocaleString('vi-VN')}đ)</option>
                     ))}
                   </select>
                 </div>
+
+                {selectedPackageId === 'custom' && (
+                  <div className="col-span-1 md:col-span-2 bg-zinc-950/50 p-4 rounded-xl border border-zinc-800 space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">Tên gói tập</label>
+                      <input 
+                        type="text" 
+                        value={customPackageName}
+                        onChange={e => setCustomPackageName(e.target.value)}
+                        className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Số buổi</label>
+                        <input 
+                          type="number" 
+                          min="1"
+                          value={customTotalSessions}
+                          onChange={e => setCustomTotalSessions(Number(e.target.value))}
+                          className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">Thời hạn (Tháng)</label>
+                        <input 
+                          type="number" 
+                          min="1"
+                          value={customDurationMonths}
+                          onChange={e => setCustomDurationMonths(Number(e.target.value))}
+                          className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">Giá gói (VNĐ)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={customPrice}
+                        onChange={e => setCustomPrice(Number(e.target.value))}
+                        className="w-full p-3 rounded-xl border border-zinc-800 bg-zinc-950 text-white focus:outline-none focus:border-pink-500" 
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <label className="block text-sm text-zinc-400">Huấn luyện viên (Có thể chọn nhiều hơn 1)</label>
